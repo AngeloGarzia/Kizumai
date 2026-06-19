@@ -1,0 +1,12 @@
+CREATE TABLE IF NOT EXISTS projects (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  quoi VARCHAR(500) NOT NULL,
+  ou VARCHAR(500) NOT NULL,
+  source VARCHAR(20) NOT NULL DEFAULT 'manual',
+  ai_prompt TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects (user_id);

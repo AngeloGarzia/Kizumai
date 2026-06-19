@@ -1,0 +1,191 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+
+  /* Wasabi — vert lime */
+  --color-wasabi-50: #f7fae8;
+  --color-wasabi-100: #ecf4cc;
+  --color-wasabi-200: #d9ea9e;
+  --color-wasabi-300: #c0db6a;
+  --color-wasabi-400: #a8c82a;
+  --color-wasabi-500: #8fad1f;
+  --color-wasabi-600: #6d8816;
+  --color-wasabi-700: #536813;
+  --color-wasabi-800: #445314;
+  --color-wasabi-900: #3a4615;
+
+  /* Orange Topaze */
+  --color-topaz-50: #fef6ee;
+  --color-topaz-100: #fdebd6;
+  --color-topaz-200: #fad3ac;
+  --color-topaz-300: #f6b477;
+  --color-topaz-400: #f18d40;
+  --color-topaz-500: #e8722a;
+  --color-topaz-600: #d9571a;
+  --color-topaz-700: #b44217;
+  --color-topaz-800: #90361a;
+  --color-topaz-900: #742f18;
+
+  /* Prune noir */
+  --color-prune-50: #f6f0f4;
+  --color-prune-100: #ede0e8;
+  --color-prune-200: #dbc1d2;
+  --color-prune-300: #c19bb3;
+  --color-prune-400: #a47190;
+  --color-prune-500: #8a5574;
+  --color-prune-600: #6f425c;
+  --color-prune-700: #5a3549;
+  --color-prune-800: #3d2433;
+  --color-prune-900: #1a0f1c;
+  --color-prune-950: #120a14;
+
+  /* Bleu azure — filigrane */
+  --color-azure-50: #f0f8ff;
+  --color-azure-100: #dbeafe;
+  --color-azure-200: #bfdbfe;
+  --color-azure-300: #7ec8f2;
+  --color-azure-400: #38a8e8;
+  --color-azure-500: #0078d4;
+  --color-azure-600: #0066b8;
+  --color-azure-700: #005499;
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply font-sans text-prune-900 antialiased;
+    background-color: #f4f8fc;
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%230078D4' stroke-opacity='0.07' stroke-width='0.65'%3E%3Cpath d='M60 10 L68 46 L104 60 L68 74 L60 110 L52 74 L16 60 L52 46 Z'/%3E%3Ccircle cx='60' cy='60' r='38'/%3E%3Ccircle cx='60' cy='60' r='24'/%3E%3Cpath d='M0 60 H120 M60 0 V120' stroke-opacity='0.04'/%3E%3C/g%3E%3C/svg%3E"),
+      radial-gradient(ellipse 85% 55% at 5% 0%, rgba(0, 120, 212, 0.09), transparent 58%),
+      radial-gradient(ellipse 75% 50% at 100% 100%, rgba(0, 120, 212, 0.06), transparent 52%);
+    background-size: 120px 120px, 100% 100%, 100% 100%;
+    background-attachment: fixed;
+  }
+}
+
+@layer components {
+  /* Fond filigrané bleu azure — pages claires */
+  .page-bg {
+    background-color: #f4f8fc;
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%230078D4' stroke-opacity='0.07' stroke-width='0.65'%3E%3Cpath d='M60 10 L68 46 L104 60 L68 74 L60 110 L52 74 L16 60 L52 46 Z'/%3E%3Ccircle cx='60' cy='60' r='38'/%3E%3Ccircle cx='60' cy='60' r='24'/%3E%3Cpath d='M0 60 H120 M60 0 V120' stroke-opacity='0.04'/%3E%3C/g%3E%3C/svg%3E"),
+      radial-gradient(ellipse 85% 55% at 5% 0%, rgba(0, 120, 212, 0.09), transparent 58%),
+      radial-gradient(ellipse 75% 50% at 100% 100%, rgba(0, 120, 212, 0.06), transparent 52%);
+    background-size: 120px 120px, 100% 100%, 100% 100%;
+    background-attachment: fixed;
+  }
+
+  /* Fond filigrané azure sur fond sombre */
+  .page-bg-dark {
+    background-color: #1a0f1c;
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%2338A8E8' stroke-opacity='0.09' stroke-width='0.65'%3E%3Cpath d='M60 10 L68 46 L104 60 L68 74 L60 110 L52 74 L16 60 L52 46 Z'/%3E%3Ccircle cx='60' cy='60' r='38'/%3E%3Ccircle cx='60' cy='60' r='24'/%3E%3Cpath d='M0 60 H120 M60 0 V120' stroke-opacity='0.05'/%3E%3C/g%3E%3C/svg%3E"),
+      radial-gradient(ellipse 80% 50% at 50% 0%, rgba(56, 168, 232, 0.12), transparent 60%),
+      radial-gradient(ellipse 60% 40% at 0% 100%, rgba(0, 120, 212, 0.08), transparent 55%);
+    background-size: 120px 120px, 100% 100%, 100% 100%;
+    background-attachment: fixed;
+  }
+
+  .header-glass {
+    @apply bg-white/65 backdrop-blur-md border-b border-azure-200/40;
+  }
+
+  .header-glass-dark {
+    @apply bg-prune-950/70 backdrop-blur-md border-b border-azure-500/10;
+  }
+
+  /* Auth : fond sombre mobile, clair desktop */
+  .page-bg-auth {
+    background-color: #1a0f1c;
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%2338A8E8' stroke-opacity='0.09' stroke-width='0.65'%3E%3Cpath d='M60 10 L68 46 L104 60 L68 74 L60 110 L52 74 L16 60 L52 46 Z'/%3E%3Ccircle cx='60' cy='60' r='38'/%3E%3Ccircle cx='60' cy='60' r='24'/%3E%3Cpath d='M0 60 H120 M60 0 V120' stroke-opacity='0.05'/%3E%3C/g%3E%3C/svg%3E"),
+      radial-gradient(ellipse 80% 50% at 50% 0%, rgba(56, 168, 232, 0.12), transparent 60%),
+      radial-gradient(ellipse 60% 40% at 0% 100%, rgba(0, 120, 212, 0.08), transparent 55%);
+    background-size: 120px 120px, 100% 100%, 100% 100%;
+    background-attachment: fixed;
+  }
+
+  @media (min-width: 1024px) {
+    .page-bg-auth {
+      background-color: #f4f8fc;
+      background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%230078D4' stroke-opacity='0.07' stroke-width='0.65'%3E%3Cpath d='M60 10 L68 46 L104 60 L68 74 L60 110 L52 74 L16 60 L52 46 Z'/%3E%3Ccircle cx='60' cy='60' r='38'/%3E%3Ccircle cx='60' cy='60' r='24'/%3E%3Cpath d='M0 60 H120 M60 0 V120' stroke-opacity='0.04'/%3E%3C/g%3E%3C/svg%3E"),
+        radial-gradient(ellipse 85% 55% at 5% 0%, rgba(0, 120, 212, 0.09), transparent 58%),
+        radial-gradient(ellipse 75% 50% at 100% 100%, rgba(0, 120, 212, 0.06), transparent 52%);
+    }
+  }
+
+  .page-container {
+    @apply w-full mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl;
+  }
+
+  .card {
+    @apply bg-white rounded-2xl border border-prune-100 shadow-sm;
+  }
+
+  .input-field {
+    @apply w-full min-h-11 px-4 py-2.5 text-base sm:text-sm
+           bg-white border border-prune-200 rounded-xl
+           text-prune-900 placeholder:text-prune-400
+           focus:outline-none focus:ring-2 focus:ring-wasabi-400 focus:border-wasabi-400
+           transition-shadow;
+  }
+
+  .btn-primary {
+    @apply w-full min-h-11 px-5 py-2.5
+           bg-wasabi-400 text-prune-950 font-semibold rounded-xl
+           hover:bg-wasabi-500 active:bg-wasabi-600
+           focus:outline-none focus:ring-2 focus:ring-wasabi-300 focus:ring-offset-2
+           transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply min-h-11 px-4 py-2.5
+           text-sm font-medium text-prune-800
+           bg-prune-100 rounded-xl
+           hover:bg-prune-200 active:bg-prune-300
+           focus:outline-none focus:ring-2 focus:ring-prune-300
+           transition-colors;
+  }
+
+  .link-accent {
+    @apply text-topaz-600 font-semibold hover:text-topaz-500 hover:underline;
+  }
+
+  .label-field {
+    @apply block text-sm font-medium text-prune-800 mb-1.5;
+  }
+
+  .alert-error {
+    @apply text-sm text-topaz-800 bg-topaz-50 border border-topaz-200 px-4 py-3 rounded-xl;
+  }
+
+  .btn-cta {
+    @apply min-h-12 px-6 py-3.5
+           bg-gradient-to-r from-topaz-500 to-topaz-400
+           text-white font-semibold rounded-full
+           hover:from-topaz-600 hover:to-topaz-500
+           shadow-lg shadow-topaz-500/30
+           flex items-center justify-center gap-3
+           transition-all active:scale-[0.98]
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-cta-overlay {
+    @apply min-h-12 px-8 py-3.5
+           bg-gradient-to-r from-topaz-500 to-topaz-400
+           text-white text-base sm:text-lg font-bold rounded-full
+           hover:from-topaz-600 hover:to-topaz-500
+           transition-all active:scale-[0.95]
+           border-2 border-white/20;
+  }
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
