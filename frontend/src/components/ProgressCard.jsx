@@ -21,7 +21,7 @@ function ProgressRing({ percent = 65 }) {
         <defs>
           <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stopColor="#a8c82a" />
-            <stop offset="100%" stopColor="#e8722a" />
+            <stop offset="100%" stopColor="#c0db6a" />
           </linearGradient>
         </defs>
       </svg>
@@ -51,7 +51,7 @@ function Timeline() {
             <div
               className={`w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full shrink-0 flex items-center justify-center
                 ${step.status === 'done' ? 'bg-wasabi-400' : ''}
-                ${step.status === 'current' ? 'bg-topaz-400 ring-2 ring-topaz-400/40' : ''}
+                ${step.status === 'current' ? 'bg-wasabi-400 ring-2 ring-wasabi-300/50' : ''}
                 ${step.status === 'upcoming' ? 'bg-white/25' : ''}`}
             >
               {step.status === 'done' && (
@@ -105,7 +105,7 @@ export default function ProgressCard({ showOverlay = true, onCreateFuture }) {
 
         <div className="mt-4 sm:mt-5 flex items-center justify-between gap-3 p-3 rounded-2xl bg-black/25 border border-white/10">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-topaz-400 shrink-0">
+            <span className="text-wasabi-400 shrink-0">
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
                 <rect x="3" y="8" width="18" height="13" rx="2" />
                 <path d="M12 8v13M3 12h18" />

@@ -1,47 +1,13 @@
 import { IconBulb, IconChevronRight, IconPin, IconUser } from './icons.jsx';
 
 const modules = [
-  {
-    title: 'Bilan de compétences',
-    percent: 80,
-    icon: IconUser,
-    accent: 'wasabi',
-  },
-  {
-    title: 'Idées rentables',
-    percent: 60,
-    icon: IconBulb,
-    accent: 'topaz',
-  },
-  {
-    title: 'Lieu stratégique',
-    percent: 20,
-    icon: IconPin,
-    accent: 'prune',
-  },
+  { title: 'Bilan de compétences', percent: 80, icon: IconUser },
+  { title: 'Idées rentables', percent: 60, icon: IconBulb },
+  { title: 'Lieu stratégique', percent: 20, icon: IconPin },
 ];
-
-const accentStyles = {
-  wasabi: {
-    icon: 'bg-wasabi-100 text-wasabi-600',
-    bar: 'bg-wasabi-400',
-    btn: 'bg-wasabi-400 hover:bg-wasabi-500',
-  },
-  topaz: {
-    icon: 'bg-topaz-100 text-topaz-600',
-    bar: 'bg-topaz-500',
-    btn: 'bg-topaz-500 hover:bg-topaz-600',
-  },
-  prune: {
-    icon: 'bg-prune-100 text-prune-700',
-    bar: 'bg-prune-600',
-    btn: 'bg-prune-800 hover:bg-prune-900',
-  },
-};
 
 function ModuleCard({ module, locked = false, onClick }) {
   const Icon = module.icon;
-  const styles = accentStyles[module.accent];
 
   return (
     <button
@@ -51,7 +17,7 @@ function ModuleCard({ module, locked = false, onClick }) {
                   transition-transform active:scale-[0.98] hover:shadow-md
                   ${locked ? 'opacity-90' : ''}`}
     >
-      <span className={`flex items-center justify-center w-11 h-11 rounded-2xl mb-3 ${styles.icon}`}>
+      <span className="flex items-center justify-center w-11 h-11 rounded-2xl mb-3 bg-prune-100 text-prune-700">
         <Icon className="w-6 h-6" />
       </span>
 
@@ -62,13 +28,13 @@ function ModuleCard({ module, locked = false, onClick }) {
       <div className="w-full">
         <div className="h-1.5 bg-prune-100 rounded-full overflow-hidden">
           <div
-            className={`h-full rounded-full ${styles.bar}`}
+            className="h-full rounded-full bg-wasabi-400"
             style={{ width: `${module.percent}%` }}
           />
         </div>
         <div className="flex items-center justify-between mt-3">
-          <span className="text-xs font-medium text-prune-500">{module.percent}%</span>
-          <span className={`flex items-center justify-center w-8 h-8 rounded-full text-white ${styles.btn}`}>
+          <span className="text-xs font-semibold text-wasabi-700">{module.percent}%</span>
+          <span className="flex items-center justify-center w-8 h-8 rounded-full text-white bg-topaz-500 hover:bg-topaz-600">
             <IconChevronRight className="w-4 h-4" />
           </span>
         </div>

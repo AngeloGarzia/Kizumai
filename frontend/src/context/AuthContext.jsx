@@ -39,8 +39,8 @@ export function AuthProvider({ children }) {
     return loggedUser;
   };
 
-  const register = async (name, email, password) => {
-    const newUser = await authService.register(name, email, password);
+  const register = async (name, email, password, plan = 'free') => {
+    const newUser = await authService.register({ name, email, password, plan });
     setUser(newUser);
     return newUser;
   };
@@ -60,6 +60,8 @@ export function AuthProvider({ children }) {
       isAuthenticated: !!user,
       isAdmin: user?.role === 'admin',
       isUser: user?.role === 'user' || user?.role === 'admin',
+      isPaid: user?.role === 'admin' || user?.plan === 'paid',
+      loadUser,
     }}
     >
       {children}

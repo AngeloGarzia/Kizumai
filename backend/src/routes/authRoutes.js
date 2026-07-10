@@ -10,5 +10,6 @@ router.post('/login', authRateLimiter, AuthController.login);
 router.post('/refresh', authRateLimiter, AuthController.refresh);
 router.post('/logout', AuthController.logout);
 router.get('/me', authenticate, AuthController.me);
+router.post('/upgrade', authenticate, AuthController.upgrade);
 
 export default router;

@@ -8,7 +8,7 @@ import { IconRocket, IconChevronRight } from '../components/icons.jsx';
 
 export default function Home() {
   const navigate = useNavigate();
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, isPaid, loading } = useAuth();
 
   const goToCreateFuture = () => navigate('/creer-son-avenir');
   const goToAuth = () => navigate(isAuthenticated ? '/dashboard' : '/register');
@@ -28,8 +28,8 @@ export default function Home() {
             <BrandLogo size="md" className="mx-auto lg:mx-0" />
             <Link
               to={isAuthenticated ? '/dashboard' : '/login'}
-              className="flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-prune-900 text-wasabi-400 shrink-0
-                         hover:bg-prune-800 transition-colors"
+              className="flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-prune-100 text-prune-700 shrink-0
+                         hover:bg-prune-200 transition-colors"
               aria-label={isAuthenticated ? 'Mon profil' : 'Se connecter'}
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
@@ -43,13 +43,13 @@ export default function Home() {
         <main className="page-container flex-1 space-y-6 sm:space-y-8 lg:space-y-10 max-w-2xl lg:max-w-4xl">
           {/* Accueil */}
           <section className="text-center lg:text-left">
-            <p className="text-xs sm:text-sm font-semibold tracking-widest text-topaz-600 uppercase">
+            <p className="text-xs sm:text-sm font-semibold tracking-widest text-prune-600 uppercase">
               Bonjour ! 👋
             </p>
             <h1 className="mt-2 text-2xl sm:text-3xl lg:text-4xl font-bold text-prune-900 leading-tight">
-              Bienvenue dans ton parcours{' '}
+              Allons-y,{' '}
               <span className="relative inline-block text-wasabi-600">
-                entrepreneurial
+                go
                 <span className="absolute -bottom-1 left-0 right-0 h-1 bg-wasabi-300/60 rounded-full" />
               </span>
             </h1>
@@ -60,13 +60,13 @@ export default function Home() {
 
           {/* Carte progression + surimpression */}
           <ProgressCard
-            showOverlay={!loading && !isAuthenticated}
+            showOverlay={!loading && (!isAuthenticated || !isPaid)}
             onCreateFuture={goToCreateFuture}
           />
 
           {/* Modules */}
           <ModulesSection
-            locked={!isAuthenticated}
+            locked={!isAuthenticated || !isPaid}
             onModuleClick={goToAuth}
             onViewAll={goToAuth}
           />

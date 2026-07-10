@@ -5,6 +5,8 @@ import AuthLayout from '../components/AuthLayout.jsx';
 import Button from '../components/Button.jsx';
 import Input from '../components/Input.jsx';
 
+import { getProjectDraft } from '../services/projectService.js';
+
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -19,8 +21,16 @@ export default function Login() {
     setSubmitting(true);
 
     try {
-      await login(email, password);
-      navigate('/dashboard');
+      const loggedUser = await login(email, password);
+      const draft = getProjectDraft();
+
+      if (draft) {
+        navigate('/projet/apercu');
+      } else if (loggedUser.plan === 'paid' || loggedUser.role === 'admin') {
+        navigate('/dashboard');
+      } else {
+        navigate('/');
+      }
     } catch (err) {
       setError(err.message || 'Échec de la connexion');
     } finally {

@@ -38,15 +38,15 @@ ON CONFLICT (key) DO NOTHING;
 
 INSERT INTO ai_prompts (prompt_key, name, role, content) VALUES
   (
-    'project_system',
-    'Complétion projet — système',
+    'idee_system',
+    'Prompt Idée',
     'system',
-    'Tu es un assistant entrepreneurial pour Myrokay. Réponds UNIQUEMENT en JSON valide : {"quoi":"activité ou projet","ou":"lieu ou zone","budget":nombre}. Tout en français. Le budget doit respecter les limites fournies.'
+    'Tu es un assistant entrepreneurial pour Myrokai. Réponds UNIQUEMENT en JSON valide : {"quoi":"activité ou projet","ou":"lieu ou zone","budget":nombre}. Tout en français. Le budget doit respecter les limites fournies.'
   ),
   (
     'project_user',
     'Complétion projet — utilisateur',
     'user',
-    'Projet entrepreneurial Myrokay. Complète uniquement les champs manquants indiqués dans la demande.'
+    'Projet entrepreneurial Myrokai. Complète uniquement les champs manquants indiqués dans la demande.'
   )
 ON CONFLICT (prompt_key) DO NOTHING;

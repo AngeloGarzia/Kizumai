@@ -1,8 +1,8 @@
 import { api } from './api.js';
 
 export const authService = {
-  async register(name, email, password) {
-    const { data } = await api.post('/auth/register', { name, email, password });
+  async register({ name, email, password, plan = 'free' }) {
+    const { data } = await api.post('/auth/register', { name, email, password, plan });
     return data.user;
   },
 
@@ -22,6 +22,11 @@ export const authService = {
 
   async refreshSession() {
     const { data } = await api.post('/auth/refresh');
+    return data.user;
+  },
+
+  async upgradeToPaid() {
+    const { data } = await api.post('/auth/upgrade');
     return data.user;
   },
 };

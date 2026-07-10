@@ -3,11 +3,24 @@ import { asyncHandler } from '../utils/AppError.js';
 import { successResponse } from '../utils/response.js';
 
 export const ProjectController = {
+  preview: asyncHandler(async (req, res) => {
+    const { quoi, ou, budget, currency } = req.body;
+
+    const preview = await ProjectService.previewProject({
+      quoi,
+      ou,
+      budget: budget === '' || budget === undefined ? null : budget,
+      currency: currency || 'EUR',
+    });
+
+    successResponse(res, { preview });
+  }),
+
   create: asyncHandler(async (req, res) => {
     const { quoi, ou, budget, currency } = req.body;
 
     const project = await ProjectService.startProject({
-      userId: req.user?.id,
+      user: req.user,
       quoi,
       ou,
       budget: budget === '' || budget === undefined ? null : budget,

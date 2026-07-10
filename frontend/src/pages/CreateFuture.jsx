@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext.jsx';
 import BrandLogo from '../components/BrandLogo.jsx';
 import Button from '../components/Button.jsx';
 import Input from '../components/Input.jsx';
@@ -10,7 +9,6 @@ import { IconChevronRight } from '../components/icons.jsx';
 
 export default function CreateFuture() {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
 
   const [quoi, setQuoi] = useState('');
   const [ou, setOu] = useState('');
@@ -19,35 +17,30 @@ export default function CreateFuture() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const hasAtLeastOneField = Boolean(quoi.trim() || ou.trim() || budget != null);
+  const hasQuoi = Boolean(quoi.trim());
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    if (!hasAtLeastOneField) {
-      setError('Renseignez au moins un champ : Quoi, Où ou Budget');
+    if (!hasQuoi) {
+      setError('Décrivez votre idée pour lancer la recherche');
       return;
     }
 
     setSubmitting(true);
 
     const payload = {
-      quoi: quoi.trim() || null,
+      quoi: quoi.trim(),
       ou: ou.trim() || null,
       budget,
       currency,
     };
 
     try {
-      const project = await projectService.createProject(payload);
-
-      if (isAuthenticated) {
-        navigate('/dashboard');
-      } else {
-        saveProjectDraft(project);
-        navigate('/register');
-      }
+      const preview = await projectService.previewProject(payload);
+      saveProjectDraft(preview);
+      navigate('/projet/apercu');
     } catch (err) {
       setError(err.message || 'Impossible de démarrer le projet');
     } finally {
@@ -75,7 +68,7 @@ export default function CreateFuture() {
 
       <main className="page-container flex-1 py-6 sm:py-10 max-w-2xl">
         <section className="text-center sm:text-left mb-6 sm:mb-8">
-          <p className="text-xs sm:text-sm font-semibold tracking-widest text-topaz-600 uppercase">
+          <p className="text-xs sm:text-sm font-semibold tracking-widest text-prune-600 uppercase">
             Nouveau projet
           </p>
           <h1 className="mt-2 text-2xl sm:text-3xl font-bold text-prune-900">
@@ -90,10 +83,11 @@ export default function CreateFuture() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <Input
               id="quoi"
-              label="Quoi ?"
+              label="Une idée, une envie ?"
               value={quoi}
               onChange={(e) => setQuoi(e.target.value)}
               placeholder="Ex : Boutique de produits locaux bio"
+              required
             />
 
             <Input
@@ -111,21 +105,19 @@ export default function CreateFuture() {
               onCurrencyChange={setCurrency}
             />
 
-            <p className="text-xs text-prune-500 bg-azure-50/60 border border-azure-200/50 rounded-xl px-4 py-3">
-              Au moins un champ est requis. Les champs vides seront complétés automatiquement par l&apos;IA.
+            <p className="text-xs text-prune-600 bg-prune-50 border border-prune-200 rounded-xl px-4 py-3">
+              Votre idée est requise. Le lieu et le budget peuvent être complétés automatiquement par l&apos;IA.
             </p>
 
             {error && <p className="alert-error">{error}</p>}
 
-            <Button type="submit" disabled={submitting || !hasAtLeastOneField}>
-              {submitting ? 'Recherche et démarrage...' : 'Démarrer mon projet'}
+            <Button type="submit" disabled={submitting || !hasQuoi}>
+              {submitting ? 'Recherche en cours...' : 'Lancer la recherche'}
             </Button>
 
-            {!isAuthenticated && (
-              <p className="text-xs text-center text-prune-500">
-                Vous serez invité à créer un compte pour sauvegarder votre projet.
-              </p>
-            )}
+            <p className="text-xs text-center text-prune-500">
+              Vous verrez un aperçu en lecture seule. Un compte payant est requis pour continuer.
+            </p>
           </form>
         </div>
 

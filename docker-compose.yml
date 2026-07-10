@@ -1,18 +1,20 @@
+name: myrokai
+
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: myrokay-postgres
+    container_name: myrokai-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: myrokay
-      POSTGRES_PASSWORD: myrokay
-      POSTGRES_DB: myrokay
+      POSTGRES_USER: myrokai
+      POSTGRES_PASSWORD: myrokai
+      POSTGRES_DB: myrokai
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U myrokay -d myrokay"]
+      test: ["CMD-SHELL", "pg_isready -U myrokai -d myrokai"]
       interval: 5s
       timeout: 5s
       retries: 5

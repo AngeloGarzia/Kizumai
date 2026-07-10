@@ -1,7 +1,7 @@
 {
-  "name": "myrokay-backend",
+  "name": "myrokai-backend",
   "version": "1.0.0",
-  "description": "Backend Myrokay - Architecture MVC en couches",
+  "description": "Backend Myrokai - Architecture MVC en couches",
   "main": "src/server.js",
   "type": "module",
   "scripts": {

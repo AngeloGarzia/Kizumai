@@ -10,7 +10,7 @@ export default function BrandLogo({ className = '', size = 'md' }) {
 
   return (
     <Link to="/" className={`inline-flex items-center gap-1.5 font-bold tracking-tight ${sizes[size]} ${className}`}>
-      <span className="text-prune-900">Myrokay</span>
+      <span className="text-prune-900">Myrokai</span>
       <IconStar className="w-4 h-4 sm:w-5 sm:h-5 text-wasabi-400" />
     </Link>
   );

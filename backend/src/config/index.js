@@ -20,9 +20,9 @@ function buildDatabaseUrl() {
 
   const host = process.env.DB_HOST || 'localhost';
   const port = process.env.DB_PORT || '5432';
-  const name = process.env.DB_NAME || 'myrokay';
-  const user = process.env.DB_USER || 'myrokay';
-  const password = process.env.DB_PASSWORD || 'myrokay';
+  const name = process.env.DB_NAME || 'myrokai';
+  const user = process.env.DB_USER || 'myrokai';
+  const password = process.env.DB_PASSWORD || 'myrokai';
 
   return `postgresql://${user}:${password}@${host}:${port}/${name}`;
 }
@@ -91,8 +91,8 @@ export const config = {
   },
 
   cookies: {
-    accessName: 'myrokay_access',
-    refreshName: 'myrokay_refresh',
+    accessName: 'myrokai_access',
+    refreshName: 'myrokai_refresh',
     httpOnly: true,
     secure: isProd,
     sameSite: isProd ? 'strict' : 'lax',

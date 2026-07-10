@@ -92,7 +92,7 @@ export default function Admin() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold tracking-widest text-topaz-600 uppercase">Administration</p>
+            <p className="text-xs font-semibold tracking-widest text-prune-600 uppercase">Administration</p>
             <h1 className="text-2xl sm:text-3xl font-bold text-prune-900">Panneau administrateur</h1>
             <p className="text-sm text-prune-500 mt-1">
               L&apos;administrateur hérite de tous les droits utilisateur.
@@ -111,7 +111,7 @@ export default function Admin() {
               onClick={() => setTab(item.id)}
               className={`shrink-0 px-4 py-2 rounded-xl text-sm font-semibold transition-colors
                 ${tab === item.id
-                  ? 'bg-prune-900 text-wasabi-400'
+                  ? 'bg-prune-900 text-white'
                   : 'bg-white border border-prune-100 text-prune-600 hover:bg-prune-50'}`}
             >
               {item.label}
@@ -120,11 +120,7 @@ export default function Admin() {
         </div>
 
         {error && <p className="alert-error">{error}</p>}
-        {message && (
-          <p className="text-sm text-wasabi-700 bg-wasabi-50 border border-wasabi-200 px-4 py-3 rounded-xl">
-            {message}
-          </p>
-        )}
+        {message && <p className="alert-success">{message}</p>}
 
         {loading ? (
           <p className="text-prune-500">Chargement...</p>
@@ -177,13 +173,13 @@ export default function Admin() {
                         setPrompts(next);
                       }}
                     />
-                    <button
+                    <Button
                       type="button"
                       onClick={() => savePrompt(prompts.find((p) => p.key === prompt.key))}
-                      className="btn-secondary text-sm"
+                      className="w-auto text-sm"
                     >
                       Enregistrer ce prompt
-                    </button>
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -223,7 +219,7 @@ export default function Admin() {
                             <td className="px-4 py-3">
                               <span className={`px-2 py-1 rounded-lg text-xs font-semibold
                                 ${user.role === 'admin'
-                                  ? 'bg-topaz-100 text-topaz-800'
+                                  ? 'bg-wasabi-100 text-wasabi-800'
                                   : 'bg-prune-100 text-prune-700'}`}
                               >
                                 {user.role === 'admin' ? 'Administrateur' : 'Utilisateur'}
@@ -267,7 +263,7 @@ export default function Admin() {
                           </td>
                           <td className="px-4 py-3">{conn.email || '—'}</td>
                           <td className="px-4 py-3">
-                            <span className="px-2 py-1 rounded-lg bg-azure-50 text-azure-700 text-xs font-medium">
+                            <span className="px-2 py-1 rounded-lg bg-prune-100 text-prune-700 text-xs font-medium">
                               {conn.action}
                             </span>
                           </td>

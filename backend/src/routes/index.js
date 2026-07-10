@@ -15,7 +15,7 @@ router.get('/health', asyncHandler(async (req, res) => {
 
   res.status(dbHealthy ? 200 : 503).json({
     status: dbHealthy ? 'ok' : 'degraded',
-    message: dbHealthy ? 'Myrokay API opérationnelle' : 'Base de données indisponible',
+    message: dbHealthy ? 'Myrokai API opérationnelle' : 'Base de données indisponible',
     environment: config.nodeEnv,
     database: dbHealthy ? 'connected' : 'disconnected',
   });

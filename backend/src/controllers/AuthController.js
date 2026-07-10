@@ -48,4 +48,9 @@ export const AuthController = {
   me: asyncHandler(async (req, res) => {
     successResponse(res, { user: req.user });
   }),
+
+  upgrade: asyncHandler(async (req, res) => {
+    const user = await AuthService.upgradeToPaid(req.user.id);
+    successResponse(res, { user });
+  }),
 };

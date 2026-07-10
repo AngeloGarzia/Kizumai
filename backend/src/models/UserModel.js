@@ -10,6 +10,7 @@ const mapUser = (row) => {
     password: row.password,
     refreshTokenVersion: row.refresh_token_version,
     role: row.role || 'user',
+    plan: row.plan || 'free',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -39,12 +40,12 @@ export const UserModel = {
     return mapUser(rows[0]);
   },
 
-  async create({ name, email, password, role = 'user' }) {
+  async create({ name, email, password, role = 'user', plan = 'free' }) {
     const { rows } = await pool.query(
-      `INSERT INTO users (name, email, password, role)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO users (name, email, password, role, plan)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [name, email.toLowerCase(), password, role]
+      [name, email.toLowerCase(), password, role, plan]
     );
     return mapUser(rows[0]);
   },
@@ -53,6 +54,14 @@ export const UserModel = {
     const { rows } = await pool.query(
       `UPDATE users SET role = $2, updated_at = NOW() WHERE id = $1 RETURNING *`,
       [Number(id), role]
+    );
+    return mapUser(rows[0]);
+  },
+
+  async updatePlan(id, plan) {
+    const { rows } = await pool.query(
+      `UPDATE users SET plan = $2, updated_at = NOW() WHERE id = $1 RETURNING *`,
+      [Number(id), plan]
     );
     return mapUser(rows[0]);
   },

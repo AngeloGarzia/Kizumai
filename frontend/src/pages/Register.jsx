@@ -1,13 +1,20 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import AuthLayout from '../components/AuthLayout.jsx';
 import Button from '../components/Button.jsx';
 import Input from '../components/Input.jsx';
+import {
+  clearProjectDraft,
+  getProjectDraft,
+  projectService,
+} from '../services/projectService.js';
 
 export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isPaidSignup = searchParams.get('plan') === 'paid';
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,8 +27,18 @@ export default function Register() {
     setSubmitting(true);
 
     try {
-      await register(name, email, password);
-      navigate('/dashboard');
+      await register(name, email, password, isPaidSignup ? 'paid' : 'free');
+
+      const draft = getProjectDraft();
+      if (isPaidSignup && draft) {
+        await projectService.createProject(draft);
+        clearProjectDraft();
+        navigate('/dashboard');
+      } else if (draft) {
+        navigate('/projet/apercu');
+      } else {
+        navigate(isPaidSignup ? '/dashboard' : '/');
+      }
     } catch (err) {
       setError(err.message || 'Échec de l\'inscription');
     } finally {
@@ -30,7 +47,14 @@ export default function Register() {
   };
 
   return (
-    <AuthLayout title="Inscription" subtitle="Créez votre compte Myrokay">
+    <AuthLayout
+      title={isPaidSignup ? 'Compte payant' : 'Inscription'}
+      subtitle={
+        isPaidSignup
+          ? 'Débloquez l\'accès au parcours complet Myrokai'
+          : 'Créez votre compte Myrokai'
+      }
+    >
       <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
         <Input
           id="name"
@@ -64,10 +88,20 @@ export default function Register() {
           hint="Minimum 8 caractères"
         />
 
+        {isPaidSignup && (
+          <p className="text-xs text-prune-600 bg-prune-50 border border-prune-200 rounded-xl px-4 py-3">
+            Votre aperçu projet sera enregistré après inscription. Paiement simulé en développement.
+          </p>
+        )}
+
         {error && <p className="alert-error">{error}</p>}
 
         <Button type="submit" disabled={submitting}>
-          {submitting ? 'Inscription...' : 'S\'inscrire'}
+          {submitting
+            ? 'Inscription...'
+            : isPaidSignup
+              ? 'Créer mon compte payant'
+              : 'S\'inscrire'}
         </Button>
       </form>
 

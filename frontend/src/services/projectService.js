@@ -1,13 +1,18 @@
 import { api } from './api.js';
 
 export const projectService = {
+  async previewProject({ quoi, ou, budget, currency }) {
+    const { data } = await api.post('/projects/preview', { quoi, ou, budget, currency });
+    return data.preview;
+  },
+
   async createProject({ quoi, ou, budget, currency }) {
     const { data } = await api.post('/projects', { quoi, ou, budget, currency });
     return data.project;
   },
 };
 
-export const PROJECT_DRAFT_KEY = 'myrokay_project_draft';
+export const PROJECT_DRAFT_KEY = 'myrokai_project_draft';
 
 export function saveProjectDraft(draft) {
   sessionStorage.setItem(PROJECT_DRAFT_KEY, JSON.stringify(draft));

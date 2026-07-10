@@ -6,7 +6,7 @@ function BrandMark() {
         <span className="w-2 h-2 rounded-full bg-topaz-500" />
         <span className="w-2 h-2 rounded-full bg-prune-900" />
       </span>
-      <span className="text-lg sm:text-xl font-bold text-prune-900">Myrokay</span>
+      <span className="text-lg sm:text-xl font-bold text-prune-900">Myrokai</span>
     </div>
   );
 }

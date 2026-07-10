@@ -13,7 +13,7 @@ function buildPrompt({ quoi, ou, budget, currency }, limits) {
   if (!ou) missing.push('ou');
   if (budget == null) missing.push('budget');
 
-  return `Projet entrepreneurial Myrokay.
+  return `Projet entrepreneurial Myrokai.
 ${parts.length ? parts.join('\n') : 'Aucune information fournie.'}
 Complète uniquement les champs manquants : ${missing.join(', ')}.
 Le budget doit être un entier entre ${limits.min} et ${limits.max} en ${currency || 'EUR'}.`;
@@ -24,9 +24,13 @@ import { SettingsService } from './SettingsService.js';
 async function completeWithOpenAI(fields, limits) {
   const aiConfig = await SettingsService.getAiConfig();
   const needsOu = !fields.ou;
-  let systemContent = `${aiConfig.systemPrompt} Budget entier entre ${limits.min} et ${limits.max}.`;
+  const needsBudget = fields.budget == null;
+  let systemContent = `${aiConfig.ideeSystemPrompt} Budget entier entre ${limits.min} et ${limits.max}.`;
   if (needsOu && aiConfig.lieuxPrompt) {
     systemContent += `\n\n${aiConfig.lieuxPrompt}`;
+  }
+  if (needsBudget && aiConfig.budgetPrompt) {
+    systemContent += `\n\n${aiConfig.budgetPrompt}`;
   }
   const userContent = `${aiConfig.userPromptTemplate}\n\n${buildPrompt(fields, limits)}`;
 
@@ -116,16 +120,16 @@ export const AiService = {
     const hasOu = Boolean(fields.ou?.trim());
     const hasBudget = fields.budget != null && fields.budget !== '';
 
-    if (!hasQuoi && !hasOu && !hasBudget) {
-      throw new AppError('Renseignez au moins un champ : Quoi, Où ou Budget', 400);
+    if (!hasQuoi) {
+      throw new AppError('Décrivez votre idée pour lancer la recherche', 400);
     }
 
     const currency = fields.currency || 'EUR';
     const limits = CurrencyService.getBudgetLimits(currency);
-    const needsAI = !hasQuoi || !hasOu || !hasBudget;
+    const needsAI = !hasOu || !hasBudget;
 
     const known = {
-      quoi: hasQuoi ? fields.quoi.trim() : null,
+      quoi: fields.quoi.trim(),
       ou: hasOu ? fields.ou.trim() : null,
       budget: hasBudget ? CurrencyService.clampBudget(fields.budget, currency) : null,
       currency,

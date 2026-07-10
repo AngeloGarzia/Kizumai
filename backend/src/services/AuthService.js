@@ -1,12 +1,13 @@
 import bcrypt from 'bcryptjs';
 import { config } from '../config/index.js';
+import { PLANS } from '../constants/plans.js';
 import { UserModel } from '../models/UserModel.js';
 import { AppError } from '../utils/AppError.js';
 import { sanitizeUser } from '../utils/sanitize.js';
 import { TokenService } from './TokenService.js';
 
 export const AuthService = {
-  async register({ name, email, password }) {
+  async register({ name, email, password, plan = PLANS.FREE }) {
     if (!name || !email || !password) {
       throw new AppError('Le nom, l\'email et le mot de passe sont requis', 400);
     }
@@ -15,13 +16,17 @@ export const AuthService = {
       throw new AppError('Le mot de passe doit contenir au moins 8 caractères', 400);
     }
 
+    if (![PLANS.FREE, PLANS.PAID].includes(plan)) {
+      throw new AppError('Formule de compte invalide', 400);
+    }
+
     const existing = await UserModel.findByEmail(email);
     if (existing) {
       throw new AppError('Cet email est déjà utilisé', 409);
     }
 
     const hashedPassword = await bcrypt.hash(password, config.bcrypt.saltRounds);
-    const user = await UserModel.create({ name, email, password: hashedPassword });
+    const user = await UserModel.create({ name, email, password: hashedPassword, plan });
 
     const tokens = this.generateTokenPair(user);
     return { user: sanitizeUser(user), tokens };
@@ -64,6 +69,19 @@ export const AuthService = {
 
   async logout(userId) {
     await UserModel.incrementRefreshTokenVersion(userId);
+  },
+
+  async upgradeToPaid(userId) {
+    const user = await UserModel.findById(userId);
+    if (!user) {
+      throw new AppError('Utilisateur introuvable', 404);
+    }
+    if (user.plan === PLANS.PAID || user.role === 'admin') {
+      return sanitizeUser(user);
+    }
+
+    const updated = await UserModel.updatePlan(userId, PLANS.PAID);
+    return sanitizeUser(updated);
   },
 
   async getAuthenticatedUser(accessToken) {
