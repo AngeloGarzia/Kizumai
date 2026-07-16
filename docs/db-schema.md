@@ -18,6 +18,8 @@ erDiagram
     USERS ||--o{ DOCUMENTS : "téléverse (uploaded_by)"
     USERS ||--o{ PUSH_SUBSCRIPTIONS : "abonne (user_id)"
     USERS ||--o{ USER_CONNECTIONS : "journalise (user_id)"
+    USERS ||--o{ PLANNER_EVENTS : "planifie (user_id)"
+    PROJECTS ||--o{ PLANNER_EVENTS : "lien optionnel (project_id)"
     ACTIVITIES ||--o{ PROJECTS : "quoi (activity_id)"
     LOCATIONS ||--o{ PROJECTS : "où (location_id)"
     PROJECTS ||--o{ DOCUMENTS : "regroupe (project_id)"
@@ -228,6 +230,24 @@ erDiagram
         timestamptz updated_at
     }
 
+    PLANNER_EVENTS {
+        serial id PK
+        int user_id FK
+        int project_id FK
+        varchar kind
+        varchar title
+        text description
+        timestamptz start_at
+        timestamptz end_at
+        boolean all_day
+        varchar status
+        varchar location
+        varchar color
+        jsonb metadata
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
     PUSH_SUBSCRIPTIONS {
         serial id PK
         int user_id FK
@@ -278,6 +298,8 @@ erDiagram
 | `users → projects` | CASCADE |
 | `projects → documents` | CASCADE |
 | `users → push_subscriptions` | CASCADE |
+| `users → planner_events` | CASCADE |
+| `projects → planner_events` | SET NULL |
 | `activities → projects` | SET NULL |
 | `locations → projects` | SET NULL |
 | `users → documents` (uploaded_by) | SET NULL |
@@ -299,3 +321,4 @@ erDiagram
 - `company_officers.person_type` ∈ `{ physique, morale }` · `ownership_percent` ∈ `[0, 100]`
 - `accounting_profiles.status` ∈ `{ brouillon, pret, transmis }` · `accounting_standard` ∈ `{ PCG, IFRS, OTHER }`
 - `accounting_profiles.tax_regime` ∈ `{ IS, IR_BIC, IR_BNC, micro }` · `vat_regime` ∈ `{ franchise, reel_simplifie, reel_normal, none }`
+- `planner_events.kind` ∈ `{ task, deadline, appointment, reminder }` · `status` ∈ `{ todo, in_progress, done, cancelled }` · `end_at ≥ start_at`
