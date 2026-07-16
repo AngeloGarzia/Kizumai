@@ -92,6 +92,118 @@ Table documents {
   }
 }
 
+Table companies {
+  id integer [pk, increment]
+  project_id integer [not null, ref: > projects.id, note: 'ON DELETE CASCADE, 1 société / projet (unique)']
+  activity_id integer [ref: > activities.id, note: 'ON DELETE SET NULL']
+  location_id integer [ref: > locations.id, note: 'siège, ON DELETE SET NULL']
+  denomination varchar(255)
+  trade_name varchar(255)
+  acronym varchar(60)
+  previous_names jsonb [not null, default: '[]']
+  logo_url text
+  legal_form_code varchar(10)
+  legal_form_label varchar(120)
+  legal_status varchar(30) [not null, default: 'active', note: 'active | dormant | dissoute | radiee | liquidation']
+  is_headquarters boolean [not null, default: true]
+  country_code varchar(2) [not null, default: 'FR']
+  siren varchar(9) [note: 'unique si non-null']
+  siret_hq varchar(14) [note: 'unique si non-null']
+  naf_ape_code varchar(6)
+  rcs_number varchar(40)
+  rcs_city varchar(120)
+  vat_number varchar(30) [note: 'unique si non-null']
+  eu_id varchar(40)
+  lei varchar(20) [note: 'unique si non-null']
+  duns varchar(9)
+  foreign_reg_number varchar(60)
+  foreign_reg_authority varchar(120)
+  tax_id varchar(60)
+  activity_description text
+  share_capital "numeric(18,2)"
+  capital_currency varchar(3) [default: 'EUR']
+  revenue_last "numeric(18,2)"
+  net_income_last "numeric(18,2)"
+  fiscal_year_end varchar(5)
+  headcount integer
+  headcount_range varchar(30)
+  incorporation_date date
+  activity_start_date date
+  cessation_date date
+  is_registered boolean [not null, default: false]
+  lifecycle_state varchar(20) [not null, default: 'projet', note: 'projet | en_creation | immatriculee | active | suspendue | cessee']
+  registration_progress jsonb [not null, default: '{}']
+  email varchar(255)
+  phone varchar(40)
+  website varchar(255)
+  social_links jsonb [not null, default: '{}']
+  source varchar(30) [not null, default: 'project']
+  external_data jsonb [not null, default: '{}']
+  metadata jsonb [not null, default: '{}']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    activity_id
+    location_id
+    country_code
+  }
+}
+
+Table company_establishments {
+  id integer [pk, increment]
+  company_id integer [not null, ref: > companies.id, note: 'ON DELETE CASCADE']
+  location_id integer [ref: > locations.id, note: 'ON DELETE SET NULL']
+  siret varchar(14) [note: 'unique si non-null']
+  label varchar(200)
+  is_headquarters boolean [not null, default: false]
+  is_active boolean [not null, default: true]
+  headcount integer
+  naf_ape_code varchar(6)
+  opened_at date
+  closed_at date
+  metadata jsonb [not null, default: '{}']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table company_officers {
+  id integer [pk, increment]
+  company_id integer [not null, ref: > companies.id, note: 'ON DELETE CASCADE']
+  role varchar(60) [not null, default: 'dirigeant']
+  is_beneficial_owner boolean [not null, default: false]
+  person_type varchar(20) [not null, default: 'physique', note: 'physique | morale']
+  person_name varchar(255) [not null]
+  birth_date date
+  nationality varchar(60)
+  ownership_percent "numeric(5,2)" [note: '0..100']
+  linked_company_id integer [ref: > companies.id, note: 'ON DELETE SET NULL (personne morale)']
+  mandate_start date
+  mandate_end date
+  metadata jsonb [not null, default: '{}']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table company_financials {
+  id integer [pk, increment]
+  company_id integer [not null, ref: > companies.id, note: 'ON DELETE CASCADE']
+  fiscal_year integer [not null, note: 'unique par (company_id, fiscal_year)']
+  period_start date
+  period_end date
+  currency varchar(3) [not null, default: 'EUR']
+  revenue "numeric(18,2)"
+  net_income "numeric(18,2)"
+  gross_operating_surplus "numeric(18,2)"
+  total_assets "numeric(18,2)"
+  equity "numeric(18,2)"
+  headcount integer
+  is_published boolean [not null, default: false]
+  metadata jsonb [not null, default: '{}']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
 Table push_subscriptions {
   id integer [pk, increment]
   user_id integer [not null, ref: > users.id, note: 'ON DELETE CASCADE']

@@ -21,6 +21,13 @@ erDiagram
     ACTIVITIES ||--o{ PROJECTS : "quoi (activity_id)"
     LOCATIONS ||--o{ PROJECTS : "où (location_id)"
     PROJECTS ||--o{ DOCUMENTS : "regroupe (project_id)"
+    PROJECTS ||--|| COMPANIES : "donne naissance (project_id)"
+    ACTIVITIES ||--o{ COMPANIES : "activity_id"
+    LOCATIONS ||--o{ COMPANIES : "siège (location_id)"
+    COMPANIES ||--o{ COMPANY_ESTABLISHMENTS : "établissements"
+    COMPANIES ||--o{ COMPANY_OFFICERS : "dirigeants / BE"
+    COMPANIES ||--o{ COMPANY_FINANCIALS : "comptes annuels"
+    LOCATIONS ||--o{ COMPANY_ESTABLISHMENTS : "location_id"
 
     USERS {
         serial id PK
@@ -101,6 +108,92 @@ erDiagram
         timestamptz updated_at
     }
 
+    COMPANIES {
+        serial id PK
+        int project_id FK
+        int activity_id FK
+        int location_id FK
+        varchar denomination
+        varchar trade_name
+        varchar legal_form_label
+        varchar legal_status
+        varchar country_code
+        varchar siren
+        varchar siret_hq
+        varchar naf_ape_code
+        varchar rcs_number
+        varchar vat_number
+        varchar lei
+        varchar duns
+        varchar foreign_reg_number
+        numeric share_capital
+        int headcount
+        date incorporation_date
+        boolean is_registered
+        varchar lifecycle_state
+        jsonb registration_progress
+        varchar email
+        varchar website
+        varchar source
+        jsonb external_data
+        jsonb metadata
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    COMPANY_ESTABLISHMENTS {
+        serial id PK
+        int company_id FK
+        int location_id FK
+        varchar siret
+        varchar label
+        boolean is_headquarters
+        boolean is_active
+        int headcount
+        varchar naf_ape_code
+        date opened_at
+        date closed_at
+        jsonb metadata
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    COMPANY_OFFICERS {
+        serial id PK
+        int company_id FK
+        varchar role
+        boolean is_beneficial_owner
+        varchar person_type
+        varchar person_name
+        date birth_date
+        varchar nationality
+        numeric ownership_percent
+        int linked_company_id FK
+        date mandate_start
+        date mandate_end
+        jsonb metadata
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    COMPANY_FINANCIALS {
+        serial id PK
+        int company_id FK
+        int fiscal_year
+        date period_start
+        date period_end
+        varchar currency
+        numeric revenue
+        numeric net_income
+        numeric total_assets
+        numeric equity
+        int headcount
+        boolean is_published
+        jsonb metadata
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
     PUSH_SUBSCRIPTIONS {
         serial id PK
         int user_id FK
@@ -155,9 +248,17 @@ erDiagram
 | `locations → projects` | SET NULL |
 | `users → documents` (uploaded_by) | SET NULL |
 | `users → user_connections` | SET NULL |
+| `projects → companies` | CASCADE |
+| `companies → company_establishments` | CASCADE |
+| `companies → company_officers` | CASCADE |
+| `companies → company_financials` | CASCADE |
+| `activities/locations → companies` | SET NULL |
 
 ## Contraintes CHECK
 
 - `users.plan` ∈ `{ free, paid }`
 - `projects.status` ∈ `{ draft, active, paused, launched, archived }`
 - `projects.stage` ∈ `{ idee, etude_marche, business_plan, financement, immatriculation, lancement }`
+- `companies.lifecycle_state` ∈ `{ projet, en_creation, immatriculee, active, suspendue, cessee }`
+- `companies.legal_status` ∈ `{ active, dormant, dissoute, radiee, liquidation }`
+- `company_officers.person_type` ∈ `{ physique, morale }` · `ownership_percent` ∈ `[0, 100]`
