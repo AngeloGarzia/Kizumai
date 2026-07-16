@@ -1,5 +1,6 @@
 import { AdminService } from '../services/AdminService.js';
-import { asyncHandler } from '../utils/AppError.js';
+import { NotificationService } from '../services/NotificationService.js';
+import { asyncHandler, AppError } from '../utils/AppError.js';
 import { successResponse } from '../utils/response.js';
 
 export const AdminController = {
@@ -29,12 +30,25 @@ export const AdminController = {
   }),
 
   updateUserRole: asyncHandler(async (req, res) => {
-    const user = await AdminService.updateUserRole(req.params.id, req.body.role);
+    const user = await AdminService.updateUserRole(req.params.id, req.body.role, req.user.id);
     successResponse(res, user);
   }),
 
   getConnections: asyncHandler(async (req, res) => {
     const connections = await AdminService.getConnections();
     successResponse(res, connections);
+  }),
+
+  broadcastNotification: asyncHandler(async (req, res) => {
+    const title = String(req.body.title || '').trim();
+    const body = String(req.body.body || '').trim();
+    const url = req.body.url ? String(req.body.url).trim() : undefined;
+
+    if (!title || !body) {
+      throw new AppError('Le titre et le message sont requis', 400);
+    }
+
+    const summary = await NotificationService.broadcast({ title, body, url });
+    successResponse(res, summary);
   }),
 };

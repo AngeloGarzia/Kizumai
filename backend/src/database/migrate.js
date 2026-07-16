@@ -5,10 +5,16 @@ import pool from './pool.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Identifiant arbitraire mais stable pour le verrou consultatif PostgreSQL.
+// Empêche deux instances de jouer les migrations simultanément.
+const MIGRATION_LOCK_ID = 4815162342;
+
 export async function runMigrations() {
   const client = await pool.connect();
 
   try {
+    await client.query('SELECT pg_advisory_lock($1)', [MIGRATION_LOCK_ID]);
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
         id SERIAL PRIMARY KEY,
@@ -47,6 +53,11 @@ export async function runMigrations() {
       }
     }
   } finally {
+    try {
+      await client.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_ID]);
+    } catch {
+      // Le verrou est de toute façon libéré à la fermeture de la connexion.
+    }
     client.release();
   }
 }

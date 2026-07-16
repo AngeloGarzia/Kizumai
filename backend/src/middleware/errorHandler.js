@@ -7,7 +7,9 @@ export const notFound = (req, res, next) => {
 };
 
 export const errorHandler = (err, req, res, next) => {
-  const statusCode = err.statusCode || 500;
+  // Les erreurs d'upload (multer) sont des erreurs client (413/400).
+  const statusCode =
+    err.statusCode || (err.name === 'MulterError' ? (err.code === 'LIMIT_FILE_SIZE' ? 413 : 400) : 500);
 
   let message = err.message || 'Erreur interne du serveur';
   if (statusCode === 500 && config.isProd) {

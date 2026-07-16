@@ -65,10 +65,22 @@ export function getBudgetLimits(currency, ratesFromEur = FALLBACK_RATES) {
   return { min: Math.max(min, 1), max: Math.max(max, min) };
 }
 
+const CURRENCY_REQUEST_TIMEOUT_MS = Number(process.env.CURRENCY_REQUEST_TIMEOUT_MS) || 8_000;
+
+async function fetchWithTimeout(url, timeoutMs = CURRENCY_REQUEST_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fetchCurrencyData() {
   const [currenciesRes, ratesRes] = await Promise.all([
-    fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies.json'),
-    fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/eur.json'),
+    fetchWithTimeout('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies.json'),
+    fetchWithTimeout('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/eur.json'),
   ]);
 
   if (!currenciesRes.ok || !ratesRes.ok) {

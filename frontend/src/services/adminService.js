@@ -28,4 +28,8 @@ export const adminService = {
   getConnections() {
     return api.get('/admin/connections').then((r) => r.data);
   },
+
+  broadcastNotification(payload) {
+    return api.post('/admin/notifications/broadcast', payload).then((r) => r.data);
+  },
 };

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import AuthLayout from '../components/AuthLayout.jsx';
 import Button from '../components/Button.jsx';
@@ -10,6 +10,7 @@ import { getProjectDraft } from '../services/projectService.js';
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -23,10 +24,14 @@ export default function Login() {
     try {
       const loggedUser = await login(email, password);
       const draft = getProjectDraft();
+      const from = location.state?.from?.pathname;
+      const isPaid = loggedUser.plan === 'paid' || loggedUser.role === 'admin';
 
       if (draft) {
         navigate('/projet/apercu');
-      } else if (loggedUser.plan === 'paid' || loggedUser.role === 'admin') {
+      } else if (from && isPaid) {
+        navigate(from, { replace: true });
+      } else if (isPaid) {
         navigate('/dashboard');
       } else {
         navigate('/');

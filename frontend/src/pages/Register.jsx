@@ -51,8 +51,8 @@ export default function Register() {
       title={isPaidSignup ? 'Compte payant' : 'Inscription'}
       subtitle={
         isPaidSignup
-          ? 'Débloquez l\'accès au parcours complet Myrokai'
-          : 'Créez votre compte Myrokai'
+          ? 'Débloquez l\'accès au parcours complet Kizumai'
+          : 'Créez votre compte Kizumai'
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">

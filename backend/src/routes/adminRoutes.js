@@ -14,5 +14,6 @@ router.put('/prompts/:key', AdminController.updatePrompt);
 router.get('/users', AdminController.getUsers);
 router.patch('/users/:id/role', AdminController.updateUserRole);
 router.get('/connections', AdminController.getConnections);
+router.post('/notifications/broadcast', AdminController.broadcastNotification);
 
 export default router;

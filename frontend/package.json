@@ -1,5 +1,5 @@
 {
-  "name": "myrokai-frontend",
+  "name": "kizumai-frontend",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -9,6 +9,12 @@
     "preview": "vite preview --mode production"
   },
   "dependencies": {
+    "@fullcalendar/core": "^6.1.21",
+    "@fullcalendar/daygrid": "^6.1.21",
+    "@fullcalendar/interaction": "^6.1.21",
+    "@fullcalendar/multimonth": "^6.1.21",
+    "@fullcalendar/react": "^6.1.21",
+    "@fullcalendar/timegrid": "^6.1.21",
     "@tailwindcss/vite": "^4.3.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

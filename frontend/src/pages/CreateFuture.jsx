@@ -4,7 +4,7 @@ import BrandLogo from '../components/BrandLogo.jsx';
 import Button from '../components/Button.jsx';
 import Input from '../components/Input.jsx';
 import BudgetField from '../components/BudgetField.jsx';
-import { projectService, saveProjectDraft } from '../services/projectService.js';
+import { saveSearchSeed } from '../services/projectService.js';
 import { IconChevronRight } from '../components/icons.jsx';
 
 export default function CreateFuture() {
@@ -18,34 +18,28 @@ export default function CreateFuture() {
   const [submitting, setSubmitting] = useState(false);
 
   const hasQuoi = Boolean(quoi.trim());
+  const canLaunch = hasQuoi;
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
 
-    if (!hasQuoi) {
-      setError('Décrivez votre idée pour lancer la recherche');
+    if (!canLaunch) {
+      setError('Une idée est necessaire !');
       return;
     }
 
     setSubmitting(true);
 
-    const payload = {
+    // Lieu optionnel. Budget jamais à 0 : minimum 500 € (EUR).
+    saveSearchSeed({
       quoi: quoi.trim(),
       ou: ou.trim() || null,
-      budget,
+      budget: budget != null && Number(budget) > 0 ? Number(budget) : 500,
       currency,
-    };
+    });
 
-    try {
-      const preview = await projectService.previewProject(payload);
-      saveProjectDraft(preview);
-      navigate('/projet/apercu');
-    } catch (err) {
-      setError(err.message || 'Impossible de démarrer le projet');
-    } finally {
-      setSubmitting(false);
-    }
+    navigate('/projet/recherche');
   };
 
   return (
@@ -75,7 +69,8 @@ export default function CreateFuture() {
             Démarrez votre projet
           </h1>
           <p className="mt-2 text-sm sm:text-base text-prune-500">
-            Renseignez ce que vous savez — l&apos;IA complétera les champs manquants.
+            Une idée suffit pour démarrer. Le lieu et le budget (minimum 500&nbsp;€)
+            peuvent être précisés ensuite.
           </p>
         </section>
 
@@ -106,18 +101,14 @@ export default function CreateFuture() {
             />
 
             <p className="text-xs text-prune-600 bg-prune-50 border border-prune-200 rounded-xl px-4 py-3">
-              Votre idée est requise. Le lieu et le budget peuvent être complétés automatiquement par l&apos;IA.
+              Une idée est necessaire !
             </p>
 
             {error && <p className="alert-error">{error}</p>}
 
-            <Button type="submit" disabled={submitting || !hasQuoi}>
+            <Button type="submit" disabled={submitting || !canLaunch}>
               {submitting ? 'Recherche en cours...' : 'Lancer la recherche'}
             </Button>
-
-            <p className="text-xs text-center text-prune-500">
-              Vous verrez un aperçu en lecture seule. Un compte payant est requis pour continuer.
-            </p>
           </form>
         </div>
 

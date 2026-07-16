@@ -1,0 +1,12 @@
+{
+  "name": "kizumai",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Kizumai — plateforme entrepreneuriale",
+  "scripts": {
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "db:migrate": "npm --prefix backend run db:migrate",
+    "db:migrate:prod": "npm --prefix backend run db:migrate:prod"
+  }
+}

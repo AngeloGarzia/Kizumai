@@ -5,7 +5,7 @@ import { PLANS } from '../constants/plans.js';
 import { ROLES } from '../constants/roles.js';
 
 export async function seedAdminUser() {
-  const email = process.env.ADMIN_EMAIL || 'admin@myrokai.com';
+  const email = process.env.ADMIN_EMAIL || 'admin@kizumai.com';
   const existing = await UserModel.findByEmail(email);
 
   if (existing) {
@@ -17,6 +17,12 @@ export async function seedAdminUser() {
       await UserModel.updatePlan(existing.id, PLANS.PAID);
     }
     return;
+  }
+
+  if (config.isProd && !process.env.ADMIN_PASSWORD) {
+    throw new Error(
+      "[seed] ADMIN_PASSWORD est requis en production pour créer le compte administrateur"
+    );
   }
 
   const password = process.env.ADMIN_PASSWORD || 'Admin123!';

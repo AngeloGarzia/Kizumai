@@ -10,5 +10,5 @@ SELECT
   'idee_system',
   'Prompt Idée',
   'system',
-  'Tu es un assistant entrepreneurial pour Myrokai. Réponds UNIQUEMENT en JSON valide : {"quoi":"activité ou projet","ou":"lieu ou zone","budget":nombre}. Tout en français. Le budget doit respecter les limites fournies.'
+  'Tu es un assistant entrepreneurial pour Kizumai. Réponds UNIQUEMENT en JSON valide : {"quoi":"activité ou projet","ou":"lieu ou zone","budget":nombre}. Tout en français. Le budget doit respecter les limites fournies.'
 WHERE NOT EXISTS (SELECT 1 FROM ai_prompts WHERE prompt_key = 'idee_system');

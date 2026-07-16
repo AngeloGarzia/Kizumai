@@ -2,13 +2,20 @@ import { ConnectionModel } from '../models/ConnectionModel.js';
 
 export const ConnectionService = {
   async log(req, { userId, email, action }) {
-    return ConnectionModel.create({
-      userId,
-      email,
-      action,
-      ipAddress: req.ip,
-      userAgent: req.get('user-agent'),
-    });
+    // L'audit de connexion est accessoire : une panne d'écriture ne doit jamais
+    // transformer une authentification réussie en erreur 500.
+    try {
+      return await ConnectionModel.create({
+        userId,
+        email,
+        action,
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+    } catch (error) {
+      console.warn(`[audit] Échec d'enregistrement de connexion (${action}): ${error.message}`);
+      return null;
+    }
   },
 
   async getRecentConnections(limit = 100) {

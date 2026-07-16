@@ -1,17 +1,42 @@
 import { Link } from 'react-router-dom';
-import { IconStar } from './icons.jsx';
 
-export default function BrandLogo({ className = '', size = 'md' }) {
-  const sizes = {
-    sm: 'text-lg',
-    md: 'text-xl sm:text-2xl',
-    lg: 'text-2xl sm:text-3xl',
-  };
+const SIZE_CLASS = {
+  sm: 'h-9 sm:h-10',
+  md: 'h-12 sm:h-14',
+  lg: 'h-16 sm:h-20',
+  xl: 'h-24 sm:h-28',
+};
+
+/**
+ * Logo officiel Kizumai (docs/Kizumai.png → /kizumai.png).
+ * Contient déjà le wordmark + baseline — pas de texte additionnel.
+ */
+export default function BrandLogo({
+  className = '',
+  size = 'md',
+  to = '/',
+  asLink = true,
+}) {
+  const img = (
+    <img
+      src="/kizumai.png"
+      alt="Kizumai — Accélérateur de Business"
+      className={`w-auto object-contain ${SIZE_CLASS[size] || SIZE_CLASS.md} ${asLink ? '' : className}`}
+      decoding="async"
+    />
+  );
+
+  if (!asLink) {
+    return img;
+  }
 
   return (
-    <Link to="/" className={`inline-flex items-center gap-1.5 font-bold tracking-tight ${sizes[size]} ${className}`}>
-      <span className="text-prune-900">Myrokai</span>
-      <IconStar className="w-4 h-4 sm:w-5 sm:h-5 text-wasabi-400" />
+    <Link
+      to={to}
+      className={`inline-flex items-center shrink-0 ${className}`}
+      aria-label="Accueil Kizumai"
+    >
+      {img}
     </Link>
   );
 }
