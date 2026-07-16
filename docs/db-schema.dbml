@@ -204,6 +204,42 @@ Table company_financials {
   updated_at timestamptz [not null]
 }
 
+// Profil comptable : UNIQUEMENT les données comptables/fiscales absentes du
+// reste de la base. Le dossier transmis à l'expert-comptable est assemblé par
+// jointure (companies + company_officers + company_establishments + documents).
+Table accounting_profiles {
+  id integer [pk, increment]
+  company_id integer [not null, ref: > companies.id, note: 'ON DELETE CASCADE, 1 profil / société (unique)']
+  tax_regime varchar(30) [note: 'IS | IR_BIC | IR_BNC | micro']
+  is_option boolean
+  vat_regime varchar(30) [note: 'franchise | reel_simplifie | reel_normal | none']
+  vat_periodicity varchar(20) [note: 'mensuelle | trimestrielle | annuelle']
+  accounting_standard varchar(20) [not null, default: 'PCG', note: 'PCG | IFRS | OTHER']
+  fiscal_year_start varchar(5) [note: 'MM-DD']
+  fiscal_year_end varchar(5) [note: 'MM-DD']
+  first_closing_date date
+  firm_name varchar(200)
+  firm_contact jsonb [not null, default: '{}']
+  firm_siren varchar(9)
+  mission_start_date date
+  mission_letter_signed boolean [not null, default: false]
+  bank_accounts jsonb [not null, default: '[]', note: 'iban/bic/banque']
+  director_social_regime varchar(30) [note: 'TNS | assimile_salarie']
+  collective_agreement varchar(120)
+  idcc_code varchar(10)
+  social_organizations jsonb [not null, default: '{}', note: 'URSSAF, retraite, prévoyance, mutuelle, OPCO']
+  invoicing_software varchar(120)
+  transmission_mode varchar(30) [note: 'depot | email | api | papier']
+  estimated_annual_revenue "numeric(18,2)"
+  estimated_monthly_invoices integer
+  status varchar(20) [not null, default: 'brouillon', note: 'brouillon | pret | transmis']
+  transmitted_at timestamptz
+  notes text
+  metadata jsonb [not null, default: '{}']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
 Table push_subscriptions {
   id integer [pk, increment]
   user_id integer [not null, ref: > users.id, note: 'ON DELETE CASCADE']

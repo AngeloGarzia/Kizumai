@@ -27,6 +27,7 @@ erDiagram
     COMPANIES ||--o{ COMPANY_ESTABLISHMENTS : "établissements"
     COMPANIES ||--o{ COMPANY_OFFICERS : "dirigeants / BE"
     COMPANIES ||--o{ COMPANY_FINANCIALS : "comptes annuels"
+    COMPANIES ||--|| ACCOUNTING_PROFILES : "profil comptable (company_id)"
     LOCATIONS ||--o{ COMPANY_ESTABLISHMENTS : "location_id"
 
     USERS {
@@ -194,6 +195,39 @@ erDiagram
         timestamptz updated_at
     }
 
+    ACCOUNTING_PROFILES {
+        serial id PK
+        int company_id FK
+        varchar tax_regime
+        boolean is_option
+        varchar vat_regime
+        varchar vat_periodicity
+        varchar accounting_standard
+        varchar fiscal_year_start
+        varchar fiscal_year_end
+        date first_closing_date
+        varchar firm_name
+        jsonb firm_contact
+        varchar firm_siren
+        date mission_start_date
+        boolean mission_letter_signed
+        jsonb bank_accounts
+        varchar director_social_regime
+        varchar collective_agreement
+        varchar idcc_code
+        jsonb social_organizations
+        varchar invoicing_software
+        varchar transmission_mode
+        numeric estimated_annual_revenue
+        int estimated_monthly_invoices
+        varchar status
+        timestamptz transmitted_at
+        text notes
+        jsonb metadata
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
     PUSH_SUBSCRIPTIONS {
         serial id PK
         int user_id FK
@@ -253,6 +287,7 @@ erDiagram
 | `companies → company_officers` | CASCADE |
 | `companies → company_financials` | CASCADE |
 | `activities/locations → companies` | SET NULL |
+| `companies → accounting_profiles` | CASCADE |
 
 ## Contraintes CHECK
 
@@ -262,3 +297,5 @@ erDiagram
 - `companies.lifecycle_state` ∈ `{ projet, en_creation, immatriculee, active, suspendue, cessee }`
 - `companies.legal_status` ∈ `{ active, dormant, dissoute, radiee, liquidation }`
 - `company_officers.person_type` ∈ `{ physique, morale }` · `ownership_percent` ∈ `[0, 100]`
+- `accounting_profiles.status` ∈ `{ brouillon, pret, transmis }` · `accounting_standard` ∈ `{ PCG, IFRS, OTHER }`
+- `accounting_profiles.tax_regime` ∈ `{ IS, IR_BIC, IR_BNC, micro }` · `vat_regime` ∈ `{ franchise, reel_simplifie, reel_normal, none }`
