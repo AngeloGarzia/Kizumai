@@ -20,6 +20,9 @@ erDiagram
     USERS ||--o{ USER_CONNECTIONS : "journalise (user_id)"
     USERS ||--o{ PLANNER_EVENTS : "planifie (user_id)"
     PROJECTS ||--o{ PLANNER_EVENTS : "lien optionnel (project_id)"
+    USERS ||--o{ CONTACTS : "possède (user_id)"
+    PROJECTS ||--o{ CONTACTS : "projet principal (project_id)"
+    CONTACTS ||--o{ CONTACT_LINKS : "rattaché à N objets"
     ACTIVITIES ||--o{ PROJECTS : "quoi (activity_id)"
     LOCATIONS ||--o{ PROJECTS : "où (location_id)"
     PROJECTS ||--o{ DOCUMENTS : "regroupe (project_id)"
@@ -248,6 +251,46 @@ erDiagram
         timestamptz updated_at
     }
 
+    CONTACTS {
+        serial id PK
+        int user_id FK
+        int project_id FK
+        varchar contact_type
+        varchar category
+        varchar first_name
+        varchar last_name
+        varchar display_name
+        varchar job_title
+        varchar organization
+        varchar siren
+        varchar email
+        varchar phone
+        varchar mobile
+        jsonb emails
+        jsonb phones
+        varchar address_line1
+        varchar postal_code
+        varchar city
+        varchar country
+        date birthday
+        jsonb tags
+        text notes
+        boolean is_favorite
+        jsonb metadata
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    CONTACT_LINKS {
+        serial id PK
+        int contact_id FK
+        varchar entity_type
+        int entity_id
+        varchar role
+        text note
+        timestamptz created_at
+    }
+
     PUSH_SUBSCRIPTIONS {
         serial id PK
         int user_id FK
@@ -300,6 +343,10 @@ erDiagram
 | `users → push_subscriptions` | CASCADE |
 | `users → planner_events` | CASCADE |
 | `projects → planner_events` | SET NULL |
+| `users → contacts` | CASCADE |
+| `projects → contacts` | SET NULL |
+| `contacts → contact_links` | CASCADE |
+| `{project,document,planner_event,company} → contact_links` | CASCADE (trigger, `entity_id` polymorphe) |
 | `activities → projects` | SET NULL |
 | `locations → projects` | SET NULL |
 | `users → documents` (uploaded_by) | SET NULL |
@@ -322,3 +369,5 @@ erDiagram
 - `accounting_profiles.status` ∈ `{ brouillon, pret, transmis }` · `accounting_standard` ∈ `{ PCG, IFRS, OTHER }`
 - `accounting_profiles.tax_regime` ∈ `{ IS, IR_BIC, IR_BNC, micro }` · `vat_regime` ∈ `{ franchise, reel_simplifie, reel_normal, none }`
 - `planner_events.kind` ∈ `{ task, deadline, appointment, reminder }` · `status` ∈ `{ todo, in_progress, done, cancelled }` · `end_at ≥ start_at`
+- `contacts.contact_type` ∈ `{ person, company }` · `preferred_channel` ∈ `{ email, phone, mobile }`
+- `contact_links.entity_type` ∈ `{ project, document, planner_event, company }` · unique `(contact_id, entity_type, entity_id)`

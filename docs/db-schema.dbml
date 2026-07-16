@@ -266,6 +266,73 @@ Table planner_events {
   }
 }
 
+// Contacts : fiche complète (adresse inline), rattachée à un utilisateur et,
+// optionnellement, à un projet principal.
+Table contacts {
+  id integer [pk, increment]
+  user_id integer [not null, ref: > users.id, note: 'ON DELETE CASCADE']
+  project_id integer [ref: > projects.id, note: 'projet principal, ON DELETE SET NULL']
+  contact_type varchar(20) [not null, default: 'person', note: 'person | company']
+  category varchar(40) [note: 'client | fournisseur | partenaire | administration | notaire | banquier | expert_comptable | autre']
+  civility varchar(10)
+  first_name varchar(120)
+  last_name varchar(120)
+  display_name varchar(200)
+  job_title varchar(120)
+  organization varchar(200)
+  siren varchar(9)
+  vat_number varchar(30)
+  avatar_url text
+  email varchar(255)
+  phone varchar(40)
+  mobile varchar(40)
+  website varchar(255)
+  emails jsonb [not null, default: '[]']
+  phones jsonb [not null, default: '[]']
+  social_links jsonb [not null, default: '{}']
+  address_line1 varchar(255)
+  address_line2 varchar(255)
+  postal_code varchar(16)
+  city varchar(120)
+  region varchar(120)
+  country varchar(2) [not null, default: 'FR']
+  birthday date
+  preferred_channel varchar(20) [note: 'email | phone | mobile']
+  tags jsonb [not null, default: '[]']
+  notes text
+  is_favorite boolean [not null, default: false]
+  source varchar(30) [not null, default: 'manual']
+  metadata jsonb [not null, default: '{}']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    user_id
+    project_id
+    email
+    category
+  }
+}
+
+// Liaison POLYMORPHE : 1 contact rattaché à N objets de types variés.
+// entity_id n'a pas de FK native (cible variable) ; l'intégrité est assurée
+// par des triggers AFTER DELETE sur projects/documents/planner_events/companies.
+Table contact_links {
+  id integer [pk, increment]
+  contact_id integer [not null, ref: > contacts.id, note: 'ON DELETE CASCADE']
+  entity_type varchar(30) [not null, note: 'project | document | planner_event | company']
+  entity_id integer [not null, note: 'id polymorphe (pas de FK) — purge par trigger']
+  role varchar(80) [note: 'rôle du contact sur cet objet (ex. signataire, notaire)']
+  note text
+  created_at timestamptz [not null]
+
+  indexes {
+    contact_id
+    (entity_type, entity_id)
+    (contact_id, entity_type, entity_id) [unique]
+  }
+}
+
 Table push_subscriptions {
   id integer [pk, increment]
   user_id integer [not null, ref: > users.id, note: 'ON DELETE CASCADE']
