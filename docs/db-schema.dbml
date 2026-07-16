@@ -1,0 +1,135 @@
+// Schéma de la base de données Kizumai
+// Éditable gratuitement sur https://dbdiagram.io (Import > coller ce fichier).
+// Source de vérité : backend/src/database/migrations/*.sql
+
+Table users {
+  id integer [pk, increment]
+  name varchar(255) [not null]
+  email varchar(255) [unique, not null]
+  password varchar(255) [not null]
+  refresh_token_version integer [not null, default: 0]
+  role varchar(20) [not null, default: 'user']
+  plan varchar(20) [not null, default: 'free', note: 'free | paid']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table projects {
+  id integer [pk, increment]
+  user_id integer [ref: > users.id, note: 'ON DELETE CASCADE']
+  activity_id integer [ref: > activities.id, note: 'ON DELETE SET NULL']
+  location_id integer [ref: > locations.id, note: 'ON DELETE SET NULL']
+  title varchar(160)
+  budget integer
+  currency varchar(3) [not null, default: 'EUR']
+  legal_form varchar(40)
+  status varchar(20) [not null, default: 'draft', note: 'draft | active | paused | launched | archived']
+  stage varchar(30) [not null, default: 'idee', note: 'idee | etude_marche | business_plan | financement | immatriculation | lancement']
+  description text
+  report text
+  sections jsonb [not null, default: '[]']
+  metadata jsonb [not null, default: '{}']
+  source varchar(20) [not null, default: 'manual']
+  ai_prompt text
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (user_id, status)
+    activity_id
+    location_id
+  }
+}
+
+Table activities {
+  id integer [pk, increment]
+  label varchar(200) [not null, note: 'unique lower(label)']
+  sector varchar(80)
+  sub_sector varchar(80)
+  ape_code varchar(10)
+  description text
+  keywords jsonb [not null, default: '[]']
+  metadata jsonb [not null, default: '{}']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table locations {
+  id integer [pk, increment]
+  label varchar(200) [not null, note: 'unique lower(label)']
+  address_line1 varchar(255)
+  address_line2 varchar(255)
+  postal_code varchar(16)
+  city varchar(120)
+  region varchar(120)
+  department varchar(120)
+  country varchar(2) [not null, default: 'FR']
+  latitude "numeric(9,6)"
+  longitude "numeric(9,6)"
+  geo_place_id varchar(120)
+  metadata jsonb [not null, default: '{}']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table documents {
+  id integer [pk, increment]
+  project_id integer [not null, ref: > projects.id, note: 'ON DELETE CASCADE']
+  uploaded_by integer [ref: > users.id, note: 'ON DELETE SET NULL']
+  type varchar(40) [not null, default: 'other', note: 'STI: pdf | image | spreadsheet | document | other (non contraint)']
+  title varchar(200)
+  file_name varchar(255) [not null]
+  storage_key text [not null]
+  mime_type varchar(150)
+  size_bytes bigint
+  attributes jsonb [not null, default: '{}']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    project_id
+    type
+  }
+}
+
+Table push_subscriptions {
+  id integer [pk, increment]
+  user_id integer [not null, ref: > users.id, note: 'ON DELETE CASCADE']
+  endpoint text [unique, not null]
+  p256dh text [not null]
+  auth text [not null]
+  user_agent text
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table user_connections {
+  id integer [pk, increment]
+  user_id integer [ref: > users.id, note: 'ON DELETE SET NULL']
+  email varchar(255)
+  action varchar(50) [not null]
+  ip_address varchar(45)
+  user_agent text
+  created_at timestamptz [not null]
+}
+
+Table ai_prompts {
+  id integer [pk, increment]
+  prompt_key varchar(100) [unique, not null]
+  name varchar(255) [not null]
+  role varchar(20) [not null, default: 'system']
+  content text [not null]
+  updated_at timestamptz [not null]
+}
+
+Table app_settings {
+  key varchar(100) [pk]
+  value text [not null]
+  updated_at timestamptz [not null]
+}
+
+Table schema_migrations {
+  id integer [pk, increment]
+  filename varchar(255) [unique, not null]
+  applied_at timestamptz [not null]
+}
