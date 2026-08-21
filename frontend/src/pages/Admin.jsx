@@ -1,104 +1,357 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import AppShell from '../components/AppShell.jsx';
 import Button from '../components/Button.jsx';
 import { adminService } from '../services/adminService.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const TABS = [
-  { id: 'settings', label: 'Paramètres IA' },
-  { id: 'prompts', label: 'Prompts' },
+  { id: 'settings', label: 'Paramètres' },
   { id: 'users', label: 'Utilisateurs' },
   { id: 'connections', label: 'Connexions' },
   { id: 'notifications', label: 'Notifications' },
 ];
 
+const SETUP_SECTIONS = [
+  {
+    id: 'memory',
+    title: 'Mémoire projet',
+    description:
+      'Paramètres communs à tous les projets. Les seuils s’appliquent immédiatement ; les crons nécessitent un redémarrage du serveur.',
+    keys: [
+      {
+        key: 'memory_archive_threshold',
+        label: 'Seuil d’archivage',
+        hint: 'Importance en dessous de laquelle un souvenir est archivé (ex. 0.05)',
+      },
+      {
+        key: 'memory_snapshot_event_threshold',
+        label: 'Seuil d’événements (snapshot)',
+        hint: 'Nombre d’événements avant régénération du snapshot',
+      },
+      {
+        key: 'memory_snapshot_max_age_hours',
+        label: 'Âge max snapshot (heures)',
+      },
+      {
+        key: 'memory_snapshot_top_nodes',
+        label: 'Top nœuds pour snapshot',
+      },
+      {
+        key: 'memory_recall_max_chars',
+        label: 'Taille max du rappel (caractères)',
+      },
+      {
+        key: 'memory_graph_depth',
+        label: 'Profondeur du graphe',
+      },
+      {
+        key: 'memory_recall_node_limit',
+        label: 'Limite de nœuds au rappel',
+      },
+      {
+        key: 'memory_default_decay_rate',
+        label: 'Taux de décroissance par défaut',
+      },
+      {
+        key: 'memory_decay_cron',
+        label: 'Cron décroissance',
+        hint: 'Expression cron — redémarrer le backend après modification',
+      },
+      {
+        key: 'memory_snapshot_cron',
+        label: 'Cron snapshot',
+        hint: 'Expression cron — redémarrer le backend après modification',
+      },
+    ],
+  },
+  {
+    id: 'business',
+    title: 'Règles métier',
+    description: 'Bornes budget et règles communes à tous les utilisateurs.',
+    keys: [
+      {
+        key: 'budget_eur_min',
+        label: 'Budget min (EUR)',
+        hint: 'Borne basse convertie dans la devise du projet',
+      },
+      {
+        key: 'budget_eur_max',
+        label: 'Budget max (EUR)',
+      },
+    ],
+  },
+  {
+    id: 'features',
+    title: 'Fonctionnalités',
+    description:
+      'Flags non secrets. Si ALLOW_SELF_SERVE_PAID est défini dans l’environnement, il prime sur cette valeur.',
+    keys: [
+      {
+        key: 'self_serve_paid_enabled',
+        label: 'Passage payant sans paiement',
+        hint: 'true / false — autorise l’auto-activation du plan payant',
+        defaultValue: 'false',
+      },
+    ],
+  },
+];
+
+const PROTECTED_KEYS = new Set([
+  'ai_provider',
+  'ai_model',
+  'ai_temperature',
+  'budget_eur_min',
+  'budget_eur_max',
+]);
+
+const PROMPT_GROUPS = [
+  {
+    id: 'parcours',
+    title: 'Parcours / recherche',
+    keys: ['idee_system', 'project_user', 'lieux', 'budget', 'formation'],
+  },
+  {
+    id: 'docs',
+    title: 'Documents',
+    keys: ['document_scan'],
+  },
+  {
+    id: 'memory',
+    title: 'Mémoire',
+    keys: ['memory_snapshot', 'memory_recall'],
+  },
+];
+
+function settingMap(settings) {
+  const map = {};
+  for (const row of settings) map[row.key] = row;
+  return map;
+}
+
+function SettingRow({ def, row, busyKey, onChange, onSave, onRemove }) {
+  const value = row?.value ?? def.defaultValue ?? '';
+  const exists = Boolean(row);
+  return (
+    <li className="grid grid-cols-1 lg:grid-cols-[minmax(12rem,16rem)_1fr_auto] gap-2 lg:items-end border-b border-prune-50 pb-3 last:border-0">
+      <div>
+        <p className="text-sm font-semibold text-prune-900">{def.label}</p>
+        <p className="text-xs text-prune-400 font-mono">{def.key}</p>
+        {def.hint && <p className="text-xs text-prune-500 mt-1">{def.hint}</p>}
+      </div>
+      <input
+        className="input-field font-mono text-sm"
+        value={value}
+        onChange={(e) => onChange(def.key, e.target.value)}
+      />
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          className="w-auto text-sm"
+          disabled={busyKey === def.key}
+          onClick={() => onSave(def.key, value)}
+        >
+          {exists ? 'Sauver' : 'Créer'}
+        </Button>
+        {exists && !PROTECTED_KEYS.has(def.key) && (
+          <button
+            type="button"
+            className="btn-secondary text-sm"
+            disabled={busyKey === def.key}
+            onClick={() => onRemove(def.key)}
+          >
+            Suppr.
+          </button>
+        )}
+      </div>
+    </li>
+  );
+}
+
 export default function Admin() {
   const { logout } = useAuth();
-  const [tab, setTab] = useState('settings');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const tab = TABS.some((t) => t.id === tabParam) ? tabParam : 'settings';
+
+  const setTab = (id) => {
+    setSearchParams(id === 'settings' ? {} : { tab: id }, { replace: true });
+  };
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [busyKey, setBusyKey] = useState('');
 
-  const [settings, setSettings] = useState({
+  const [ai, setAi] = useState({
     aiProvider: 'gemini',
     aiModel: '',
     aiTemperature: '0.7',
     providers: [],
   });
+  const [settings, setSettings] = useState([]);
   const [prompts, setPrompts] = useState([]);
+  const [selectedPromptKey, setSelectedPromptKey] = useState('');
+  const [newSetting, setNewSetting] = useState({ key: '', value: '' });
+
   const [usersOverview, setUsersOverview] = useState(null);
   const [connections, setConnections] = useState([]);
   const [broadcast, setBroadcast] = useState({ title: '', body: '', url: '' });
   const [broadcasting, setBroadcasting] = useState(false);
 
-  const loadData = async () => {
-    setLoading(true);
+  const byKey = useMemo(() => settingMap(settings), [settings]);
+  const catalogKeys = useMemo(
+    () => new Set(SETUP_SECTIONS.flatMap((s) => s.keys.map((k) => k.key))),
+    []
+  );
+  const advancedSettings = useMemo(
+    () =>
+      settings.filter(
+        (s) =>
+          !catalogKeys.has(s.key) &&
+          !['ai_provider', 'ai_model', 'ai_temperature'].includes(s.key)
+      ),
+    [settings, catalogKeys]
+  );
+
+  const loadSetup = async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     setError('');
-    // Chaque jeu de données est chargé indépendamment : l'échec d'un endpoint
-    // ne doit pas rendre tout le panneau inutilisable.
-    const [settingsRes, promptsRes, usersRes, connectionsRes] = await Promise.allSettled([
-      adminService.getSettings(),
-      adminService.getPrompts(),
+    try {
+      const data = await adminService.getSetup();
+      setAi(data.ai || { providers: [] });
+      setSettings(data.settings || []);
+      setPrompts(data.prompts || []);
+      if (!selectedPromptKey && data.prompts?.[0]) {
+        setSelectedPromptKey(data.prompts[0].key);
+      }
+    } catch (err) {
+      setError(err.message || 'Impossible de charger les paramètres');
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
+
+  const loadOps = async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
+    setError('');
+    const [usersRes, connectionsRes] = await Promise.allSettled([
       adminService.getUsers(),
       adminService.getConnections(),
     ]);
-
-    if (settingsRes.status === 'fulfilled') setSettings(settingsRes.value);
-    if (promptsRes.status === 'fulfilled') setPrompts(promptsRes.value);
     if (usersRes.status === 'fulfilled') setUsersOverview(usersRes.value);
     if (connectionsRes.status === 'fulfilled') setConnections(connectionsRes.value);
-
-    const failed = [settingsRes, promptsRes, usersRes, connectionsRes]
-      .filter((r) => r.status === 'rejected');
+    const failed = [usersRes, connectionsRes].filter((r) => r.status === 'rejected');
     if (failed.length) {
       setError(failed[0].reason?.message || 'Certaines données n\'ont pas pu être chargées');
     }
-
-    setLoading(false);
+    if (!silent) setLoading(false);
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (tab === 'settings') loadSetup();
+    else loadOps();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
 
-  const selectedProvider = settings.providers.find((p) => p.id === settings.aiProvider);
+  const selectedProvider = ai.providers?.find((p) => p.id === ai.aiProvider);
   const availableModels = selectedProvider?.models ?? [];
+  const modelsStatus = useMemo(() => {
+    const providers = ai.providers || [];
+    const live = providers.filter((p) => p.modelsSource === 'live').length;
+    const fallback = providers.filter((p) => p.modelsSource === 'fallback').length;
+    return { live, fallback, refreshedAt: ai.modelsRefreshedAt };
+  }, [ai.providers, ai.modelsRefreshedAt]);
+  const selectedPrompt = useMemo(
+    () => prompts.find((p) => p.key === selectedPromptKey) || null,
+    [prompts, selectedPromptKey]
+  );
 
-  const handleProviderChange = (providerId) => {
-    const provider = settings.providers.find((p) => p.id === providerId);
-    setSettings({
-      ...settings,
-      aiProvider: providerId,
-      aiModel: provider?.defaultModel || settings.aiModel,
+  const saveAi = async (e) => {
+    e.preventDefault();
+    setMessage('');
+    setError('');
+    setBusyKey('ai');
+    try {
+      const updated = await adminService.updateSettings(ai);
+      setAi((prev) => ({ ...prev, ...updated }));
+      setMessage('Paramètres IA enregistrés');
+      await loadSetup({ silent: true });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyKey('');
+    }
+  };
+
+  const setLocalValue = (key, value) => {
+    setSettings((list) => {
+      const exists = list.some((s) => s.key === key);
+      if (exists) return list.map((s) => (s.key === key ? { ...s, value } : s));
+      return [...list, { key, value, updatedAt: null }];
     });
   };
 
-  const saveSettings = async (e) => {
-    e.preventDefault();
+  const saveSetting = async (key, value) => {
     setMessage('');
+    setError('');
+    setBusyKey(key);
     try {
-      const updated = await adminService.updateSettings(settings);
-      setSettings(updated);
-      setMessage('Paramètres enregistrés');
+      await adminService.upsertAppSetting(key, value);
+      setMessage(`Paramètre « ${key} » enregistré`);
+      await loadSetup({ silent: true });
     } catch (err) {
       setError(err.message);
+    } finally {
+      setBusyKey('');
     }
   };
 
-  const savePrompt = async (prompt) => {
-    setMessage('');
+  const removeSetting = async (key) => {
+    if (!window.confirm(`Supprimer le paramètre « ${key} » ?`)) return;
+    setBusyKey(key);
+    setError('');
     try {
-      await adminService.updatePrompt(prompt.key, {
-        name: prompt.name,
-        content: prompt.content,
-        role: prompt.role,
-      });
-      setMessage(`Prompt « ${prompt.name} » enregistré`);
-      await loadData();
+      await adminService.deleteAppSetting(key);
+      setMessage(`Paramètre « ${key} » supprimé`);
+      await loadSetup({ silent: true });
     } catch (err) {
       setError(err.message);
+    } finally {
+      setBusyKey('');
     }
+  };
+
+  const addSetting = async (e) => {
+    e.preventDefault();
+    await saveSetting(newSetting.key.trim().toLowerCase(), newSetting.value);
+    setNewSetting({ key: '', value: '' });
+  };
+
+  const savePrompt = async () => {
+    if (!selectedPrompt) return;
+    setBusyKey(`prompt:${selectedPrompt.key}`);
+    setMessage('');
+    setError('');
+    try {
+      await adminService.updatePrompt(selectedPrompt.key, {
+        name: selectedPrompt.name,
+        role: selectedPrompt.role,
+        content: selectedPrompt.content,
+      });
+      setMessage(`Prompt « ${selectedPrompt.name} » enregistré`);
+      await loadSetup({ silent: true });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyKey('');
+    }
+  };
+
+  const updatePromptField = (field, value) => {
+    setPrompts((list) =>
+      list.map((p) => (p.key === selectedPromptKey ? { ...p, [field]: value } : p))
+    );
   };
 
   const sendBroadcast = async (e) => {
@@ -123,28 +376,40 @@ export default function Admin() {
     const nextRole = user.role === 'admin' ? 'user' : 'admin';
     try {
       await adminService.updateUserRole(user.id, nextRole);
-      await loadData();
+      await loadOps({ silent: true });
       setMessage(`Rôle de ${user.email} mis à jour`);
     } catch (err) {
       setError(err.message);
     }
   };
 
+  const sectionAnchors = [
+    { id: 'ai', label: 'Moteur IA' },
+    ...SETUP_SECTIONS.map((s) => ({ id: s.id, label: s.title })),
+    { id: 'prompts', label: 'Prompts IA' },
+    { id: 'advanced', label: 'Avancé' },
+  ];
+
   return (
     <AppShell onLogout={logout}>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="space-y-6 max-w-[86.4rem]">
+        <section className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold tracking-widest text-prune-600 uppercase">Administration</p>
-            <h1 className="text-2xl sm:text-3xl font-bold text-prune-900">Panneau administrateur</h1>
-            <p className="text-sm text-prune-500 mt-1">
-              L&apos;administrateur hérite de tous les droits utilisateur.
+            <p className="text-xs font-semibold tracking-widest text-topaz-600 uppercase">
+              Administration
+            </p>
+            <h1 className="mt-1 text-2xl sm:text-3xl font-bold text-prune-900">
+              Administration
+            </h1>
+            <p className="mt-2 text-prune-500 max-w-2xl">
+              Paramètres communs à tous les utilisateurs, gestion des comptes et notifications.
+              Les secrets (clés API, JWT, SMTP…) restent dans l’environnement serveur.
             </p>
           </div>
-          <Link to="/dashboard" className="btn-secondary text-center text-sm">
-            Retour au tableau de bord
+          <Link to="/" className="btn-secondary text-sm w-auto inline-flex justify-center">
+            Accueil
           </Link>
-        </div>
+        </section>
 
         <div className="flex gap-2 overflow-x-auto pb-1">
           {TABS.map((item) => (
@@ -166,131 +431,300 @@ export default function Admin() {
         {message && <p className="alert-success">{message}</p>}
 
         {loading ? (
-          <p className="text-prune-500">Chargement...</p>
+          <p className="text-prune-500">Chargement…</p>
         ) : (
           <>
             {tab === 'settings' && (
-              <form onSubmit={saveSettings} className="card p-5 sm:p-8 space-y-5">
-                <div>
-                  <h2 className="text-lg font-bold text-prune-900">Moteur IA</h2>
-                  <p className="text-sm text-prune-500 mt-1">
-                    Choisissez le fournisseur et le modèle utilisés pour compléter les projets.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {settings.providers.map((provider) => (
-                    <div
-                      key={provider.id}
-                      className={`rounded-xl border px-4 py-3 text-sm
-                        ${provider.configured
-                          ? 'border-wasabi-200 bg-wasabi-50 text-wasabi-800'
-                          : 'border-prune-200 bg-prune-50 text-prune-500'}`}
+              <div className="space-y-6">
+                <nav className="flex flex-wrap gap-2">
+                  {sectionAnchors.map((link) => (
+                    <a
+                      key={link.id}
+                      href={`#admin-${link.id}`}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-full bg-prune-100 text-prune-700 hover:bg-prune-200"
                     >
-                      <p className="font-semibold text-prune-900">{provider.name}</p>
-                      <p className="text-xs mt-1">
-                        {provider.configured ? 'Clé API configurée' : 'Clé API absente du .env'}
+                      {link.label}
+                    </a>
+                  ))}
+                </nav>
+
+                <form
+                  id="admin-ai"
+                  onSubmit={saveAi}
+                  className="rounded-2xl bg-white/80 border border-prune-100 p-5 sm:p-6 space-y-4 scroll-mt-24"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <div>
+                      <h2 className="text-lg font-bold text-prune-900">Moteur IA</h2>
+                      <p className="text-sm text-prune-500 mt-1">
+                        Clés API dans l&apos;environnement ; provider / modèle / température en base.
+                      </p>
+                      <p className="text-xs text-prune-400 mt-2">
+                        {modelsStatus.refreshedAt
+                          ? `Listes mises à jour : ${new Date(modelsStatus.refreshedAt).toLocaleString('fr-FR')} — ${modelsStatus.live} live / ${modelsStatus.fallback} repli`
+                          : 'Listes de modèles non encore chargées'}
                       </p>
                     </div>
-                  ))}
-                </div>
-
-                <div>
-                  <label className="label-field" htmlFor="aiProvider">Fournisseur</label>
-                  <select
-                    id="aiProvider"
-                    className="input-field"
-                    value={settings.aiProvider}
-                    onChange={(e) => handleProviderChange(e.target.value)}
-                  >
-                    {settings.providers.map((provider) => (
-                      <option key={provider.id} value={provider.id} disabled={!provider.configured}>
-                        {provider.name}{provider.configured ? '' : ' (non configuré)'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="label-field" htmlFor="aiModel">Modèle</label>
-                  <select
-                    id="aiModel"
-                    className="input-field"
-                    value={settings.aiModel}
-                    onChange={(e) => setSettings({ ...settings, aiModel: e.target.value })}
-                  >
-                    {availableModels.map((model) => (
-                      <option key={model.id} value={model.id}>{model.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="label-field" htmlFor="aiTemperature">Température</label>
-                  <input
-                    id="aiTemperature"
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    max="2"
-                    className="input-field"
-                    value={settings.aiTemperature}
-                    onChange={(e) => setSettings({ ...settings, aiTemperature: e.target.value })}
-                  />
-                </div>
-
-                {!selectedProvider?.configured && (
-                  <p className="alert-error">
-                    Le fournisseur sélectionné n&apos;a pas de clé API. Ajoutez-la dans le fichier
-                    {' '}<code className="text-xs">backend/.env.development</code> puis redémarrez le serveur.
-                  </p>
-                )}
-
-                <Button type="submit">Enregistrer les paramètres</Button>
-              </form>
-            )}
-
-            {tab === 'prompts' && (
-              <div className="space-y-4">
-                <p className="text-sm text-prune-600">
-                  Les prompts en base pilotent entièrement le comportement de l&apos;IA.
-                  Variables utiles selon l&apos;étape :{' '}
-                  <code className="text-xs bg-prune-100 px-1 rounded">{'{{quoi}}'}</code>,{' '}
-                  <code className="text-xs bg-prune-100 px-1 rounded">{'{{ou}}'}</code>,{' '}
-                  <code className="text-xs bg-prune-100 px-1 rounded">{'{{business}}'}</code>,{' '}
-                  <code className="text-xs bg-prune-100 px-1 rounded">{'{{business_activity}}'}</code>,{' '}
-                  <code className="text-xs bg-prune-100 px-1 rounded">{'{{business_pitch}}'}</code>,{' '}
-                  <code className="text-xs bg-prune-100 px-1 rounded">{'{{location}}'}</code>,{' '}
-                  <code className="text-xs bg-prune-100 px-1 rounded">{'{{budget}}'}</code>,{' '}
-                  <code className="text-xs bg-prune-100 px-1 rounded">{'{{refine}}'}</code>,{' '}
-                  <code className="text-xs bg-prune-100 px-1 rounded">{'{{avoid}}'}</code>,{' '}
-                  <code className="text-xs bg-prune-100 px-1 rounded">{'{{count}}'}</code>.
-                </p>
-                {prompts.map((prompt) => (
-                  <div key={prompt.key} className="card p-5 sm:p-6 space-y-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                      <h3 className="font-semibold text-prune-900">{prompt.name}</h3>
-                      <span className="text-xs text-prune-500">{prompt.key} · {prompt.role}</span>
-                    </div>
-                    <textarea
-                      className="input-field min-h-[140px] resize-y font-mono text-sm"
-                      value={prompt.content}
-                      onChange={(e) => {
-                        const next = prompts.map((p) =>
-                          p.key === prompt.key ? { ...p, content: e.target.value } : p
-                        );
-                        setPrompts(next);
-                      }}
-                    />
                     <Button
                       type="button"
-                      onClick={() => savePrompt(prompts.find((p) => p.key === prompt.key))}
-                      className="w-auto text-sm"
+                      variant="secondary"
+                      className="w-auto shrink-0"
+                      disabled={busyKey === 'refresh-models'}
+                      onClick={async () => {
+                        setBusyKey('refresh-models');
+                        setError('');
+                        try {
+                          await loadSetup({ silent: true });
+                          setMessage('Listes de modèles rafraîchies');
+                        } catch (err) {
+                          setError(err.message || 'Échec du rafraîchissement');
+                        } finally {
+                          setBusyKey('');
+                        }
+                      }}
                     >
-                      Enregistrer ce prompt
+                      {busyKey === 'refresh-models' ? 'Actualisation…' : 'Actualiser les modèles'}
                     </Button>
                   </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="label-field" htmlFor="setup-provider">Fournisseur</label>
+                      <select
+                        id="setup-provider"
+                        className="input-field"
+                        value={ai.aiProvider}
+                        onChange={(e) => {
+                          const provider = ai.providers.find((p) => p.id === e.target.value);
+                          setAi({
+                            ...ai,
+                            aiProvider: e.target.value,
+                            aiModel: provider?.defaultModel || ai.aiModel,
+                          });
+                        }}
+                      >
+                        {(ai.providers || []).map((p) => (
+                          <option key={p.id} value={p.id} disabled={!p.configured}>
+                            {p.name}
+                            {p.configured ? '' : ' (clé absente)'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label-field" htmlFor="setup-model">Modèle</label>
+                      <select
+                        id="setup-model"
+                        className="input-field"
+                        value={ai.aiModel}
+                        onChange={(e) => setAi({ ...ai, aiModel: e.target.value })}
+                      >
+                        {availableModels.map((m) => (
+                          <option key={m.id} value={m.id}>{m.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label-field" htmlFor="setup-temp">Température</label>
+                      <input
+                        id="setup-temp"
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="2"
+                        className="input-field"
+                        value={ai.aiTemperature}
+                        onChange={(e) => setAi({ ...ai, aiTemperature: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <Button type="submit" disabled={busyKey === 'ai'} className="w-auto">
+                    {busyKey === 'ai' ? 'Enregistrement…' : 'Enregistrer l’IA'}
+                  </Button>
+                </form>
+
+                {SETUP_SECTIONS.map((section) => (
+                  <section
+                    key={section.id}
+                    id={`admin-${section.id}`}
+                    className="rounded-2xl bg-white/80 border border-prune-100 p-5 sm:p-6 space-y-4 scroll-mt-24"
+                  >
+                    <div>
+                      <h2 className="text-lg font-bold text-prune-900">{section.title}</h2>
+                      <p className="text-sm text-prune-500 mt-1">{section.description}</p>
+                    </div>
+                    <ul className="space-y-3">
+                      {section.keys.map((def) => (
+                        <SettingRow
+                          key={def.key}
+                          def={def}
+                          row={byKey[def.key]}
+                          busyKey={busyKey}
+                          onChange={setLocalValue}
+                          onSave={saveSetting}
+                          onRemove={removeSetting}
+                        />
+                      ))}
+                    </ul>
+                  </section>
                 ))}
+
+                <section
+                  id="admin-prompts"
+                  className="rounded-2xl bg-white/80 border border-prune-100 p-5 sm:p-6 space-y-4 scroll-mt-24"
+                >
+                  <div>
+                    <h2 className="text-lg font-bold text-prune-900">Prompts IA</h2>
+                    <p className="text-sm text-prune-500 mt-1">
+                      Contenu 100 % en base — appliqué à tous les utilisateurs.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {PROMPT_GROUPS.map((group) => (
+                      <div key={group.id} className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-xs font-semibold text-prune-500 uppercase mr-1">
+                          {group.title}
+                        </span>
+                        {group.keys.map((key) => {
+                          const p = prompts.find((x) => x.key === key);
+                          if (!p) return null;
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => setSelectedPromptKey(key)}
+                              className={[
+                                'text-xs font-semibold px-2.5 py-1 rounded-full border',
+                                selectedPromptKey === key
+                                  ? 'border-wasabi-500 bg-wasabi-50 text-prune-900'
+                                  : 'border-prune-200 text-prune-600 hover:border-prune-400',
+                              ].join(' ')}
+                            >
+                              {p.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div>
+                    <label className="label-field" htmlFor="prompt-select">Prompt</label>
+                    <select
+                      id="prompt-select"
+                      className="input-field"
+                      value={selectedPromptKey}
+                      onChange={(e) => setSelectedPromptKey(e.target.value)}
+                    >
+                      {prompts.map((p) => (
+                        <option key={p.key} value={p.key}>
+                          {p.name} ({p.key})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {selectedPrompt && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="label-field" htmlFor="prompt-name">Nom</label>
+                          <input
+                            id="prompt-name"
+                            className="input-field"
+                            value={selectedPrompt.name}
+                            onChange={(e) => updatePromptField('name', e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="label-field" htmlFor="prompt-role">Rôle</label>
+                          <select
+                            id="prompt-role"
+                            className="input-field"
+                            value={selectedPrompt.role}
+                            onChange={(e) => updatePromptField('role', e.target.value)}
+                          >
+                            <option value="system">system</option>
+                            <option value="user">user</option>
+                            <option value="assistant">assistant</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="label-field" htmlFor="prompt-content">Contenu</label>
+                        <textarea
+                          id="prompt-content"
+                          className="input-field min-h-[220px] resize-y font-mono text-sm"
+                          value={selectedPrompt.content}
+                          onChange={(e) => updatePromptField('content', e.target.value)}
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        className="w-auto"
+                        disabled={busyKey === `prompt:${selectedPrompt.key}`}
+                        onClick={savePrompt}
+                      >
+                        Enregistrer ce prompt
+                      </Button>
+                    </div>
+                  )}
+                </section>
+
+                <section
+                  id="admin-advanced"
+                  className="rounded-2xl bg-white/80 border border-prune-100 p-5 sm:p-6 space-y-4 scroll-mt-24"
+                >
+                  <div>
+                    <h2 className="text-lg font-bold text-prune-900">Avancé</h2>
+                    <p className="text-sm text-prune-500 mt-1">
+                      Autres clés{' '}
+                      <code className="text-xs bg-prune-100 px-1 rounded">app_settings</code>{' '}
+                      hors catalogue, et ajout libre.
+                    </p>
+                  </div>
+
+                  {advancedSettings.length > 0 ? (
+                    <ul className="space-y-3">
+                      {advancedSettings.map((row) => (
+                        <SettingRow
+                          key={row.key}
+                          def={{ key: row.key, label: row.key }}
+                          row={row}
+                          busyKey={busyKey}
+                          onChange={setLocalValue}
+                          onSave={saveSetting}
+                          onRemove={removeSetting}
+                        />
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-prune-500">Aucune clé hors catalogue.</p>
+                  )}
+
+                  <form onSubmit={addSetting} className="pt-2 border-t border-prune-100 space-y-3">
+                    <h3 className="font-semibold text-prune-900">Ajouter un paramètre</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-[1fr_2fr_auto] gap-2">
+                      <input
+                        className="input-field font-mono text-sm"
+                        placeholder="ma_cle"
+                        value={newSetting.key}
+                        onChange={(e) => setNewSetting((s) => ({ ...s, key: e.target.value }))}
+                        required
+                      />
+                      <input
+                        className="input-field text-sm"
+                        placeholder="valeur"
+                        value={newSetting.value}
+                        onChange={(e) => setNewSetting((s) => ({ ...s, value: e.target.value }))}
+                        required
+                      />
+                      <Button type="submit" className="w-auto text-sm">Ajouter</Button>
+                    </div>
+                  </form>
+                </section>
               </div>
             )}
 
@@ -424,7 +858,7 @@ export default function Admin() {
                   <input
                     id="notifUrl"
                     className="input-field"
-                    placeholder="/dashboard"
+                    placeholder="/"
                     value={broadcast.url}
                     onChange={(e) => setBroadcast({ ...broadcast, url: e.target.value })}
                   />

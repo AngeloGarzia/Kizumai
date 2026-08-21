@@ -1,10 +1,12 @@
-import { CurrencyService } from '../services/CurrencyService.js';
+import { CurrencyResponseDto } from '../dto/currency.dto.js';
 import { asyncHandler } from '../utils/AppError.js';
 import { successResponse } from '../utils/response.js';
 
-export const CurrencyController = {
-  list: asyncHandler(async (req, res) => {
-    const data = await CurrencyService.getCurrencyData();
-    successResponse(res, data);
-  }),
-};
+export function createCurrencyController({ currencyService }) {
+  return {
+    list: asyncHandler(async (req, res) => {
+      const data = await currencyService.getCurrencyData();
+      successResponse(res, CurrencyResponseDto.from(data));
+    }),
+  };
+}

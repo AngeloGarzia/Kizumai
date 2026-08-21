@@ -25,14 +25,21 @@ export default function Login() {
       const loggedUser = await login(email, password);
       const draft = getProjectDraft();
       const from = location.state?.from?.pathname;
-      const isPaid = loggedUser.plan === 'paid' || loggedUser.role === 'admin';
+      const safeFrom =
+        typeof from === 'string' && /^\/(?!\/)/.test(from) && !from.includes('\\')
+          ? from
+          : null;
+      const isAdmin = loggedUser.role === 'admin';
+      const isPaid = loggedUser.plan === 'paid' || isAdmin;
 
       if (draft) {
         navigate('/projet/apercu');
-      } else if (from && isPaid) {
-        navigate(from, { replace: true });
+      } else if (safeFrom && isPaid) {
+        navigate(safeFrom, { replace: true });
+      } else if (isAdmin) {
+        navigate('/admin');
       } else if (isPaid) {
-        navigate('/dashboard');
+        navigate('/');
       } else {
         navigate('/');
       }

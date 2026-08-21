@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import { NotificationController } from '../controllers/NotificationController.js';
-import { authenticate } from '../middleware/auth.js';
 
-const router = Router();
+export function createNotificationRoutes({ notificationController, authenticate }) {
+  const router = Router();
 
-router.get('/vapid-public-key', NotificationController.getPublicKey);
-router.post('/subscribe', authenticate, NotificationController.subscribe);
-router.post('/unsubscribe', authenticate, NotificationController.unsubscribe);
+  router.get('/vapid-public-key', notificationController.getPublicKey);
+  router.post('/subscribe', authenticate, notificationController.subscribe);
+  router.post('/unsubscribe', authenticate, notificationController.unsubscribe);
 
-export default router;
+  return router;
+}

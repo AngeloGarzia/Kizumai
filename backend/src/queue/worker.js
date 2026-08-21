@@ -1,9 +1,11 @@
-import { Worker } from 'bullmq';
+﻿import { Worker } from 'bullmq';
 import { config } from '../config/index.js';
 import { getRedisConnection } from './connection.js';
 import { QUEUE_NAMES, JOB_TYPES } from './queues.js';
-import { PlannerEventModel } from '../models/PlannerEventModel.js';
-import { NotificationService } from '../services/NotificationService.js';
+import { PlannerEventRepository } from '../repositories/PlannerEventRepository.js';
+import { container } from '../container/index.js';
+
+const { notificationService } = container.services;
 
 let worker = null;
 
@@ -34,13 +36,13 @@ function buildReminderPayload(event) {
 
 async function processReminder(job) {
   const { eventId } = job.data;
-  const event = await PlannerEventModel.findById(eventId);
+  const event = await PlannerEventRepository.findById(eventId);
 
   // L'événement a pu être supprimé, terminé ou annulé entre-temps.
   if (!event) return { skipped: 'deleted' };
   if (!['todo', 'in_progress'].includes(event.status)) return { skipped: event.status };
 
-  const result = await NotificationService.notifyUser(event.userId, buildReminderPayload(event));
+  const result = await notificationService.notifyUser(event.userId, buildReminderPayload(event));
   return { channel: result.channel };
 }
 
@@ -88,3 +90,5 @@ export async function stopWorker() {
     worker = null;
   }
 }
+
+

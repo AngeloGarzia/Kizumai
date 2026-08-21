@@ -1,7 +1,7 @@
 import webpush from 'web-push';
 import { config } from '../config/index.js';
-import { PushSubscriptionModel } from '../models/PushSubscriptionModel.js';
 import { AppError } from '../utils/AppError.js';
+import { assertSafePushEndpoint } from '../utils/pushEndpoint.js';
 
 let configured = false;
 
@@ -15,58 +15,83 @@ function ensureConfigured() {
   }
 }
 
-export const PushService = {
-  isEnabled() {
-    return config.push.enabled;
-  },
+export function createPushService({ pushSubscriptionRepository }) {
+  return {
+    isEnabled() {
+      return config.push.enabled;
+    },
 
-  getPublicKey() {
-    return config.push.publicKey;
-  },
+    getPublicKey() {
+      return config.push.publicKey;
+    },
 
-  async subscribe(userId, subscription, userAgent) {
-    ensureConfigured();
-    const endpoint = subscription?.endpoint;
-    const p256dh = subscription?.keys?.p256dh;
-    const auth = subscription?.keys?.auth;
+    async subscribe(userId, subscription, userAgent) {
+      ensureConfigured();
+      const endpoint = subscription?.endpoint;
+      const p256dh = subscription?.keys?.p256dh;
+      const auth = subscription?.keys?.auth;
 
-    if (!endpoint || !p256dh || !auth) {
-      throw new AppError('Abonnement push invalide', 400);
-    }
+      if (!endpoint || !p256dh || !auth) {
+        throw new AppError('Abonnement push invalide', 400);
+      }
 
-    return PushSubscriptionModel.upsert({ userId, endpoint, p256dh, auth, userAgent });
-  },
+      const safeEndpoint = await assertSafePushEndpoint(endpoint);
 
-  async unsubscribe(endpoint) {
-    if (!endpoint) throw new AppError('Endpoint requis', 400);
-    return PushSubscriptionModel.deleteByEndpoint(endpoint);
-  },
+      const existing = await pushSubscriptionRepository.findByEndpoint(safeEndpoint);
+      if (existing && existing.userId !== userId) {
+        throw new AppError('Cet abonnement push est déjà lié à un autre compte', 409);
+      }
 
-  // Envoie une notification à un ensemble d'abonnements. Purge automatiquement
-  // les abonnements expirés (410 Gone / 404). Renvoie le nombre d'envois réussis.
-  async sendToSubscriptions(subscriptions, payload) {
-    ensureConfigured();
-    const body = JSON.stringify(payload);
-    let delivered = 0;
+      const saved = await pushSubscriptionRepository.upsert({
+        userId,
+        endpoint: safeEndpoint,
+        p256dh,
+        auth,
+        userAgent,
+      });
+      if (!saved) {
+        throw new AppError('Impossible d\'enregistrer l\'abonnement push', 409);
+      }
+      return saved;
+    },
 
-    await Promise.all(
-      subscriptions.map(async (sub) => {
-        try {
-          await webpush.sendNotification(
-            { endpoint: sub.endpoint, keys: sub.keys },
-            body
-          );
-          delivered += 1;
-        } catch (error) {
-          if (error?.statusCode === 410 || error?.statusCode === 404) {
-            await PushSubscriptionModel.deleteByEndpoint(sub.endpoint);
-          } else {
-            console.warn(`[push] Échec d'envoi (${error?.statusCode || '??'}): ${error.message}`);
+    async unsubscribe(userId, endpoint) {
+      if (!endpoint) throw new AppError('Endpoint requis', 400);
+      const safeEndpoint = await assertSafePushEndpoint(endpoint);
+      const deleted = await pushSubscriptionRepository.deleteByEndpointForUser(
+        safeEndpoint,
+        userId
+      );
+      if (!deleted) {
+        throw new AppError('Abonnement introuvable', 404);
+      }
+      return true;
+    },
+
+    async sendToSubscriptions(subscriptions, payload) {
+      ensureConfigured();
+      const body = JSON.stringify(payload);
+      let delivered = 0;
+
+      await Promise.all(
+        subscriptions.map(async (sub) => {
+          try {
+            await webpush.sendNotification(
+              { endpoint: sub.endpoint, keys: sub.keys },
+              body
+            );
+            delivered += 1;
+          } catch (error) {
+            if (error?.statusCode === 410 || error?.statusCode === 404) {
+              await pushSubscriptionRepository.deleteByEndpoint(sub.endpoint);
+            } else {
+              console.warn(`[push] Échec d'envoi (${error?.statusCode || '??'}): ${error.message}`);
+            }
           }
-        }
-      })
-    );
+        })
+      );
 
-    return delivered;
-  },
-};
+      return delivered;
+    },
+  };
+}

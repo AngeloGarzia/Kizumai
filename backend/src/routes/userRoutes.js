@@ -1,15 +1,14 @@
 import { Router } from 'express';
-import { UserController } from '../controllers/UserController.js';
-import { authenticate } from '../middleware/auth.js';
-import { requireAdmin } from '../middleware/requireAdmin.js';
 
-const router = Router();
+export function createUserRoutes({ userController, authenticate, requireAdmin }) {
+  const router = Router();
 
-router.use(authenticate);
+  router.use(authenticate);
 
-router.get('/', requireAdmin, UserController.getAll);
-router.get('/:id', UserController.getById);
-router.put('/:id', UserController.update);
-router.delete('/:id', UserController.delete);
+  router.get('/', requireAdmin, userController.getAll);
+  router.get('/:id', userController.getById);
+  router.put('/:id', userController.update);
+  router.delete('/:id', requireAdmin, userController.delete);
 
-export default router;
+  return router;
+}

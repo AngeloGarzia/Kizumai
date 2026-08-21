@@ -85,8 +85,8 @@ export function isModelValidForProvider(providerId, modelId) {
 export function resolveModel(providerId, modelId) {
   const provider = getProviderById(providerId);
   if (!provider) return null;
-  if (modelId && provider.models.some((m) => m.id === modelId)) {
-    return modelId;
-  }
+  const trimmed = modelId != null ? String(modelId).trim() : '';
+  // Accepte le modèle enregistré en base (catalogue live ou legacy).
+  if (trimmed) return trimmed;
   return provider.defaultModel;
 }

@@ -1,15 +1,24 @@
 import { Router } from 'express';
-import { AuthController } from '../controllers/AuthController.js';
-import { authenticate } from '../middleware/auth.js';
-import { authRateLimiter } from '../middleware/rateLimiter.js';
 
-const router = Router();
+export function createAuthRoutes({
+  authController,
+  authenticate,
+  loginRateLimiter,
+  registerRateLimiter,
+  refreshRateLimiter,
+  authActionRateLimiter,
+}) {
+  const router = Router();
 
-router.post('/register', authRateLimiter, AuthController.register);
-router.post('/login', authRateLimiter, AuthController.login);
-router.post('/refresh', authRateLimiter, AuthController.refresh);
-router.post('/logout', AuthController.logout);
-router.get('/me', authenticate, AuthController.me);
-router.post('/upgrade', authenticate, AuthController.upgrade);
+  router.get('/csrf', authController.csrf);
+  router.get('/billing-config', authController.billingConfig);
+  router.post('/register', registerRateLimiter, authController.register);
+  router.post('/login', loginRateLimiter, authController.login);
+  router.post('/refresh', refreshRateLimiter, authController.refresh);
+  router.post('/logout', authController.logout);
+  router.post('/logout-all', authenticate, authActionRateLimiter, authController.logoutAll);
+  router.get('/me', authenticate, authController.me);
+  router.post('/upgrade', authenticate, authActionRateLimiter, authController.upgrade);
 
-export default router;
+  return router;
+}

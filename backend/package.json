@@ -9,7 +9,9 @@
     "start": "node --env-file=.env.production src/server.js",
     "start:dev": "node --env-file=.env.development src/server.js",
     "db:migrate": "node --env-file=.env.development src/database/run-migrate.js",
-    "db:migrate:prod": "node --env-file=.env.production src/database/run-migrate.js"
+    "db:migrate:prod": "node --env-file=.env.production src/database/run-migrate.js",
+    "db:seed:camille": "node --env-file=.env.development src/database/seedCamilleDemo.js",
+    "test": "node --test tests/**/*.test.js"
   },
   "keywords": [],
   "author": "",
@@ -20,14 +22,27 @@
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
-    "express": "^4.21.2",
+    "express": "^4.22.2",
     "express-rate-limit": "^7.5.0",
+    "file-type": "^22.0.1",
     "helmet": "^8.0.0",
     "ioredis": "^5.11.1",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.2.0",
+    "node-cron": "^4.6.0",
     "nodemailer": "^9.0.3",
+    "officeparser": "^7.3.0",
+    "pdf-parse": "^2.4.5",
     "pg": "^8.22.0",
-    "web-push": "^3.6.7"
+    "tesseract.js": "^7.0.0",
+    "web-push": "^3.6.7",
+    "word-extractor": "^1.0.4"
+  },
+  "overrides": {
+    "body-parser": "^1.20.6",
+    "pdfjs-dist": "5.4.296",
+    "officeparser": {
+      "pdfjs-dist": "5.4.296"
+    }
   }
 }

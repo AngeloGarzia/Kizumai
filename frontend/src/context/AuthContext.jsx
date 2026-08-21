@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { authService } from '../services/authService.js';
-import { ApiError } from '../services/api.js';
+import { ApiError, ensureCsrfToken } from '../services/api.js';
+import { clearProjectDraft, clearSearchSeed } from '../services/projectService.js';
 
 const AuthContext = createContext(null);
 
@@ -10,6 +11,7 @@ export function AuthProvider({ children }) {
 
   const loadUser = useCallback(async () => {
     try {
+      await ensureCsrfToken();
       const currentUser = await authService.getMe();
       setUser(currentUser);
     } catch (error) {
@@ -39,14 +41,16 @@ export function AuthProvider({ children }) {
     return loggedUser;
   };
 
-  const register = async (name, email, password, plan = 'free') => {
-    const newUser = await authService.register({ name, email, password, plan });
+  const register = async (name, email, password) => {
+    const newUser = await authService.register({ name, email, password });
     setUser(newUser);
     return newUser;
   };
 
   const logout = async () => {
     await authService.logout();
+    clearProjectDraft();
+    clearSearchSeed();
     setUser(null);
   };
 

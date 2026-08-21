@@ -1,0 +1,78 @@
+@theme {
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+
+  /* Typographie : échelle standard Tailwind décalée d’un cran (+1) */
+  --text-xs: 0.875rem;
+  --text-xs--line-height: calc(1.25 / 0.875);
+  --text-sm: 1rem;
+  --text-sm--line-height: calc(1.5 / 1);
+  --text-base: 1.125rem;
+  --text-base--line-height: calc(1.75 / 1.125);
+  --text-lg: 1.25rem;
+  --text-lg--line-height: calc(1.75 / 1.25);
+  --text-xl: 1.5rem;
+  --text-xl--line-height: calc(2 / 1.5);
+  --text-2xl: 1.875rem;
+  --text-2xl--line-height: calc(2.25 / 1.875);
+  --text-3xl: 2.25rem;
+  --text-3xl--line-height: calc(2.5 / 2.25);
+  --text-4xl: 3rem;
+  --text-4xl--line-height: 1;
+  --text-5xl: 3.75rem;
+  --text-5xl--line-height: 1;
+  --text-6xl: 4.5rem;
+  --text-6xl--line-height: 1;
+  --text-7xl: 6rem;
+  --text-7xl--line-height: 1;
+  --text-8xl: 8rem;
+  --text-8xl--line-height: 1;
+  --text-9xl: 9rem;
+  --text-9xl--line-height: 1;
+
+  /* Wasabi — vert lime */
+  --color-wasabi-50: #f7fae8;
+  --color-wasabi-100: #ecf4cc;
+  --color-wasabi-200: #d9ea9e;
+  --color-wasabi-300: #c0db6a;
+  --color-wasabi-400: #a8c82a;
+  --color-wasabi-500: #8fad1f;
+  --color-wasabi-600: #6d8816;
+  --color-wasabi-700: #536813;
+  --color-wasabi-800: #445314;
+  --color-wasabi-900: #3a4615;
+
+  /* Orange Topaze */
+  --color-topaz-50: #fef6ee;
+  --color-topaz-100: #fdebd6;
+  --color-topaz-200: #fad3ac;
+  --color-topaz-300: #f6b477;
+  --color-topaz-400: #f18d40;
+  --color-topaz-500: #e8722a;
+  --color-topaz-600: #d9571a;
+  --color-topaz-700: #b44217;
+  --color-topaz-800: #90361a;
+  --color-topaz-900: #742f18;
+
+  /* Prune noir */
+  --color-prune-50: #f6f0f4;
+  --color-prune-100: #ede0e8;
+  --color-prune-200: #dbc1d2;
+  --color-prune-300: #c19bb3;
+  --color-prune-400: #a47190;
+  --color-prune-500: #8a5574;
+  --color-prune-600: #6f425c;
+  --color-prune-700: #5a3549;
+  --color-prune-800: #3d2433;
+  --color-prune-900: #1a0f1c;
+  --color-prune-950: #120a14;
+
+  /* Azure — conservé pour usage ponctuel */
+  --color-azure-50: #f0f8ff;
+  --color-azure-100: #dbeafe;
+  --color-azure-200: #bfdbfe;
+  --color-azure-300: #7ec8f2;
+  --color-azure-400: #38a8e8;
+  --color-azure-500: #0078d4;
+  --color-azure-600: #0066b8;
+  --color-azure-700: #005499;
+}

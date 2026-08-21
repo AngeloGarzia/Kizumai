@@ -4,11 +4,19 @@ import { connectDatabase } from './database/connect.js';
 import { startWorker, stopWorker } from './queue/worker.js';
 import { closeQueues } from './queue/queues.js';
 import { closeRedisConnection } from './queue/connection.js';
+import { container } from './container/index.js';
+import { startProjectMemoryJobs } from './jobs/projectMemoryJobs.js';
 
 await connectDatabase();
 
 // Worker BullMQ (traitement des rappels planifiés). No-op sans Redis.
 startWorker();
+
+const memoryJobs = await startProjectMemoryJobs({
+  projectMemoryDecayJob: container.services.projectMemoryDecayJob,
+  projectMemorySnapshotService: container.services.projectMemorySnapshotService,
+  settingsService: container.services.settingsService,
+});
 
 const server = app.listen(config.port, () => {
   console.log(`Serveur Kizumai démarré sur le port ${config.port}`);
@@ -17,6 +25,7 @@ const server = app.listen(config.port, () => {
 
 async function shutdown(signal) {
   console.log(`\n[server] Signal ${signal} reçu — arrêt en cours...`);
+  memoryJobs.stop();
   server.close();
   await stopWorker();
   await closeQueues();

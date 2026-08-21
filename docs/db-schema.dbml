@@ -14,6 +14,20 @@ Table users {
   updated_at timestamptz [not null]
 }
 
+Table refresh_tokens {
+  id uuid [pk]
+  user_id integer [not null, ref: > users.id, note: 'ON DELETE CASCADE']
+  token_hash text [unique, not null, note: 'HMAC-SHA256 du refresh opaque']
+  family_id uuid [not null, note: 'famille pour rotation / détection de vol']
+  expires_at timestamptz [not null]
+  revoked_at timestamptz
+  replaced_by uuid [ref: > refresh_tokens.id, note: 'ON DELETE SET NULL']
+  created_at timestamptz [not null]
+  last_used_at timestamptz
+  user_agent text
+  ip inet
+}
+
 Table projects {
   id integer [pk, increment]
   user_id integer [ref: > users.id, note: 'ON DELETE CASCADE']
@@ -79,7 +93,8 @@ Table documents {
   type varchar(40) [not null, default: 'other', note: 'STI: pdf | image | spreadsheet | document | other (non contraint)']
   title varchar(200)
   file_name varchar(255) [not null]
-  storage_key text [not null]
+  storage_key text [not null, note: 'clé logique ; contenu binaire dans content']
+  content bytea [note: 'fichier binaire (PDF, image, etc.) stocké en base']
   mime_type varchar(150)
   size_bytes bigint
   attributes jsonb [not null, default: '{}']
@@ -333,6 +348,41 @@ Table contact_links {
   }
 }
 
+// Parcours compétences : formation, diplôme, études, bilan de compétences.
+// project_id optionnel ; pièce jointe via documents (document_id nullable).
+Table learning_records {
+  id integer [pk, increment]
+  user_id integer [not null, ref: > users.id, note: 'ON DELETE CASCADE']
+  project_id integer [ref: > projects.id, note: 'ON DELETE SET NULL — optionnel']
+  document_id integer [ref: > documents.id, note: 'ON DELETE SET NULL — pièce jointe optionnelle']
+  record_type varchar(30) [not null, note: 'formation | diplome | etude | bilan_competences']
+  title varchar(255) [not null]
+  organization varchar(255)
+  status varchar(30) [not null, default: 'envisage', note: 'envisage | en_cours | termine | abandonne']
+  level varchar(80)
+  field varchar(120)
+  format varchar(30) [note: 'en_ligne | presentiel | mixte']
+  start_date date
+  end_date date
+  duration_label varchar(80)
+  diploma_obtained boolean
+  skills jsonb [not null, default: '[]']
+  description text
+  notes text
+  source varchar(30) [not null, default: 'manual', note: 'manual | ai_suggestion | import']
+  ai_snapshot jsonb [not null, default: '{}']
+  metadata jsonb [not null, default: '{}']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    user_id
+    project_id
+    (user_id, record_type)
+    status
+  }
+}
+
 Table push_subscriptions {
   id integer [pk, increment]
   user_id integer [not null, ref: > users.id, note: 'ON DELETE CASCADE']
@@ -374,3 +424,160 @@ Table schema_migrations {
   filename varchar(255) [unique, not null]
   applied_at timestamptz [not null]
 }
+
+Table resource_categories {
+  id integer [pk, increment]
+  parent_id integer [ref: > resource_categories.id, note: 'ON DELETE SET NULL — héritage hiérarchique']
+  slug varchar(80) [unique, not null]
+  title varchar(160) [not null]
+  description text
+  icon varchar(40)
+  sort_order integer [not null, default: 0]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+Table project_stage_runs {
+  id integer [pk, increment]
+  project_id integer [not null, ref: > projects.id, note: 'ON DELETE CASCADE']
+  stage varchar(30) [not null, note: 'unique avec project_id']
+  status varchar(20) [not null, default: 'not_started']
+  progress_percent smallint [not null, default: 0]
+  started_at timestamptz
+  completed_at timestamptz
+  summary text
+  metadata jsonb [not null, default: '{}']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table stage_workflow_templates {
+  id integer [pk, increment]
+  stage varchar(30) [not null]
+  slug varchar(80) [not null]
+  title varchar(200) [not null]
+  description text
+  sort_order integer [not null, default: 0]
+  is_required boolean [not null, default: true]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table stage_workflow_actions {
+  id integer [pk, increment]
+  template_id integer [not null, ref: > stage_workflow_templates.id, note: 'ON DELETE CASCADE']
+  slug varchar(80) [not null]
+  title varchar(255) [not null]
+  description text
+  sort_order integer [not null, default: 0]
+  is_required boolean [not null, default: true]
+  default_duration_days integer
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table project_stage_tasks {
+  id integer [pk, increment]
+  stage_run_id integer [not null, ref: > project_stage_runs.id, note: 'ON DELETE CASCADE']
+  action_id integer [not null, ref: > stage_workflow_actions.id]
+  status varchar(20) [not null, default: 'todo']
+  notes text
+  due_at timestamptz
+  completed_at timestamptz
+  completed_by integer [ref: > users.id, note: 'ON DELETE SET NULL']
+  planner_event_id integer [ref: > planner_events.id, note: 'ON DELETE SET NULL']
+  metadata jsonb [not null, default: '{}']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table project_stage_links {
+  id integer [pk, increment]
+  stage_run_id integer [not null, ref: > project_stage_runs.id, note: 'ON DELETE CASCADE']
+  entity_type varchar(30) [not null, note: 'document | contact | planner_event | task']
+  entity_id integer [not null]
+  role varchar(80)
+  note text
+  created_at timestamptz [not null]
+}
+
+Table stage_milestone_templates {
+  id integer [pk, increment]
+  stage varchar(30) [not null]
+  slug varchar(80) [not null]
+  title varchar(200) [not null]
+  description text
+  offset_days integer [not null, default: 0]
+  sort_order integer [not null, default: 0]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table project_stage_milestones {
+  id integer [pk, increment]
+  stage_run_id integer [not null, ref: > project_stage_runs.id, note: 'ON DELETE CASCADE']
+  slug varchar(80) [not null]
+  title varchar(200) [not null]
+  description text
+  milestone_at timestamptz [not null]
+  status varchar(20) [not null, default: 'planned']
+  task_id integer [ref: > project_stage_tasks.id, note: 'ON DELETE SET NULL']
+  planner_event_id integer [ref: > planner_events.id, note: 'ON DELETE SET NULL']
+  sort_order integer [not null, default: 0]
+  metadata jsonb [not null, default: '{}']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+// Mémoire synaptique IA (pgvector)
+Table project_memory_nodes {
+  id uuid [pk]
+  project_id integer [not null, ref: > projects.id, note: 'ON DELETE CASCADE']
+  node_type varchar(30) [not null, note: 'fact|decision|event|task_state|milestone|insight|risk']
+  source_entity_type varchar(40) [note: 'polymorphe']
+  source_entity_id integer
+  content text [not null]
+  embedding vector [note: 'vector(1536) pgvector']
+  importance numeric(4,3) [not null, default: 0.5]
+  confidence numeric(4,3) [not null, default: 1.0]
+  decay_rate numeric(5,4) [not null, default: 0.01]
+  access_count integer [not null, default: 0]
+  last_accessed_at timestamptz
+  archived_at timestamptz
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table project_memory_edges {
+  id uuid [pk]
+  project_id integer [not null, ref: > projects.id, note: 'ON DELETE CASCADE']
+  source_node_id uuid [not null, ref: > project_memory_nodes.id, note: 'ON DELETE CASCADE']
+  target_node_id uuid [not null, ref: > project_memory_nodes.id, note: 'ON DELETE CASCADE']
+  relation_type varchar(30) [not null, note: 'causes|depends_on|blocks|relates_to|follows|contradicts|reinforces']
+  weight numeric(4,3) [not null, default: 0.5]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (source_node_id, target_node_id, relation_type) [unique]
+  }
+}
+
+Table project_memory_snapshots {
+  id integer [pk, increment]
+  project_id integer [not null, unique, ref: > projects.id, note: 'ON DELETE CASCADE']
+  summary text [not null]
+  key_facts jsonb [not null, default: '[]']
+  active_blockers jsonb [not null, default: '[]']
+  next_actions jsonb [not null, default: '[]']
+  generated_at timestamptz [not null]
+  model_used varchar(80)
+  token_count integer
+  events_since_snapshot integer [not null, default: 0]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+

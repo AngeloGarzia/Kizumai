@@ -143,7 +143,7 @@ export default function BudgetField({
             <span>{formatBudget(limits.min, currency)}</span>
             <span>{formatBudget(limits.max, currency)}</span>
           </div>
-          <p className="text-[11px] text-prune-400 mt-2">
+          <p className="text-xs text-prune-400 mt-2">
             Plage équivalente à 500 € – 1 000 000 €
           </p>
         </div>

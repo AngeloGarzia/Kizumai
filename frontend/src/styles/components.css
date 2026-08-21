@@ -1,0 +1,139 @@
+@layer components {
+  /* Fond filigrané prune — pages claires */
+  .page-bg {
+    background-color: #f6f0f4;
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%238a5574' stroke-opacity='0.07' stroke-width='0.65'%3E%3Cpath d='M60 10 L68 46 L104 60 L68 74 L60 110 L52 74 L16 60 L52 46 Z'/%3E%3Ccircle cx='60' cy='60' r='38'/%3E%3Ccircle cx='60' cy='60' r='24'/%3E%3Cpath d='M0 60 H120 M60 0 V120' stroke-opacity='0.04'/%3E%3C/g%3E%3C/svg%3E"),
+      radial-gradient(ellipse 85% 55% at 5% 0%, rgba(90, 53, 73, 0.06), transparent 58%),
+      radial-gradient(ellipse 75% 50% at 100% 100%, rgba(26, 15, 28, 0.04), transparent 52%);
+    background-size: 120px 120px, 100% 100%, 100% 100%;
+    background-attachment: fixed;
+  }
+
+  /* Fond filigrané prune sur fond sombre */
+  .page-bg-dark {
+    background-color: #1a0f1c;
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%23c19bb3' stroke-opacity='0.09' stroke-width='0.65'%3E%3Cpath d='M60 10 L68 46 L104 60 L68 74 L60 110 L52 74 L16 60 L52 46 Z'/%3E%3Ccircle cx='60' cy='60' r='38'/%3E%3Ccircle cx='60' cy='60' r='24'/%3E%3Cpath d='M0 60 H120 M60 0 V120' stroke-opacity='0.05'/%3E%3C/g%3E%3C/svg%3E"),
+      radial-gradient(ellipse 80% 50% at 50% 0%, rgba(193, 155, 179, 0.1), transparent 60%),
+      radial-gradient(ellipse 60% 40% at 0% 100%, rgba(90, 53, 73, 0.12), transparent 55%);
+    background-size: 120px 120px, 100% 100%, 100% 100%;
+    background-attachment: fixed;
+  }
+
+  .header-glass {
+    @apply bg-white/65 backdrop-blur-md border-b border-prune-200/40;
+  }
+
+  .header-glass-dark {
+    @apply bg-prune-950/70 backdrop-blur-md border-b border-prune-700/20;
+  }
+
+  /* Auth : fond sombre mobile, clair desktop */
+  .page-bg-auth {
+    background-color: #1a0f1c;
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%23c19bb3' stroke-opacity='0.09' stroke-width='0.65'%3E%3Cpath d='M60 10 L68 46 L104 60 L68 74 L60 110 L52 74 L16 60 L52 46 Z'/%3E%3Ccircle cx='60' cy='60' r='38'/%3E%3Ccircle cx='60' cy='60' r='24'/%3E%3Cpath d='M0 60 H120 M60 0 V120' stroke-opacity='0.05'/%3E%3C/g%3E%3C/svg%3E"),
+      radial-gradient(ellipse 80% 50% at 50% 0%, rgba(193, 155, 179, 0.1), transparent 60%),
+      radial-gradient(ellipse 60% 40% at 0% 100%, rgba(90, 53, 73, 0.12), transparent 55%);
+    background-size: 120px 120px, 100% 100%, 100% 100%;
+    background-attachment: fixed;
+  }
+
+  @media (min-width: 1024px) {
+    .page-bg-auth {
+      background-color: #f6f0f4;
+      background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%238a5574' stroke-opacity='0.07' stroke-width='0.65'%3E%3Cpath d='M60 10 L68 46 L104 60 L68 74 L60 110 L52 74 L16 60 L52 46 Z'/%3E%3Ccircle cx='60' cy='60' r='38'/%3E%3Ccircle cx='60' cy='60' r='24'/%3E%3Cpath d='M0 60 H120 M60 0 V120' stroke-opacity='0.04'/%3E%3C/g%3E%3C/svg%3E"),
+        radial-gradient(ellipse 85% 55% at 5% 0%, rgba(90, 53, 73, 0.06), transparent 58%),
+        radial-gradient(ellipse 75% 50% at 100% 100%, rgba(26, 15, 28, 0.04), transparent 52%);
+    }
+  }
+
+  .page-container {
+    @apply w-full mx-auto px-4 sm:px-6 lg:px-8;
+    max-width: 96rem; /* 7xl (80rem) + 20 % */
+  }
+
+  .card {
+    @apply bg-white rounded-2xl border border-prune-100 shadow-sm;
+  }
+
+  .input-field {
+    @apply w-full min-h-11 px-4 py-2.5 text-base
+           bg-white border border-prune-200 rounded-xl
+           text-prune-900 placeholder:text-prune-400
+           focus:outline-none focus:ring-2 focus:ring-topaz-400 focus:border-topaz-400
+           transition-shadow;
+  }
+
+  .btn-primary {
+    @apply w-full min-h-11 px-5 py-2.5
+           bg-gradient-to-r from-topaz-500 to-topaz-400
+           text-white text-base font-semibold rounded-xl
+           hover:from-topaz-600 hover:to-topaz-500 active:from-topaz-700 active:to-topaz-600
+           focus:outline-none focus:ring-2 focus:ring-topaz-300 focus:ring-offset-2
+           shadow-md shadow-topaz-500/25
+           transition-all disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply min-h-11 px-4 py-2.5
+           text-base font-medium text-prune-800
+           bg-prune-100 rounded-xl
+           hover:bg-prune-200 active:bg-prune-300
+           focus:outline-none focus:ring-2 focus:ring-prune-300
+           transition-colors;
+  }
+
+  .link-accent {
+    @apply text-topaz-600 font-semibold hover:text-topaz-500 hover:underline;
+  }
+
+  .label-field {
+    @apply block text-base font-medium text-prune-800 mb-1.5;
+  }
+
+  .alert-error {
+    @apply text-base text-prune-800 bg-prune-50 border border-prune-200 px-4 py-3 rounded-xl;
+  }
+
+  .alert-success {
+    @apply text-base text-wasabi-800 bg-wasabi-50 border border-wasabi-200 px-4 py-3 rounded-xl;
+  }
+
+  .btn-cta {
+    @apply min-h-12 px-6 py-3.5
+           bg-gradient-to-r from-topaz-500 to-topaz-400
+           text-white text-base sm:text-lg font-semibold rounded-full
+           hover:from-topaz-600 hover:to-topaz-500
+           shadow-lg shadow-topaz-500/30
+           flex items-center justify-center gap-3
+           transition-all active:scale-[0.98]
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-cta-overlay {
+    @apply min-h-12 px-8 py-3.5
+           bg-gradient-to-r from-topaz-500 to-topaz-400
+           text-white text-base sm:text-lg font-bold rounded-full
+           hover:from-topaz-600 hover:to-topaz-500
+           transition-all active:scale-[0.95]
+           border-2 border-white/20;
+  }
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

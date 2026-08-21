@@ -15,6 +15,7 @@ La **source de vérité** reste les migrations : `backend/src/database/migration
 ```mermaid
 erDiagram
     USERS ||--o{ PROJECTS : "possède (user_id)"
+    USERS ||--o{ REFRESH_TOKENS : "sessions (user_id)"
     USERS ||--o{ DOCUMENTS : "téléverse (uploaded_by)"
     USERS ||--o{ PUSH_SUBSCRIPTIONS : "abonne (user_id)"
     USERS ||--o{ USER_CONNECTIONS : "journalise (user_id)"
@@ -23,6 +24,9 @@ erDiagram
     USERS ||--o{ CONTACTS : "possède (user_id)"
     PROJECTS ||--o{ CONTACTS : "projet principal (project_id)"
     CONTACTS ||--o{ CONTACT_LINKS : "rattaché à N objets"
+    USERS ||--o{ LEARNING_RECORDS : "parcours compétences (user_id)"
+    PROJECTS ||--o{ LEARNING_RECORDS : "lien optionnel (project_id)"
+    DOCUMENTS ||--o| LEARNING_RECORDS : "pièce jointe optionnelle (document_id)"
     ACTIVITIES ||--o{ PROJECTS : "quoi (activity_id)"
     LOCATIONS ||--o{ PROJECTS : "où (location_id)"
     PROJECTS ||--o{ DOCUMENTS : "regroupe (project_id)"
@@ -45,6 +49,20 @@ erDiagram
         varchar plan
         timestamptz created_at
         timestamptz updated_at
+    }
+
+    REFRESH_TOKENS {
+        uuid id PK
+        int user_id FK
+        text token_hash UK
+        uuid family_id
+        timestamptz expires_at
+        timestamptz revoked_at
+        uuid replaced_by FK
+        timestamptz created_at
+        timestamptz last_used_at
+        text user_agent
+        inet ip
     }
 
     PROJECTS {
@@ -291,6 +309,32 @@ erDiagram
         timestamptz created_at
     }
 
+    LEARNING_RECORDS {
+        serial id PK
+        int user_id FK
+        int project_id FK
+        int document_id FK
+        varchar record_type
+        varchar title
+        varchar organization
+        varchar status
+        varchar level
+        varchar field
+        varchar format
+        date start_date
+        date end_date
+        varchar duration_label
+        boolean diploma_obtained
+        jsonb skills
+        text description
+        text notes
+        varchar source
+        jsonb ai_snapshot
+        jsonb metadata
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
     PUSH_SUBSCRIPTIONS {
         serial id PK
         int user_id FK
@@ -339,6 +383,7 @@ erDiagram
 | Relation | Règle |
 |---|---|
 | `users → projects` | CASCADE |
+| `users → refresh_tokens` | CASCADE |
 | `projects → documents` | CASCADE |
 | `users → push_subscriptions` | CASCADE |
 | `users → planner_events` | CASCADE |
@@ -347,6 +392,9 @@ erDiagram
 | `projects → contacts` | SET NULL |
 | `contacts → contact_links` | CASCADE |
 | `{project,document,planner_event,company} → contact_links` | CASCADE (trigger, `entity_id` polymorphe) |
+| `users → learning_records` | CASCADE |
+| `projects → learning_records` | SET NULL |
+| `documents → learning_records` | SET NULL |
 | `activities → projects` | SET NULL |
 | `locations → projects` | SET NULL |
 | `users → documents` (uploaded_by) | SET NULL |
@@ -357,6 +405,10 @@ erDiagram
 | `companies → company_financials` | CASCADE |
 | `activities/locations → companies` | SET NULL |
 | `companies → accounting_profiles` | CASCADE |
+| `projects → project_memory_nodes` | CASCADE |
+| `projects → project_memory_edges` | CASCADE |
+| `projects → project_memory_snapshots` | CASCADE |
+| `project_memory_nodes → edges` | CASCADE |
 
 ## Contraintes CHECK
 
@@ -371,3 +423,9 @@ erDiagram
 - `planner_events.kind` ∈ `{ task, deadline, appointment, reminder }` · `status` ∈ `{ todo, in_progress, done, cancelled }` · `end_at ≥ start_at`
 - `contacts.contact_type` ∈ `{ person, company }` · `preferred_channel` ∈ `{ email, phone, mobile }`
 - `contact_links.entity_type` ∈ `{ project, document, planner_event, company }` · unique `(contact_id, entity_type, entity_id)`
+- `learning_records.record_type` ∈ `{ formation, diplome, etude, bilan_competences }`
+- `learning_records.status` ∈ `{ envisage, en_cours, termine, abandonne }`
+- `learning_records.format` ∈ `{ en_ligne, presentiel, mixte }` · `source` ∈ `{ manual, ai_suggestion, import }`
+- `learning_records.end_date ≥ start_date` (si les deux sont renseignés)
+- `project_memory_nodes.node_type` ∈ `{ fact, decision, event, task_state, milestone, insight, risk }`
+- `project_memory_edges.relation_type` ∈ `{ causes, depends_on, blocks, relates_to, follows, contradicts, reinforces }`

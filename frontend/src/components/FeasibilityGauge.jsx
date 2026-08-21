@@ -79,7 +79,7 @@ export default function FeasibilityGauge({ score, compact = false }) {
       </div>
 
       <div className="mt-2 flex items-center justify-between gap-2">
-        <span className="text-[11px] text-[#a65d4e]">Faudra cravacher</span>
+        <span className="text-xs text-[#a65d4e]">Faudra cravacher</span>
         <span
           className={[
             'text-xs font-semibold text-center',
@@ -89,7 +89,7 @@ export default function FeasibilityGauge({ score, compact = false }) {
         >
           {label}
         </span>
-        <span className="text-[11px] text-wasabi-600 text-right">Plus facile</span>
+        <span className="text-xs text-wasabi-600 text-right">Plus facile</span>
       </div>
     </div>
   );

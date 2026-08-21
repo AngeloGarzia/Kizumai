@@ -33,9 +33,11 @@ const IconAdmin = (props) => (
 );
 
 const NAV_LINKS = [
-  { to: '/creer-son-avenir', label: 'Créer mon avenir', Icon: IconSearch },
-  { to: '/dashboard', label: 'Tableau de bord', Icon: IconDashboard },
-  { to: '/planner', label: 'Planner', Icon: IconCalendar },
+  { to: '/', label: 'Accueil', Icon: IconDashboard },
+  { to: '/parcours', label: 'Parcours', Icon: IconSearch },
+  { to: '/fil-du-temps', label: 'Fil du temps', Icon: IconDashboard },
+  { to: '/ressources', label: 'Ressources', Icon: IconSearch },
+  { to: '/planner', label: 'Agenda', Icon: IconCalendar },
   { to: '/admin', label: 'Administration', Icon: IconAdmin, adminOnly: true },
 ];
 
@@ -94,24 +96,27 @@ export default function AppShell({ children, onLogout }) {
         </nav>
 
         <div className="border-t border-prune-100 p-3">
-          <div className="flex items-center gap-3 px-2 py-2">
-            <span className="flex items-center justify-center w-9 h-9 rounded-full bg-prune-100 text-prune-700 font-semibold text-sm shrink-0">
-              {(user?.name || user?.email || '?').charAt(0).toUpperCase()}
-            </span>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-prune-900 truncate">{user?.name || 'Utilisateur'}</p>
-              <p className="text-xs text-prune-500 truncate">{user?.email}</p>
-            </div>
-          </div>
           <button
             type="button"
             onClick={handleLogout}
-            className="btn-secondary w-full mt-2 justify-center flex items-center gap-2 text-sm"
+            className="flex items-center gap-3 px-2 py-2 rounded-xl w-full text-left
+                       hover:bg-prune-50 transition-colors"
+            title="Déconnexion"
           >
-            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M15 12H3m0 0l4-4m-4 4l4 4M9 4h8a2 2 0 012 2v12a2 2 0 01-2 2h-8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Déconnexion
+            <span className="flex items-center justify-center w-9 h-9 rounded-full bg-prune-100 text-prune-700 shrink-0">
+              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+                <circle cx="12" cy="8" r="4" />
+                <path strokeLinecap="round" d="M5 20c0-4 3.5-6 7-6s7 2 7 6" />
+              </svg>
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium text-prune-900 truncate">
+                {user?.name || 'Utilisateur'}
+              </span>
+              <span className="block text-xs text-prune-500 truncate">
+                {user?.email || 'Déconnexion'}
+              </span>
+            </span>
           </button>
         </div>
       </aside>

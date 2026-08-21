@@ -1,4 +1,4 @@
-import { api } from './api.js';
+import { api, ensureCsrfToken, getCsrfHeaders } from './api.js';
 import { publicConfig } from '../config/publicConfig.js';
 
 export const projectService = {
@@ -22,7 +22,7 @@ export const projectService = {
 
   // --- Parcours de recherche en 3 phases ---
 
-  async searchBusinesses({ quoi, ou, budget, currency, refine, avoid }) {
+  async searchBusinesses({ quoi, ou, budget, currency, refine, avoid, projectId }) {
     const { data } = await api.post('/projects/search/businesses', {
       quoi,
       ou,
@@ -30,8 +30,38 @@ export const projectService = {
       currency,
       refine,
       avoid,
+      projectId,
     });
     return data.businesses;
+  },
+
+  async searchTrainings({
+    business,
+    businessActivity,
+    businessPitch,
+    businessRationale,
+    quoi,
+    ou,
+    budget,
+    currency,
+    refine,
+    avoid,
+    projectId,
+  }) {
+    const { data } = await api.post('/projects/search/trainings', {
+      business,
+      businessActivity,
+      businessPitch,
+      businessRationale,
+      quoi,
+      ou,
+      budget,
+      currency,
+      refine,
+      avoid,
+      projectId,
+    });
+    return data.trainings;
   },
 
   async searchLocations({
@@ -44,6 +74,7 @@ export const projectService = {
     currency,
     refine,
     avoid,
+    projectId,
   }) {
     const { data } = await api.post('/projects/search/locations', {
       business,
@@ -55,17 +86,19 @@ export const projectService = {
       currency,
       refine,
       avoid,
+      projectId,
     });
     return data.locations;
   },
 
-  async buildProposals({ business, location, budget, currency, refine }) {
+  async buildProposals({ business, location, budget, currency, refine, projectId }) {
     const { data } = await api.post('/projects/search/proposals', {
       business,
       location,
       budget,
       currency,
       refine,
+      projectId,
     });
     return {
       proposals: data.proposals || [],
@@ -83,8 +116,45 @@ export const projectService = {
     return data.project;
   },
 
+  async getSituationSummary(intent = '') {
+    const { data } = await api.post('/projects/mine/memory/situation', { intent });
+    return data.situation;
+  },
+
+  async getSituationSummaryForProject(projectId, intent = '') {
+    const { data } = await api.post(`/projects/${projectId}/memory/situation`, { intent });
+    return data.situation;
+  },
+
+  async scanProjectMemory() {
+    const { data } = await api.post('/projects/mine/memory/scan', {});
+    return data.scan;
+  },
+
+  async scanProjectMemoryForProject(projectId) {
+    const { data } = await api.post(`/projects/${projectId}/memory/scan`, {});
+    return data.scan;
+  },
+
+  async getTimeline(limit = 200) {
+    const { data } = await api.get(`/projects/mine/timeline?limit=${Number(limit) || 200}`);
+    return data.timeline;
+  },
+
+  async getTimelineForProject(projectId, limit = 200) {
+    const { data } = await api.get(
+      `/projects/${projectId}/timeline?limit=${Number(limit) || 200}`
+    );
+    return data.timeline;
+  },
+
   async updateProject(id, fields) {
     const { data } = await api.patch(`/projects/${id}`, fields);
+    return data.project;
+  },
+
+  async updateProjectLocation(id, fields) {
+    const { data } = await api.put(`/projects/${id}/location`, fields);
     return data.project;
   },
 
@@ -100,9 +170,13 @@ export const projectService = {
     form.append('file', file);
     if (title) form.append('title', title);
 
+    await ensureCsrfToken();
     const response = await fetch(`${publicConfig.apiUrl}/projects/${projectId}/documents`, {
       method: 'POST',
       credentials: 'include',
+      headers: {
+        ...getCsrfHeaders(),
+      },
       body: form,
     });
     const data = await response.json().catch(() => ({}));
@@ -116,8 +190,114 @@ export const projectService = {
     return `${publicConfig.apiUrl}/projects/${projectId}/documents/${documentId}/download`;
   },
 
+  async getResources(projectId) {
+    const { data } = await api.get(`/projects/${projectId}/resources`);
+    return data;
+  },
+
+  async getDocument(projectId, documentId) {
+    const { data } = await api.get(`/projects/${projectId}/documents/${documentId}`);
+    return data.document;
+  },
+
+  async updateDocument(projectId, documentId, fields) {
+    const { data } = await api.patch(`/projects/${projectId}/documents/${documentId}`, fields);
+    return data.document;
+  },
+
+  async getDocumentTextPreview(projectId, documentId) {
+    const { data } = await api.get(`/projects/${projectId}/documents/${documentId}/preview-text`);
+    return data;
+  },
+
+  async linkDocumentContact(projectId, documentId, payload) {
+    const { data } = await api.post(
+      `/projects/${projectId}/documents/${documentId}/contacts`,
+      payload
+    );
+    return data.document;
+  },
+
+  async unlinkDocumentContact(projectId, documentId, contactId) {
+    const { data } = await api.delete(
+      `/projects/${projectId}/documents/${documentId}/contacts/${contactId}`
+    );
+    return data.document;
+  },
+
+  async listResourceCategories(projectId) {
+    const { data } = await api.get(`/projects/${projectId}/resource-categories`);
+    return data.categories;
+  },
+
   async deleteDocument(projectId, documentId) {
     await api.delete(`/projects/${projectId}/documents/${documentId}`);
+  },
+
+  async getDocumentScan(projectId, scanId) {
+    const { data } = await api.get(`/projects/${projectId}/scans/${scanId}`);
+    return data;
+  },
+
+  async getLatestDocumentScan(projectId, documentId) {
+    const { data } = await api.get(`/projects/${projectId}/documents/${documentId}/scans/latest`);
+    return data;
+  },
+
+  async retryDocumentScan(projectId, documentId) {
+    const { data } = await api.post(`/projects/${projectId}/documents/${documentId}/scans`);
+    return data;
+  },
+
+  async applyDocumentScan(projectId, scanId, payload) {
+    const { data } = await api.post(`/projects/${projectId}/scans/${scanId}/apply`, payload);
+    return data;
+  },
+
+  async dismissDocumentScan(projectId, scanId) {
+    const { data } = await api.post(`/projects/${projectId}/scans/${scanId}/dismiss`);
+    return data;
+  },
+
+  async getStage(projectId, stage = 'etude_marche') {
+    const { data } = await api.get(`/projects/${projectId}/stages/${stage}`);
+    return data;
+  },
+
+  async updateStageTask(projectId, stage, taskId, fields) {
+    const { data } = await api.patch(
+      `/projects/${projectId}/stages/${stage}/tasks/${taskId}`,
+      fields
+    );
+    return data;
+  },
+
+  async addStageLink(projectId, stage, payload) {
+    const { data } = await api.post(`/projects/${projectId}/stages/${stage}/links`, payload);
+    return data;
+  },
+
+  async removeStageLink(projectId, stage, linkId) {
+    const { data } = await api.delete(
+      `/projects/${projectId}/stages/${stage}/links/${linkId}`
+    );
+    return data;
+  },
+
+  async createStageContact(projectId, stage, payload) {
+    const { data } = await api.post(
+      `/projects/${projectId}/stages/${stage}/contacts`,
+      payload
+    );
+    return data;
+  },
+
+  async updateStageMilestone(projectId, stage, milestoneId, fields) {
+    const { data } = await api.patch(
+      `/projects/${projectId}/stages/${stage}/milestones/${milestoneId}`,
+      fields
+    );
+    return data;
   },
 };
 

@@ -1,8 +1,9 @@
 import { api } from './api.js';
 
 export const authService = {
-  async register({ name, email, password, plan = 'free' }) {
-    const { data } = await api.post('/auth/register', { name, email, password, plan });
+  async register({ name, email, password }) {
+    // Le plan n'est jamais envoyé au client — décidé uniquement côté serveur.
+    const { data } = await api.post('/auth/register', { name, email, password });
     return data.user;
   },
 
@@ -23,6 +24,11 @@ export const authService = {
   async refreshSession() {
     const { data } = await api.post('/auth/refresh');
     return data.user;
+  },
+
+  async getBillingConfig() {
+    const { data } = await api.get('/auth/billing-config');
+    return data;
   },
 
   async upgradeToPaid() {

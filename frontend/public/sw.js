@@ -8,6 +8,19 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
+/** Uniquement chemins same-origin (anti open-redirect). */
+function safeNotificationUrl(raw) {
+  const fallback = '/';
+  if (!raw || typeof raw !== 'string') return fallback;
+  try {
+    const u = new URL(raw, self.location.origin);
+    if (u.origin !== self.location.origin) return fallback;
+    return `${u.pathname}${u.search}${u.hash}` || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 self.addEventListener('push', (event) => {
   let data = {};
   try {
@@ -21,7 +34,7 @@ self.addEventListener('push', (event) => {
     body: data.body || '',
     icon: '/icon.svg',
     badge: '/icon.svg',
-    data: { url: data.url || '/' },
+    data: { url: safeNotificationUrl(data.url || '/') },
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
@@ -29,7 +42,7 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = event.notification.data?.url || '/';
+  const targetUrl = safeNotificationUrl(event.notification.data?.url || '/');
 
   event.waitUntil(
     self.clients

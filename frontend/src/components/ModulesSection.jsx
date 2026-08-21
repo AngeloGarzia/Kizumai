@@ -1,19 +1,14 @@
 import { IconBulb, IconChevronRight, IconPin, IconUser } from './icons.jsx';
 
-const modules = [
-  { title: 'Bilan de compétences', percent: 80, icon: IconUser },
-  { title: 'Idées rentables', percent: 60, icon: IconBulb },
-  { title: 'Lieu stratégique', percent: 20, icon: IconPin },
-];
-
 function ModuleCard({ module, locked = false, onClick }) {
   const Icon = module.icon;
+  const percent = Math.min(100, Math.max(0, Number(module.percent) || 0));
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`card flex flex-col items-start p-4 min-w-[140px] sm:min-w-0 w-full text-left
+      className={`card flex flex-col items-start p-4 w-full min-w-0 text-left
                   transition-transform active:scale-[0.98] hover:shadow-md
                   ${locked ? 'opacity-90' : ''}`}
     >
@@ -21,19 +16,22 @@ function ModuleCard({ module, locked = false, onClick }) {
         <Icon className="w-6 h-6" />
       </span>
 
-      <h3 className="text-sm font-semibold text-prune-900 leading-snug mb-4 flex-1">
+      <h3 className="text-sm font-semibold text-prune-900 leading-snug mb-1 flex-1">
         {module.title}
       </h3>
+      {module.subtitle && (
+        <p className="text-xs text-prune-500 mb-3 line-clamp-2">{module.subtitle}</p>
+      )}
 
-      <div className="w-full">
+      <div className="w-full mt-auto">
         <div className="h-1.5 bg-prune-100 rounded-full overflow-hidden">
           <div
-            className="h-full rounded-full bg-wasabi-400"
-            style={{ width: `${module.percent}%` }}
+            className="h-full rounded-full bg-wasabi-400 transition-[width] duration-500"
+            style={{ width: `${percent}%` }}
           />
         </div>
         <div className="flex items-center justify-between mt-3">
-          <span className="text-xs font-semibold text-wasabi-700">{module.percent}%</span>
+          <span className="text-xs font-semibold text-wasabi-700">{percent}%</span>
           <span className="flex items-center justify-center w-8 h-8 rounded-full text-white bg-topaz-500 hover:bg-topaz-600">
             <IconChevronRight className="w-4 h-4" />
           </span>
@@ -43,7 +41,20 @@ function ModuleCard({ module, locked = false, onClick }) {
   );
 }
 
-export default function ModulesSection({ locked = false, onModuleClick, onViewAll }) {
+export default function ModulesSection({
+  locked = false,
+  modules = [],
+  onModuleClick,
+  onViewAll,
+}) {
+  const list = modules.length
+    ? modules
+    : [
+        { id: 'competences', title: 'Mes compétences', percent: 0, icon: IconUser },
+        { id: 'feuille-de-route', title: 'Ma feuille de route', percent: 0, icon: IconBulb },
+        { id: 'geographie', title: 'Gestion géographique', percent: 0, icon: IconPin },
+      ];
+
   return (
     <section>
       <div className="flex items-center justify-between mb-3 sm:mb-4">
@@ -60,13 +71,13 @@ export default function ModulesSection({ locked = false, onModuleClick, onViewAl
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-2.5 sm:gap-4 lg:gap-5">
-        {modules.map((module) => (
+      <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">
+        {list.map((module) => (
           <ModuleCard
-            key={module.title}
+            key={module.id || module.title}
             module={module}
             locked={locked}
-            onClick={() => onModuleClick(module)}
+            onClick={() => onModuleClick?.(module)}
           />
         ))}
       </div>

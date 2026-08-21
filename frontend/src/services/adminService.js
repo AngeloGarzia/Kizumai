@@ -32,4 +32,16 @@ export const adminService = {
   broadcastNotification(payload) {
     return api.post('/admin/notifications/broadcast', payload).then((r) => r.data);
   },
+
+  getSetup() {
+    return api.get('/admin/setup').then((r) => r.data);
+  },
+
+  upsertAppSetting(key, value) {
+    return api.put(`/admin/app-settings/${encodeURIComponent(key)}`, { value }).then((r) => r.data);
+  },
+
+  deleteAppSetting(key) {
+    return api.delete(`/admin/app-settings/${encodeURIComponent(key)}`).then((r) => r.data);
+  },
 };

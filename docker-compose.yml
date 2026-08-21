@@ -1,38 +1,123 @@
+# Infrastructure Kizumai — Postgres et Redis NON exposés sur l'hôte.
+# Accès local : docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# Copier .env.docker.example → .env avant le premier démarrage.
+
 name: kizumai
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16-bookworm
     container_name: kizumai-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: kizumai
-      POSTGRES_PASSWORD: kizumai
-      POSTGRES_DB: kizumai
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER requis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requis}
+      POSTGRES_DB: ${POSTGRES_DB:-kizumai}
+      POSTGRES_APP_USER: ${POSTGRES_APP_USER:-kizumai_app}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?POSTGRES_APP_PASSWORD requis}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - kizumai_internal
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kizumai -d kizumai"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4.2-alpine
     container_name: kizumai-redis
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
-    ports:
-      - "6379:6379"
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - ${REDIS_PASSWORD:?REDIS_PASSWORD requis}
+      - --protected-mode
+      - "yes"
+      - --bind
+      - "0.0.0.0"
+      - --rename-command
+      - FLUSHALL
+      - ""
+      - --rename-command
+      - FLUSHDB
+      - ""
+      - --rename-command
+      - CONFIG
+      - ""
+      - --rename-command
+      - KEYS
+      - ""
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD requis}
     volumes:
       - redis_data:/data
+    networks:
+      - kizumai_internal
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
       interval: 5s
       timeout: 3s
-      retries: 5
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETGID
+      - SETUID
+
+  api:
+    profiles: ["app"]
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: kizumai-api:local
+    container_name: kizumai-api
+    restart: unless-stopped
+    env_file:
+      - path: ./backend/.env.production
+        required: false
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_APP_USER:-kizumai_app}:${POSTGRES_APP_PASSWORD}@postgres:5432/${POSTGRES_DB:-kizumai}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+    ports:
+      - "127.0.0.1:3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - kizumai_internal
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+      - /app/uploads:size=512m
+    cap_drop:
+      - ALL
+    user: "1001:1001"
+
+networks:
+  kizumai_internal:
+    driver: bridge
 
 volumes:
   postgres_data:

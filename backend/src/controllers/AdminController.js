@@ -1,54 +1,76 @@
-import { AdminService } from '../services/AdminService.js';
-import { NotificationService } from '../services/NotificationService.js';
-import { asyncHandler, AppError } from '../utils/AppError.js';
+import {
+  AdminUserResponseDto,
+  BroadcastNotificationRequestDto,
+  UpsertAppSettingRequestDto,
+  UpdatePromptRequestDto,
+  UpdateSettingsRequestDto,
+  UpdateUserRoleRequestDto,
+} from '../dto/admin.dto.js';
+import { asyncHandler } from '../utils/AppError.js';
 import { successResponse } from '../utils/response.js';
 
-export const AdminController = {
-  getSettings: asyncHandler(async (req, res) => {
-    const settings = await AdminService.getSettings();
-    successResponse(res, settings);
-  }),
+export function createAdminController({ adminService, notificationService }) {
+  return {
+    getSettings: asyncHandler(async (req, res) => {
+      const settings = await adminService.getSettings();
+      successResponse(res, settings);
+    }),
 
-  updateSettings: asyncHandler(async (req, res) => {
-    const settings = await AdminService.updateSettings(req.body);
-    successResponse(res, settings);
-  }),
+    updateSettings: asyncHandler(async (req, res) => {
+      const dto = UpdateSettingsRequestDto.from(req.body);
+      const settings = await adminService.updateSettings(dto);
+      successResponse(res, settings);
+    }),
 
-  getPrompts: asyncHandler(async (req, res) => {
-    const prompts = await AdminService.getPrompts();
-    successResponse(res, prompts);
-  }),
+    getSetup: asyncHandler(async (req, res) => {
+      const data = await adminService.getSetup();
+      successResponse(res, data);
+    }),
 
-  updatePrompt: asyncHandler(async (req, res) => {
-    const prompt = await AdminService.updatePrompt(req.params.key, req.body);
-    successResponse(res, prompt);
-  }),
+    upsertAppSetting: asyncHandler(async (req, res) => {
+      const dto = UpsertAppSettingRequestDto.from(req.params, req.body);
+      const setting = await adminService.upsertAppSetting(dto.key, dto.value);
+      successResponse(res, { setting });
+    }),
 
-  getUsers: asyncHandler(async (req, res) => {
-    const overview = await AdminService.getUsersOverview();
-    successResponse(res, overview);
-  }),
+    deleteAppSetting: asyncHandler(async (req, res) => {
+      const key = String(req.params.key || '').trim();
+      await adminService.deleteAppSetting(key);
+      successResponse(res, { deleted: true });
+    }),
 
-  updateUserRole: asyncHandler(async (req, res) => {
-    const user = await AdminService.updateUserRole(req.params.id, req.body.role, req.user.id);
-    successResponse(res, user);
-  }),
+    getPrompts: asyncHandler(async (req, res) => {
+      const prompts = await adminService.getPrompts();
+      successResponse(res, prompts);
+    }),
 
-  getConnections: asyncHandler(async (req, res) => {
-    const connections = await AdminService.getConnections();
-    successResponse(res, connections);
-  }),
+    updatePrompt: asyncHandler(async (req, res) => {
+      const dto = UpdatePromptRequestDto.from(req.params, req.body);
+      const { key, ...payload } = dto;
+      const prompt = await adminService.updatePrompt(key, payload);
+      successResponse(res, prompt);
+    }),
 
-  broadcastNotification: asyncHandler(async (req, res) => {
-    const title = String(req.body.title || '').trim();
-    const body = String(req.body.body || '').trim();
-    const url = req.body.url ? String(req.body.url).trim() : undefined;
+    getUsers: asyncHandler(async (req, res) => {
+      const overview = await adminService.getUsersOverview();
+      successResponse(res, overview);
+    }),
 
-    if (!title || !body) {
-      throw new AppError('Le titre et le message sont requis', 400);
-    }
+    updateUserRole: asyncHandler(async (req, res) => {
+      const dto = UpdateUserRoleRequestDto.from(req.params, req.body);
+      const user = await adminService.updateUserRole(dto.id, dto.role, req.user.id);
+      successResponse(res, AdminUserResponseDto.from(user));
+    }),
 
-    const summary = await NotificationService.broadcast({ title, body, url });
-    successResponse(res, summary);
-  }),
-};
+    getConnections: asyncHandler(async (req, res) => {
+      const connections = await adminService.getConnections();
+      successResponse(res, connections);
+    }),
+
+    broadcastNotification: asyncHandler(async (req, res) => {
+      const dto = BroadcastNotificationRequestDto.from(req.body);
+      const summary = await notificationService.broadcast(dto);
+      successResponse(res, summary);
+    }),
+  };
+}

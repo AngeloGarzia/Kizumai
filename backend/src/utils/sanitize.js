@@ -1,13 +1,7 @@
-const SENSITIVE_FIELDS = ['password', 'refreshTokenVersion'];
+import { UserResponseDto } from '../dto/user.dto.js';
 
-export const sanitizeUser = (user) => {
-  if (!user) return null;
+/** @deprecated Préférer UserResponseDto.from */
+export const sanitizeUser = (user) => UserResponseDto.from(user);
 
-  const publicUser = { ...user };
-  for (const field of SENSITIVE_FIELDS) {
-    delete publicUser[field];
-  }
-  return publicUser;
-};
-
-export const sanitizeUsers = (users) => users.map(sanitizeUser);
+/** @deprecated Préférer UserResponseDto.fromMany */
+export const sanitizeUsers = (users) => UserResponseDto.fromMany(users);

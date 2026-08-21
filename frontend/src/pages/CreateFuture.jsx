@@ -25,7 +25,7 @@ export default function CreateFuture() {
     setError('');
 
     if (!canLaunch) {
-      setError('Une idée est necessaire !');
+      setError('Une idée est nécessaire !');
       return;
     }
 
@@ -60,7 +60,7 @@ export default function CreateFuture() {
         </div>
       </header>
 
-      <main className="page-container flex-1 py-6 sm:py-10 max-w-2xl">
+      <main className="page-container flex-1 py-6 sm:py-10 max-w-[50.4rem]">
         <section className="text-center sm:text-left mb-6 sm:mb-8">
           <p className="text-xs sm:text-sm font-semibold tracking-widest text-prune-600 uppercase">
             Nouveau projet
@@ -101,7 +101,7 @@ export default function CreateFuture() {
             />
 
             <p className="text-xs text-prune-600 bg-prune-50 border border-prune-200 rounded-xl px-4 py-3">
-              Une idée est necessaire !
+              Une idée est nécessaire !
             </p>
 
             {error && <p className="alert-error">{error}</p>}

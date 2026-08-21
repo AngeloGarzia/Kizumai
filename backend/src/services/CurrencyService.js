@@ -58,10 +58,15 @@ export function getRateFromEur(ratesFromEur, currency) {
   return ratesFromEur[code] ?? ratesFromEur[code.toLowerCase()] ?? 1;
 }
 
-export function getBudgetLimits(currency, ratesFromEur = FALLBACK_RATES) {
+export function getBudgetLimits(
+  currency,
+  ratesFromEur = FALLBACK_RATES,
+  eurMin = EUR_BUDGET_MIN,
+  eurMax = EUR_BUDGET_MAX
+) {
   const rate = getRateFromEur(ratesFromEur, currency);
-  const min = roundBudget(EUR_BUDGET_MIN * rate);
-  const max = roundBudget(EUR_BUDGET_MAX * rate);
+  const min = roundBudget(eurMin * rate);
+  const max = roundBudget(eurMax * rate);
   return { min: Math.max(min, 1), max: Math.max(max, min) };
 }
 
@@ -105,56 +110,72 @@ async function fetchCurrencyData() {
   return { currencies, ratesFromEur };
 }
 
-export const CurrencyService = {
-  async getCurrencyData() {
-    if (cache.currencies && cache.ratesFromEur && Date.now() < cache.expiresAt) {
-      return {
-        currencies: cache.currencies,
-        ratesFromEur: cache.ratesFromEur,
-        default: 'EUR',
-        topWorldCurrencies: TOP_WORLD_CURRENCIES,
-        budgetEurMin: EUR_BUDGET_MIN,
-        budgetEurMax: EUR_BUDGET_MAX,
-      };
-    }
-
-    try {
-      const data = await fetchCurrencyData();
-      cache = {
-        currencies: data.currencies,
-        ratesFromEur: data.ratesFromEur,
-        expiresAt: Date.now() + CACHE_TTL_MS,
-      };
-    } catch {
-      return {
-        currencies: FALLBACK_CURRENCIES,
-        ratesFromEur: FALLBACK_RATES,
-        default: 'EUR',
-        topWorldCurrencies: TOP_WORLD_CURRENCIES,
-        budgetEurMin: EUR_BUDGET_MIN,
-        budgetEurMax: EUR_BUDGET_MAX,
-      };
-    }
-
-    return {
-      currencies: cache.currencies,
-      ratesFromEur: cache.ratesFromEur,
-      default: 'EUR',
-      topWorldCurrencies: TOP_WORLD_CURRENCIES,
-      budgetEurMin: EUR_BUDGET_MIN,
-      budgetEurMax: EUR_BUDGET_MAX,
+async function ensureRatesLoaded() {
+  if (cache.currencies && cache.ratesFromEur && Date.now() < cache.expiresAt) {
+    return cache;
+  }
+  try {
+    const data = await fetchCurrencyData();
+    cache = {
+      currencies: data.currencies,
+      ratesFromEur: data.ratesFromEur,
+      expiresAt: Date.now() + CACHE_TTL_MS,
     };
-  },
+  } catch {
+    return {
+      currencies: FALLBACK_CURRENCIES,
+      ratesFromEur: FALLBACK_RATES,
+    };
+  }
+  return cache;
+}
 
-  getBudgetLimits(currency) {
-    const rates = cache.ratesFromEur || FALLBACK_RATES;
-    return getBudgetLimits(currency, rates);
-  },
+/** Service monnaie — lit les bornes budget depuis Setup (app_settings) si fourni. */
+export function createCurrencyService({ settingsService = null } = {}) {
+  async function eurBounds() {
+    if (settingsService) {
+      const business = await settingsService.getBusinessConfig();
+      return {
+        budgetEurMin: business.budgetEurMin,
+        budgetEurMax: business.budgetEurMax,
+      };
+    }
+    return { budgetEurMin: EUR_BUDGET_MIN, budgetEurMax: EUR_BUDGET_MAX };
+  }
 
-  clampBudget(amount, currency) {
-    const { min, max } = this.getBudgetLimits(currency);
-    const num = Math.round(Number(amount));
-    if (Number.isNaN(num)) return min;
-    return Math.min(max, Math.max(min, num));
-  },
-};
+  return {
+    async getCurrencyData() {
+      const data = await ensureRatesLoaded();
+      const bounds = await eurBounds();
+      return {
+        currencies: data.currencies || FALLBACK_CURRENCIES,
+        ratesFromEur: data.ratesFromEur || FALLBACK_RATES,
+        default: 'EUR',
+        topWorldCurrencies: TOP_WORLD_CURRENCIES,
+        budgetEurMin: bounds.budgetEurMin,
+        budgetEurMax: bounds.budgetEurMax,
+      };
+    },
+
+    async getBudgetLimits(currency) {
+      const data = await ensureRatesLoaded();
+      const bounds = await eurBounds();
+      return getBudgetLimits(
+        currency,
+        data.ratesFromEur || FALLBACK_RATES,
+        bounds.budgetEurMin,
+        bounds.budgetEurMax
+      );
+    },
+
+    async clampBudget(amount, currency) {
+      const { min, max } = await this.getBudgetLimits(currency);
+      const n = Math.round(Number(amount));
+      if (Number.isNaN(n)) return min;
+      return Math.min(max, Math.max(min, n));
+    },
+  };
+}
+
+/** @deprecated Prefer createCurrencyService — kept for imports without DI. */
+export const CurrencyService = createCurrencyService();

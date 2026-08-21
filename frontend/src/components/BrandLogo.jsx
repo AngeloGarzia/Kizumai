@@ -4,7 +4,8 @@ const SIZE_CLASS = {
   sm: 'h-9 sm:h-10',
   md: 'h-12 sm:h-14',
   lg: 'h-16 sm:h-20',
-  xl: 'h-24 sm:h-28',
+  xl: 'h-28 sm:h-36 md:h-40',
+  hero: 'h-44 sm:h-56 md:h-64 lg:h-72',
 };
 
 /**

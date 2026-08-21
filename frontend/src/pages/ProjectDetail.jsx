@@ -2,8 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import AppShell from '../components/AppShell.jsx';
 import Button from '../components/Button.jsx';
+import ProjectReport from '../components/ProjectReport.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useProject } from '../context/ProjectContext.jsx';
 import { projectService } from '../services/projectService.js';
+import { DOCUMENT_ACCEPT } from '../utils/safeDisplay.js';
 
 const STATUSES = [
   { value: 'draft', label: 'Brouillon' },
@@ -14,22 +17,13 @@ const STATUSES = [
 ];
 
 const STAGES = [
-  { value: 'idee', label: 'Idée' },
+  { value: 'idee', label: 'Informations générales' },
   { value: 'etude_marche', label: 'Étude de marché' },
   { value: 'business_plan', label: 'Business plan' },
   { value: 'financement', label: 'Financement' },
   { value: 'immatriculation', label: 'Immatriculation' },
   { value: 'lancement', label: 'Lancement' },
 ];
-
-function formatBudget(amount, currency) {
-  if (amount == null) return '—';
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: currency || 'EUR',
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
 
 function formatSize(bytes) {
   if (bytes == null) return '';
@@ -41,6 +35,7 @@ function formatSize(bytes) {
 export default function ProjectDetail() {
   const { id } = useParams();
   const { logout } = useAuth();
+  const { setCurrentProjectId } = useProject();
   const fileInputRef = useRef(null);
 
   const [project, setProject] = useState(null);
@@ -60,7 +55,7 @@ export default function ProjectDetail() {
         projectService.listDocuments(id),
       ]);
       setProject(proj);
-      setDocuments(docs);
+      setDocuments(Array.isArray(docs) ? docs : []);
     } catch (err) {
       setError(err.message || 'Projet introuvable');
     } finally {
@@ -69,8 +64,9 @@ export default function ProjectDetail() {
   }, [id]);
 
   useEffect(() => {
+    if (id) setCurrentProjectId(id);
     load();
-  }, [load]);
+  }, [id, load, setCurrentProjectId]);
 
   const saveLifecycle = async (fields) => {
     setSaving(true);
@@ -133,7 +129,7 @@ export default function ProjectDetail() {
     return (
       <AppShell onLogout={logout}>
         <p className="alert-error">{error || 'Projet introuvable'}</p>
-        <Link to="/dashboard" className="link-accent mt-4 inline-block">Retour au tableau de bord</Link>
+        <Link to="/" className="link-accent mt-4 inline-block">Retour à l&apos;accueil</Link>
       </AppShell>
     );
   }
@@ -143,41 +139,22 @@ export default function ProjectDetail() {
       <div className="space-y-6">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold tracking-widest text-prune-600 uppercase">Projet</p>
-            <h1 className="text-2xl sm:text-3xl font-bold text-prune-900">{project.title || project.quoi}</h1>
+            <p className="text-xs font-semibold tracking-widest text-prune-600 uppercase">
+              Informations générales
+            </p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-prune-900">
+              {project.title || project.quoi}
+            </h1>
           </div>
-          <Link to="/dashboard" className="btn-secondary text-center text-sm">Retour</Link>
+          <Link to="/parcours" className="btn-secondary text-center text-sm">
+            Retour
+          </Link>
         </div>
 
         {error && <p className="alert-error">{error}</p>}
         {message && <p className="alert-success">{message}</p>}
 
-        <div className="card p-5 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <p className="text-xs font-semibold text-prune-500 uppercase">Activité</p>
-            <p className="text-prune-900 font-medium mt-1">{project.activity?.label || '—'}</p>
-            {project.activity?.sector && (
-              <p className="text-sm text-prune-500">{project.activity.sector}</p>
-            )}
-          </div>
-          <div>
-            <p className="text-xs font-semibold text-prune-500 uppercase">Lieu</p>
-            <p className="text-prune-900 font-medium mt-1">{project.location?.label || '—'}</p>
-            {project.location?.latitude != null && (
-              <p className="text-sm text-prune-500">
-                {project.location.latitude}, {project.location.longitude}
-              </p>
-            )}
-          </div>
-          <div>
-            <p className="text-xs font-semibold text-prune-500 uppercase">Budget</p>
-            <p className="text-prune-900 font-medium mt-1">{formatBudget(project.budget, project.currency)}</p>
-          </div>
-          <div>
-            <p className="text-xs font-semibold text-prune-500 uppercase">Forme juridique</p>
-            <p className="text-prune-900 font-medium mt-1">{project.legalForm || '—'}</p>
-          </div>
-        </div>
+        <ProjectReport project={project} />
 
         <div className="card p-5 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
@@ -206,13 +183,6 @@ export default function ProjectDetail() {
           </div>
         </div>
 
-        {project.report && (
-          <div className="card p-5 sm:p-6">
-            <p className="text-xs font-semibold text-prune-500 uppercase mb-2">Rapport</p>
-            <p className="text-sm text-prune-800 whitespace-pre-line">{project.report}</p>
-          </div>
-        )}
-
         <div className="card p-5 sm:p-6 space-y-4">
           <h2 className="text-lg font-bold text-prune-900">Documents</h2>
 
@@ -220,6 +190,7 @@ export default function ProjectDetail() {
             <input
               ref={fileInputRef}
               type="file"
+              accept={DOCUMENT_ACCEPT}
               className="text-sm text-prune-700 file:mr-3 file:rounded-lg file:border-0 file:bg-prune-100 file:px-3 file:py-2 file:text-prune-700"
             />
             <Button type="submit" disabled={uploading} className="w-auto text-sm">

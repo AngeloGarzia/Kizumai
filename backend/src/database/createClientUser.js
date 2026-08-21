@@ -1,9 +1,9 @@
-import bcrypt from 'bcryptjs';
+﻿import bcrypt from 'bcryptjs';
 import { config } from '../config/index.js';
-import { UserModel } from '../models/UserModel.js';
-import { ActivityModel } from '../models/ActivityModel.js';
-import { LocationModel } from '../models/LocationModel.js';
-import { ProjectModel } from '../models/ProjectModel.js';
+import { UserRepository } from '../repositories/UserRepository.js';
+import { ActivityRepository } from '../repositories/ActivityRepository.js';
+import { LocationRepository } from '../repositories/LocationRepository.js';
+import { ProjectRepository } from '../repositories/ProjectRepository.js';
 import { PLANS } from '../constants/plans.js';
 import { ROLES } from '../constants/roles.js';
 import pool from './pool.js';
@@ -20,17 +20,17 @@ async function createClientUser() {
   const password = process.env.CLIENT_PASSWORD || 'Client1234!';
   const name = process.env.CLIENT_NAME || 'Camille Durand';
 
-  let user = await UserModel.findByEmail(email);
+  let user = await UserRepository.findByEmail(email);
 
   if (user) {
     // Le plan payant est requis pour accéder aux fonctionnalités projet.
     if (user.plan !== PLANS.PAID) {
-      await UserModel.updatePlan(user.id, PLANS.PAID);
+      await UserRepository.updatePlan(user.id, PLANS.PAID);
     }
     console.log(`[client] Compte client existant réutilisé : ${email}`);
   } else {
     const hashedPassword = await bcrypt.hash(password, config.bcrypt.saltRounds);
-    user = await UserModel.create({
+    user = await UserRepository.create({
       name,
       email,
       password: hashedPassword,
@@ -41,7 +41,7 @@ async function createClientUser() {
   }
 
   // Activité : boulangerie artisanale.
-  const activity = await ActivityModel.findOrCreate({
+  const activity = await ActivityRepository.findOrCreate({
     label: 'Boulangerie artisanale',
     sector: 'Commerce de détail alimentaire',
     subSector: 'Boulangerie-pâtisserie',
@@ -51,7 +51,7 @@ async function createClientUser() {
   });
 
   // Lieu : local commercial à Lyon.
-  const location = await LocationModel.findOrCreate({
+  const location = await LocationRepository.findOrCreate({
     label: 'Local commercial - Lyon 3e',
     addressLine1: '24 rue de la Part-Dieu',
     postalCode: '69003',
@@ -64,7 +64,7 @@ async function createClientUser() {
   });
 
   // Projet de création d'entreprise.
-  const project = await ProjectModel.create({
+  const project = await ProjectRepository.create({
     userId: user.id,
     title: 'Ouverture de ma boulangerie artisanale',
     activityId: activity.id,
@@ -100,3 +100,5 @@ createClientUser()
     console.error('[client] Échec :', error);
     return pool.end().finally(() => process.exit(1));
   });
+
+

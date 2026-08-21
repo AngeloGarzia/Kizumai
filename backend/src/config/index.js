@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { parseDurationMs } from '../utils/duration.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '../..');
@@ -13,9 +14,30 @@ const envFile = isProd ? '.env.production' : '.env.development';
 dotenv.config({ path: join(rootDir, envFile) });
 dotenv.config({ path: join(rootDir, '.env') });
 
+const WEAK_SECRET_PATTERNS = [
+  /^change.?me/i,
+  /^your.?secret/i,
+  /^secret$/i,
+  /^password$/i,
+  /kizumai/i,
+  /^test/i,
+  /^dev-/i,
+  /^example/i,
+];
+
+function isWeakSecret(value) {
+  const s = String(value || '');
+  if (s.length < 32) return true;
+  return WEAK_SECRET_PATTERNS.some((re) => re.test(s));
+}
+
 function buildDatabaseUrl() {
   if (process.env.DATABASE_URL) {
     return process.env.DATABASE_URL;
+  }
+
+  if (isProd) {
+    throw new Error('DATABASE_URL est obligatoire en production');
   }
 
   const host = process.env.DB_HOST || 'localhost';
@@ -37,21 +59,51 @@ const requiredInProduction = [
 function validateConfig() {
   if (!isProd) return;
 
-  const missing = requiredInProduction.filter((key) => !process.env[key]);
+  const missing = requiredInProduction.filter((key) => !process.env[key]?.trim());
   if (missing.length > 0) {
     throw new Error(
       `Variables d'environnement manquantes en production : ${missing.join(', ')}`
     );
   }
 
-  const secrets = [
-    process.env.JWT_ACCESS_SECRET,
-    process.env.JWT_REFRESH_SECRET,
-  ];
-  for (const secret of secrets) {
-    if (secret.length < 32) {
-      throw new Error('Les secrets JWT doivent contenir au moins 32 caractères en production');
+  const access = process.env.JWT_ACCESS_SECRET;
+  const refresh = process.env.JWT_REFRESH_SECRET;
+
+  if (isWeakSecret(access) || isWeakSecret(refresh)) {
+    throw new Error(
+      'Secrets JWT trop faibles en production (min. 32 caractères, non triviaux)'
+    );
+  }
+  if (access === refresh) {
+    throw new Error('JWT_ACCESS_SECRET et JWT_REFRESH_SECRET doivent être distincts');
+  }
+
+  const cors = process.env.CORS_ORIGIN.trim();
+  if (!/^https:\/\//i.test(cors) && process.env.ALLOW_INSECURE_CORS !== 'true') {
+    throw new Error('CORS_ORIGIN doit être une origine https:// en production');
+  }
+  if (/localhost|127\.0\.0\.1/i.test(cors) && process.env.ALLOW_INSECURE_CORS !== 'true') {
+    throw new Error('CORS_ORIGIN ne doit pas pointer vers localhost en production');
+  }
+
+  const dbUrl = process.env.DATABASE_URL;
+  if (/:(kizumai|password|postgres|admin)@/i.test(dbUrl) || /:CHANGE_ME/i.test(dbUrl)) {
+    throw new Error('DATABASE_URL semble utiliser un mot de passe par défaut — refuse le démarrage');
+  }
+
+  if (process.env.REDIS_URL) {
+    const redisUrl = process.env.REDIS_URL.trim();
+    const withoutScheme = redisUrl.replace(/^rediss?:\/\//i, '');
+    const hasAuth =
+      withoutScheme.startsWith(':') || // redis://:password@host
+      /^[^:/@]+:[^@]+@/.test(withoutScheme); // redis://user:pass@host
+    if (!hasAuth && process.env.ALLOW_INSECURE_REDIS !== 'true') {
+      throw new Error('REDIS_URL sans mot de passe interdit en production');
     }
+  }
+
+  if (process.env.ALLOW_SELF_SERVE_PAID === 'true') {
+    console.warn('[config] ALLOW_SELF_SERVE_PAID=true en production');
   }
 }
 
@@ -66,6 +118,14 @@ if (isDev && (!process.env.JWT_ACCESS_SECRET || !process.env.JWT_REFRESH_SECRET)
   console.warn('[config] Secrets JWT par défaut utilisés — réservé au développement local');
 }
 
+function parseCorsOrigin(raw) {
+  const value = raw || 'http://localhost:5173';
+  if (value.includes(',')) {
+    return value.split(',').map((s) => s.trim()).filter(Boolean);
+  }
+  return value;
+}
+
 export const config = {
   port: Number(process.env.PORT) || 3001,
   nodeEnv,
@@ -74,12 +134,17 @@ export const config = {
 
   database: {
     url: buildDatabaseUrl(),
-    ssl: isProd ? { rejectUnauthorized: true } : false,
+    ssl:
+      process.env.DB_SSL === 'false'
+        ? false
+        : isProd
+          ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' }
+          : false,
     max: Number(process.env.DB_POOL_MAX) || 20,
   },
 
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+    origin: parseCorsOrigin(process.env.CORS_ORIGIN),
     credentials: true,
   },
 
@@ -88,17 +153,24 @@ export const config = {
     refreshSecret: process.env.JWT_REFRESH_SECRET || (isDev ? devSecrets.refresh : ''),
     accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+    issuer: process.env.JWT_ISSUER || 'kizumai-api',
+    audience: process.env.JWT_AUDIENCE || 'kizumai-web',
+    algorithm: 'HS256',
+    clockToleranceSec: Number(process.env.JWT_CLOCK_TOLERANCE_SEC) || 5,
   },
 
   cookies: {
     accessName: 'kizumai_access',
     refreshName: 'kizumai_refresh',
+    csrfName: 'kizumai_csrf',
     httpOnly: true,
     secure: isProd,
     sameSite: isProd ? 'strict' : 'lax',
     domain: process.env.COOKIE_DOMAIN || undefined,
-    accessMaxAge: 15 * 60 * 1000,
-    refreshMaxAge: 7 * 24 * 60 * 60 * 1000,
+    accessMaxAge:
+      parseDurationMs(process.env.JWT_ACCESS_EXPIRES_IN || '15m') ?? 15 * 60 * 1000,
+    refreshMaxAge:
+      parseDurationMs(process.env.JWT_REFRESH_EXPIRES_IN || '7d') ?? 7 * 24 * 60 * 60 * 1000,
     refreshPath: '/api/auth',
   },
 
@@ -107,9 +179,6 @@ export const config = {
   },
 
   billing: {
-    // Autorise l'obtention d'un compte payant sans passerelle de paiement.
-    // Par défaut activé en développement uniquement ; désactivé en production
-    // tant qu'aucun fournisseur de paiement n'est branché.
     selfServePaidEnabled:
       process.env.ALLOW_SELF_SERVE_PAID != null
         ? process.env.ALLOW_SELF_SERVE_PAID === 'true'
@@ -131,7 +200,10 @@ export const config = {
   storage: {
     driver: process.env.STORAGE_DRIVER || 'local',
     localDir: process.env.STORAGE_LOCAL_DIR || 'uploads',
-    maxFileSizeBytes: Number(process.env.MAX_FILE_SIZE_BYTES) || 25 * 1024 * 1024,
+    maxFileSizeBytes: Number(process.env.MAX_FILE_SIZE_BYTES) || 20 * 1024 * 1024,
+    maxDocumentsPerProject: Number(process.env.MAX_DOCS_PER_PROJECT) || 100,
+    maxProjectStorageBytes:
+      Number(process.env.MAX_PROJECT_STORAGE_BYTES) || 200 * 1024 * 1024,
   },
 
   push: {
@@ -148,8 +220,6 @@ export const config = {
   },
 
   queue: {
-    // File d'attente BullMQ activée dès qu'une URL Redis est fournie.
-    // Peut être forcée via QUEUE_ENABLED=true/false.
     get enabled() {
       if (process.env.QUEUE_ENABLED != null) {
         return process.env.QUEUE_ENABLED === 'true';
@@ -157,7 +227,6 @@ export const config = {
       return Boolean(process.env.REDIS_URL);
     },
     prefix: process.env.QUEUE_PREFIX || 'kizumai',
-    // Nombre de jobs traités en parallèle par le worker.
     concurrency: Number(process.env.QUEUE_CONCURRENCY) || 5,
   },
 
@@ -171,5 +240,17 @@ export const config = {
     get enabled() {
       return Boolean(this.host);
     },
+  },
+
+  memory: {
+    decayCron: process.env.MEMORY_DECAY_CRON || '0 */6 * * *',
+    snapshotCron: process.env.MEMORY_SNAPSHOT_CRON || '15 */6 * * *',
+    archiveThreshold: Number(process.env.MEMORY_ARCHIVE_THRESHOLD) || 0.05,
+    snapshotEventThreshold: Number(process.env.MEMORY_SNAPSHOT_EVENT_THRESHOLD) || 8,
+    snapshotMaxAgeHours: Number(process.env.MEMORY_SNAPSHOT_MAX_AGE_HOURS) || 24,
+    snapshotTopNodes: Number(process.env.MEMORY_SNAPSHOT_TOP_NODES) || 40,
+    recallMaxChars: Number(process.env.MEMORY_RECALL_MAX_CHARS) || 4000,
+    graphDepth: Number(process.env.MEMORY_GRAPH_DEPTH) || 2,
+    recallNodeLimit: Number(process.env.MEMORY_RECALL_NODE_LIMIT) || 12,
   },
 };

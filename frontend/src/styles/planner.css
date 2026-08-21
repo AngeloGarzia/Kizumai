@@ -1,0 +1,65 @@
+/* Planner / FullCalendar : accord avec la charte Kizumai */
+.planner-calendar {
+  --fc-border-color: var(--color-prune-100);
+  --fc-today-bg-color: var(--color-wasabi-50);
+  --fc-now-indicator-color: var(--color-topaz-500);
+  --fc-page-bg-color: #fff;
+}
+
+.planner-calendar .fc {
+  font-size: 1rem;
+}
+
+.planner-calendar .fc .fc-toolbar-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-prune-900);
+  text-transform: capitalize;
+}
+
+.planner-calendar .fc .fc-button {
+  background: var(--color-prune-100);
+  border: none;
+  color: var(--color-prune-800);
+  font-weight: 500;
+  text-transform: capitalize;
+  box-shadow: none;
+}
+
+.planner-calendar .fc .fc-button:hover {
+  background: var(--color-prune-200);
+}
+
+.planner-calendar .fc .fc-button-primary:not(:disabled).fc-button-active,
+.planner-calendar .fc .fc-button-primary:not(:disabled):active {
+  background: var(--color-topaz-500);
+  color: #fff;
+}
+
+.planner-calendar .fc .fc-button-primary:focus,
+.planner-calendar .fc .fc-button:focus {
+  box-shadow: 0 0 0 2px var(--color-topaz-300);
+}
+
+.planner-calendar .fc-daygrid-day-number,
+.planner-calendar .fc-col-header-cell-cushion {
+  color: var(--color-prune-700);
+  text-decoration: none;
+}
+
+.planner-calendar .fc-event {
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 1px 3px;
+  font-weight: 500;
+}
+
+.planner-calendar .fc-event-done {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.planner-calendar .fc-toolbar.fc-header-toolbar {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}

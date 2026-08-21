@@ -1,6 +1,6 @@
-import bcrypt from 'bcryptjs';
+﻿import bcrypt from 'bcryptjs';
 import { config } from '../config/index.js';
-import { UserModel } from '../models/UserModel.js';
+import { UserRepository } from '../repositories/UserRepository.js';
 import { PLANS } from '../constants/plans.js';
 import { ROLES } from '../constants/roles.js';
 import pool from './pool.js';
@@ -17,14 +17,14 @@ async function createTestUser() {
   const password = process.env.TEST_USER_PASSWORD || 'Test1234!';
   const name = process.env.TEST_USER_NAME || 'Utilisateur Test';
 
-  const existing = await UserModel.findByEmail(email);
+  const existing = await UserRepository.findByEmail(email);
 
   if (existing) {
     if (existing.role !== ROLES.ADMIN) {
-      await UserModel.updateRole(existing.id, ROLES.ADMIN);
+      await UserRepository.updateRole(existing.id, ROLES.ADMIN);
     }
     if (existing.plan !== PLANS.PAID) {
-      await UserModel.updatePlan(existing.id, PLANS.PAID);
+      await UserRepository.updatePlan(existing.id, PLANS.PAID);
     }
     console.log(`[test-user] Compte existant mis à niveau : ${email}`);
     console.log(`[test-user] Mot de passe inchangé (utiliser celui déjà défini).`);
@@ -33,7 +33,7 @@ async function createTestUser() {
 
   const hashedPassword = await bcrypt.hash(password, config.bcrypt.saltRounds);
 
-  await UserModel.create({
+  await UserRepository.create({
     name,
     email,
     password: hashedPassword,
@@ -55,3 +55,5 @@ createTestUser()
     console.error('[test-user] Échec :', error);
     return pool.end().finally(() => process.exit(1));
   });
+
+

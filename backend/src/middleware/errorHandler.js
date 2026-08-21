@@ -7,17 +7,34 @@ export const notFound = (req, res, next) => {
 };
 
 export const errorHandler = (err, req, res, next) => {
-  // Les erreurs d'upload (multer) sont des erreurs client (413/400).
   const statusCode =
-    err.statusCode || (err.name === 'MulterError' ? (err.code === 'LIMIT_FILE_SIZE' ? 413 : 400) : 500);
+    err.statusCode ||
+    (err.name === 'MulterError' ? (err.code === 'LIMIT_FILE_SIZE' ? 413 : 400) : 500);
 
+  const isOperational = err instanceof AppError || Boolean(err.statusCode);
   let message = err.message || 'Erreur interne du serveur';
-  if (statusCode === 500 && config.isProd) {
+
+  if (statusCode >= 500 && config.isProd) {
     message = 'Erreur interne du serveur';
   }
 
   if (config.isDev) {
     console.error(err);
+  } else if (statusCode >= 500) {
+    console.error(
+      JSON.stringify({
+        level: 'error',
+        msg: 'unhandled_error',
+        statusCode,
+        name: err.name,
+        code: err.code,
+        path: req.originalUrl,
+        method: req.method,
+        operational: isOperational,
+        // Pas de stack complète ni de body utilisateur en prod.
+        errorMessage: String(err.message || '').slice(0, 300),
+      })
+    );
   }
 
   errorResponse(res, message, statusCode);
