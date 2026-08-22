@@ -81,9 +81,14 @@ export function createSettingsService({ settingsRepository, aiPromptRepository }
       const s = await settingsObject();
       const min = Math.max(1, num(s.budget_eur_min, 500));
       const max = Math.max(min, num(s.budget_eur_max, 1_000_000));
+      const projectSuggestionsCount = Math.min(
+        8,
+        Math.max(1, Math.round(num(s.business_project_suggestions_count, 3)))
+      );
       return {
         budgetEurMin: min,
         budgetEurMax: max,
+        projectSuggestionsCount,
       };
     },
 

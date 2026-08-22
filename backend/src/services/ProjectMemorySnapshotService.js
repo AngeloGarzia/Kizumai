@@ -25,7 +25,10 @@ export function createProjectMemorySnapshotService({
       const nodes = await projectMemoryNodeRepository.listActiveByImportance(projectId, {
         limit: topN,
       });
-      if (!nodes.length) {
+      const safeNodes = nodes.filter(
+        (n) => !['personal', 'confidential'].includes(String(n.sensitivity || 'normal'))
+      );
+      if (!safeNodes.length) {
         return projectMemorySnapshotRepository.upsertForProject({
           projectId,
           summary: 'Aucune mémoire active pour ce projet.',
@@ -38,8 +41,8 @@ export function createProjectMemorySnapshotService({
       }
 
       const prior = await projectMemorySnapshotRepository.findByProjectId(projectId);
-      const memoriesText = nodes
-        .map((n) => `- [${n.nodeType}|${Number(n.importance).toFixed(2)}] ${n.content}`)
+      const memoriesText = safeNodes
+        .map((n) => `- [${n.nodeType}|${n.memoryKind || 'durable'}|${Number(n.importance).toFixed(2)}] ${n.content}`)
         .join('\n');
 
       let result;
@@ -55,12 +58,12 @@ export function createProjectMemorySnapshotService({
             .slice(0, 8)
             .map((n) => n.content)
             .join(' '),
-          keyFacts: nodes.slice(0, 5).map((n) => n.content.slice(0, 120)),
-          activeBlockers: nodes
+          keyFacts: safeNodes.slice(0, 5).map((n) => n.content.slice(0, 120)),
+          activeBlockers: safeNodes
             .filter((n) => n.nodeType === 'risk' || n.nodeType === 'insight')
             .slice(0, 3)
             .map((n) => n.content.slice(0, 120)),
-          nextActions: nodes
+          nextActions: safeNodes
             .filter((n) => n.nodeType === 'task_state' || n.nodeType === 'milestone')
             .slice(0, 3)
             .map((n) => n.content.slice(0, 120)),

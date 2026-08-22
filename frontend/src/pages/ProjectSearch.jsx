@@ -553,9 +553,9 @@ export default function ProjectSearch() {
             </h1>
             <p className="mt-1 text-sm text-prune-500">
               {step === 'businesses' &&
-                "3 idées générées par l'IA. Choisissez-en une, ou demandez une formation utile avant de continuer."}
+                "Idées générées par l'IA. Choisissez-en une, ou demandez une formation utile avant de continuer."}
               {step === 'locations' &&
-                `5 lieux adaptés à « ${selectedBusiness?.title} »${seed?.ou ? ` autour de ${seed.ou}` : ''}. Sélectionnez-en un ou affinez.`}
+                `Lieux adaptés à « ${selectedBusiness?.title} »${seed?.ou ? ` autour de ${seed.ou}` : ''}. Sélectionnez-en un ou affinez.`}
               {step === 'proposals' &&
                 (budgetAssessment?.adjustedProposed
                   ? '4 projets : votre budget, flexible, idéal IA, et un budget ajusté plus bas jugé viable.'

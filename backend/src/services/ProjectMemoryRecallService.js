@@ -65,6 +65,7 @@ export function createProjectMemoryRecallService({
       const nodes = [...nodeMap.values()].sort(
         (a, b) => (b.importance || 0) - (a.importance || 0)
       );
+      const includeSensitive = Boolean(options.includeSensitive);
 
       return assembleRecallContext({
         snapshot,
@@ -72,6 +73,7 @@ export function createProjectMemoryRecallService({
         edges: graph.edges || [],
         intent,
         maxChars,
+        includeSensitive,
       });
     },
 
@@ -118,7 +120,7 @@ export function createProjectMemoryRecallService({
 
       const nodesText = (context.nodes || [])
         .slice(0, 16)
-        .map((n) => `- [${n.nodeType}] ${n.content}`)
+        .map((n) => `- [${n.nodeType}|${n.memoryKind || 'durable'}] ${n.content}`)
         .join('\n');
 
       try {

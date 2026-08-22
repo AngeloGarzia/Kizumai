@@ -22,6 +22,12 @@ export function createAdminController({ adminService, notificationService }) {
       successResponse(res, settings);
     }),
 
+    testAiEngine: asyncHandler(async (req, res) => {
+      const dto = UpdateSettingsRequestDto.from(req.body);
+      const result = await adminService.testAiEngine(dto);
+      successResponse(res, result);
+    }),
+
     getSetup: asyncHandler(async (req, res) => {
       const data = await adminService.getSetup();
       successResponse(res, data);

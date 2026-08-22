@@ -2,9 +2,12 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   assembleRecallContext,
+  classifyMemoryKind,
+  classifyMemorySensitivity,
   computeDecayedImportance,
   reinforceImportance,
   reinforceWeight,
+  shouldExposeMemoryNode,
   shouldArchive,
 } from '../src/services/projectMemoryMath.js';
 
@@ -42,6 +45,25 @@ describe('projectMemoryMath', () => {
     assert.equal(shouldArchive(0.2, 0.05), false);
   });
 
+  it('classe les souvenirs permanents, durables et temporaires', () => {
+    assert.equal(classifyMemoryKind({ sourceEntityType: 'project', nodeType: 'fact' }), 'permanent');
+    assert.equal(classifyMemoryKind({ nodeType: 'decision' }), 'durable');
+    assert.equal(classifyMemoryKind({ nodeType: 'event' }), 'temporary');
+  });
+
+  it('détecte la sensibilité des souvenirs avant rappel IA', () => {
+    assert.equal(classifyMemorySensitivity('Budget public estimé à 15000 euros'), 'normal');
+    assert.equal(classifyMemorySensitivity('Email du contact : test@example.com'), 'personal');
+    assert.equal(classifyMemorySensitivity('IBAN fourni pour le paiement'), 'confidential');
+  });
+
+  it('masque par défaut les souvenirs personnels ou confidentiels', () => {
+    assert.equal(shouldExposeMemoryNode({ sensitivity: 'normal' }), true);
+    assert.equal(shouldExposeMemoryNode({ sensitivity: 'personal' }), false);
+    assert.equal(shouldExposeMemoryNode({ sensitivity: 'confidential' }), false);
+    assert.equal(shouldExposeMemoryNode({ sensitivity: 'confidential' }, { includeSensitive: true }), true);
+  });
+
   it('assemble un contexte de rappel borné', () => {
     const result = assembleRecallContext({
       intent: 'relance',
@@ -64,6 +86,13 @@ describe('projectMemoryMath', () => {
           content: 'Risque de budget trop serré',
           importance: 0.6,
         },
+        {
+          id: 'c',
+          nodeType: 'fact',
+          content: 'Email personnel du porteur',
+          importance: 0.9,
+          sensitivity: 'personal',
+        },
       ],
       edges: [
         {
@@ -78,6 +107,7 @@ describe('projectMemoryMath', () => {
 
     assert.equal(result.hasSnapshot, true);
     assert.equal(result.nodeCount, 2);
+    assert.ok(!result.text.includes('Email personnel'));
     assert.ok(result.text.includes('Intent: relance'));
     assert.ok(result.charCount <= 200);
     assert.equal(result.truncated, true);

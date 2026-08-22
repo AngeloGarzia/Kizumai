@@ -35,6 +35,13 @@ export const projectService = {
     return data.businesses;
   },
 
+  async suggestLocations(query) {
+    const q = String(query || '').trim();
+    if (q.length < 2) return [];
+    const { data } = await api.get(`/projects/locations/suggest?q=${encodeURIComponent(q)}`);
+    return data.locations || [];
+  },
+
   async searchTrainings({
     business,
     businessActivity,

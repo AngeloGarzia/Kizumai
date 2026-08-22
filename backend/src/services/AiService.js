@@ -994,6 +994,49 @@ export function createAiService({ settingsService, currencyService }) {
       };
     },
 
+    async testCurrentEngine(overrides = {}) {
+      const baseConfig = await settingsService.getAiConfig();
+      const aiConfig = {
+        ...baseConfig,
+        provider: overrides.provider || baseConfig.provider,
+        model: overrides.model || baseConfig.model,
+        temperature:
+          overrides.temperature != null && overrides.temperature !== ''
+            ? Number(overrides.temperature)
+            : baseConfig.temperature,
+      };
+      const providerId = aiConfig.provider;
+      const apiKey = providerApiKey(providerId);
+      if (!apiKey) {
+        throw new AppError(`Clé API manquante pour ${providerId}.`, 503);
+      }
+
+      const startedAt = Date.now();
+      const text = await rawChatText({
+        systemContent: [
+          'Tu es un endpoint de diagnostic IA pour Kizumai.',
+          'Réponds uniquement avec un JSON valide et concis.',
+        ].join('\n'),
+        userContent:
+          'Teste la connexion au moteur IA. Réponds exactement avec un JSON au format {"ok":true,"message":"..."}. Le message doit être en français et confirmer le fonctionnement.',
+        aiConfig: {
+          ...aiConfig,
+          temperature: Number.isFinite(aiConfig.temperature) ? aiConfig.temperature : 0,
+        },
+        providerId,
+        apiKey,
+      });
+      const data = extractJson(text);
+
+      return {
+        ok: data.ok === true,
+        message: String(data.message || 'Le moteur IA a répondu correctement.').slice(0, 500),
+        provider: providerId,
+        model: aiConfig.model,
+        durationMs: Date.now() - startedAt,
+      };
+    },
+
     async completeProject(fields) {
       const hasQuoi = Boolean(fields.quoi?.trim());
       const hasOu = Boolean(fields.ou?.trim());

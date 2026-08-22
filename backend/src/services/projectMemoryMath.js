@@ -16,6 +16,49 @@ export function shouldArchive(importance, threshold = 0.05) {
   return Number(importance) < Number(threshold);
 }
 
+export function classifyMemoryKind({ sourceEntityType = null, nodeType = 'event' } = {}) {
+  const source = String(sourceEntityType || '').toLowerCase();
+  const type = String(nodeType || '').toLowerCase();
+  if (['project', 'company', 'accounting_profile', 'company_officer'].includes(source)) {
+    return 'permanent';
+  }
+  if (['decision', 'milestone'].includes(type)) {
+    return 'durable';
+  }
+  if (['task_state', 'event'].includes(type)) {
+    return 'temporary';
+  }
+  return 'durable';
+}
+
+export function classifyMemorySensitivity(content = '') {
+  const text = String(content || '').toLowerCase();
+  const confidentialPatterns = [
+    /\b(iban|bic|rib|carte bancaire|num[eé]ro de carte|cvv|mot de passe|password|secret|token)\b/,
+    /\b(salaire|revenu personnel|imp[oô]t|dette|cr[eé]dit personnel|patrimoine)\b/,
+    /\b(sant[eé]|m[eé]dical|handicap|maladie)\b/,
+  ];
+  if (confidentialPatterns.some((pattern) => pattern.test(text))) {
+    return 'confidential';
+  }
+
+  const personalPatterns = [
+    /\b(email|e-mail|t[eé]l[eé]phone|adresse personnelle|date de naissance)\b/,
+    /\b(nom de famille|pr[eé]nom|pi[eè]ce d'identit[eé]|passeport)\b/,
+  ];
+  if (personalPatterns.some((pattern) => pattern.test(text))) {
+    return 'personal';
+  }
+
+  return 'normal';
+}
+
+export function shouldExposeMemoryNode(node, { includeSensitive = false } = {}) {
+  if (!node) return false;
+  if (includeSensitive) return true;
+  return !['personal', 'confidential'].includes(String(node.sensitivity || 'normal'));
+}
+
 export function reinforceImportance(importance, boost = 0.05) {
   return Math.min(1, Math.round((Number(importance) + Number(boost)) * 1000) / 1000);
 }
@@ -33,8 +76,10 @@ export function assembleRecallContext({
   edges = [],
   intent = '',
   maxChars = 4000,
+  includeSensitive = false,
 } = {}) {
   const parts = [];
+  const visibleNodes = nodes.filter((node) => shouldExposeMemoryNode(node, { includeSensitive }));
 
   if (intent) {
     parts.push(`Intent: ${intent}`);
@@ -53,10 +98,11 @@ export function assembleRecallContext({
     }
   }
 
-  if (nodes.length) {
-    const lines = nodes.slice(0, 20).map((n) => {
+  if (visibleNodes.length) {
+    const lines = visibleNodes.slice(0, 20).map((n) => {
       const imp = n.importance != null ? Number(n.importance).toFixed(2) : '?';
-      return `- [${n.nodeType}|imp=${imp}] ${n.content}`;
+      const kind = n.memoryKind ? `|${n.memoryKind}` : '';
+      return `- [${n.nodeType}${kind}|imp=${imp}] ${n.content}`;
     });
     parts.push(`## Souvenirs\n${lines.join('\n')}`);
   }
@@ -80,11 +126,11 @@ export function assembleRecallContext({
     text,
     truncated,
     charCount: text.length,
-    nodeCount: nodes.length,
+    nodeCount: visibleNodes.length,
     edgeCount: edges.length,
     hasSnapshot: Boolean(snapshot?.summary),
     snapshot,
-    nodes,
+    nodes: visibleNodes,
     edges,
   };
 }

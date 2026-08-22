@@ -79,6 +79,12 @@ const SETUP_SECTIONS = [
         key: 'budget_eur_max',
         label: 'Budget max (EUR)',
       },
+      {
+        key: 'business_project_suggestions_count',
+        label: 'Nombre de projets business proposés',
+        hint: 'Entier entre 1 et 8 — utilisé dans le prompt {{count}}',
+        defaultValue: '3',
+      },
     ],
   },
   {
@@ -103,6 +109,7 @@ const PROTECTED_KEYS = new Set([
   'ai_temperature',
   'budget_eur_min',
   'budget_eur_max',
+  'business_project_suggestions_count',
 ]);
 
 const PROMPT_GROUPS = [
@@ -192,6 +199,7 @@ export default function Admin() {
   const [settings, setSettings] = useState([]);
   const [prompts, setPrompts] = useState([]);
   const [selectedPromptKey, setSelectedPromptKey] = useState('');
+  const [aiTestResult, setAiTestResult] = useState(null);
   const [newSetting, setNewSetting] = useState({ key: '', value: '' });
 
   const [usersOverview, setUsersOverview] = useState(null);
@@ -279,6 +287,22 @@ export default function Admin() {
       await loadSetup({ silent: true });
     } catch (err) {
       setError(err.message);
+    } finally {
+      setBusyKey('');
+    }
+  };
+
+  const testAiEngine = async () => {
+    setMessage('');
+    setError('');
+    setAiTestResult(null);
+    setBusyKey('test-ai');
+    try {
+      const result = await adminService.testAiEngine(ai);
+      setAiTestResult(result);
+      setMessage(`Test IA réussi avec ${result.provider} / ${result.model}`);
+    } catch (err) {
+      setError(err.message || 'Le test du moteur IA a échoué');
     } finally {
       setBusyKey('');
     }
@@ -465,26 +489,37 @@ export default function Admin() {
                           : 'Listes de modèles non encore chargées'}
                       </p>
                     </div>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      className="w-auto shrink-0"
-                      disabled={busyKey === 'refresh-models'}
-                      onClick={async () => {
-                        setBusyKey('refresh-models');
-                        setError('');
-                        try {
-                          await loadSetup({ silent: true });
-                          setMessage('Listes de modèles rafraîchies');
-                        } catch (err) {
-                          setError(err.message || 'Échec du rafraîchissement');
-                        } finally {
-                          setBusyKey('');
-                        }
-                      }}
-                    >
-                      {busyKey === 'refresh-models' ? 'Actualisation…' : 'Actualiser les modèles'}
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="w-auto shrink-0"
+                        disabled={busyKey === 'test-ai'}
+                        onClick={testAiEngine}
+                      >
+                        {busyKey === 'test-ai' ? 'Test en cours…' : 'Tester l’IA choisie'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="w-auto shrink-0"
+                        disabled={busyKey === 'refresh-models'}
+                        onClick={async () => {
+                          setBusyKey('refresh-models');
+                          setError('');
+                          try {
+                            await loadSetup({ silent: true });
+                            setMessage('Listes de modèles rafraîchies');
+                          } catch (err) {
+                            setError(err.message || 'Échec du rafraîchissement');
+                          } finally {
+                            setBusyKey('');
+                          }
+                        }}
+                      >
+                        {busyKey === 'refresh-models' ? 'Actualisation…' : 'Actualiser les modèles'}
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -542,6 +577,16 @@ export default function Admin() {
                   <Button type="submit" disabled={busyKey === 'ai'} className="w-auto">
                     {busyKey === 'ai' ? 'Enregistrement…' : 'Enregistrer l’IA'}
                   </Button>
+
+                  {aiTestResult && (
+                    <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                      <p className="font-semibold">Moteur IA opérationnel</p>
+                      <p className="mt-1">{aiTestResult.message}</p>
+                      <p className="mt-1 text-xs text-emerald-700">
+                        Fournisseur : {aiTestResult.provider} — Modèle : {aiTestResult.model} — Temps : {aiTestResult.durationMs} ms
+                      </p>
+                    </div>
+                  )}
                 </form>
 
                 {SETUP_SECTIONS.map((section) => (

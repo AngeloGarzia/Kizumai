@@ -9,6 +9,10 @@ export const adminService = {
     return api.put('/admin/settings', data).then((r) => r.data);
   },
 
+  testAiEngine(data) {
+    return api.post('/admin/settings/test-ai', data).then((r) => r.data);
+  },
+
   getPrompts() {
     return api.get('/admin/prompts').then((r) => r.data);
   },

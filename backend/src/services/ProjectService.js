@@ -2,12 +2,62 @@ import { AppError } from '../utils/AppError.js';
 import { hasPaidAccess } from '../constants/plans.js';
 import { computeProjectProgress } from '../constants/projectStages.js';
 
+const LOCATION_SUGGEST_TIMEOUT_MS = 4500;
+
+async function fetchLocationSuggestions(query) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), LOCATION_SUGGEST_TIMEOUT_MS);
+  try {
+    const params = new URLSearchParams({
+      q: query,
+      format: 'jsonv2',
+      addressdetails: '1',
+      limit: '6',
+      'accept-language': 'fr',
+    });
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'Kizumai/1.0 (location suggestions)',
+      },
+      signal: controller.signal,
+    });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function formatLocationSuggestion(item) {
+  const address = item?.address || {};
+  const city = address.city || address.town || address.village || address.municipality || '';
+  const region = address.state || address.region || address.county || '';
+  const country = address.country || '';
+  const parts = [city, region, country].filter(Boolean);
+  const label = parts.length ? parts.join(', ') : String(item?.display_name || '').split(',').slice(0, 3).join(',').trim();
+
+  return {
+    label,
+    displayName: String(item?.display_name || label),
+    city,
+    region,
+    country,
+    latitude: item?.lat != null ? Number(item.lat) : null,
+    longitude: item?.lon != null ? Number(item.lon) : null,
+  };
+}
+
 export function createProjectService({
   projectRepository,
   activityRepository,
   locationRepository,
   aiService,
   currencyService,
+  settingsService = null,
   projectMemoryUpdateService = null,
   projectMemoryRecallService = null,
   projectMemoryScanService = null,
@@ -28,8 +78,8 @@ export function createProjectService({
   }
 
   /**
-   * Charge un contexte mémoire pour enrichir les prompts IA.
-   * Jamais sans utilisateur authentifié : projectId anonyme = IDOR.
+   * Charge un contexte mï¿½moire pour enrichir les prompts IA.
+   * Jamais sans utilisateur authentifiï¿½ : projectId anonyme = IDOR.
    */
   async function resolveMemoryContext({
     userId = null,
@@ -61,6 +111,24 @@ export function createProjectService({
   }
 
   return {
+    async suggestLocations({ q }) {
+      const query = q?.trim() || '';
+      if (query.length < 2) return [];
+
+      const rows = await fetchLocationSuggestions(query);
+      const seen = new Set();
+      return rows
+        .map(formatLocationSuggestion)
+        .filter((location) => {
+          if (!location.label) return false;
+          const key = location.label.toLowerCase();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .slice(0, 5);
+    },
+
     async previewProject({ quoi, ou, budget, currency = 'EUR', userId = null, projectId = null }) {
       await currencyService.getCurrencyData();
       const memoryContext = await resolveMemoryContext({
@@ -103,22 +171,28 @@ export function createProjectService({
       userId = null,
       projectId = null,
     }) {
-      if (!quoi?.trim()) {
-        throw new AppError("L'id?e est requise pour lancer la recherche.", 400);
+      const normalizedQuoi = quoi?.trim() || '';
+      const normalizedOu = ou?.trim() || '';
+      if (!normalizedQuoi && !normalizedOu) {
+        throw new AppError("Une id?e ou un lieu est requis pour lancer la recherche.", 400);
       }
       await currencyService.getCurrencyData();
+      const businessConfig = settingsService
+        ? await settingsService.getBusinessConfig()
+        : { projectSuggestionsCount: 3 };
       const memoryContext = await resolveMemoryContext({
         userId,
         projectId,
-        intent: `Recherche d'id?es business : ${quoi}`,
+        intent: `Recherche d'id?es business : ${normalizedQuoi} ${normalizedOu}`.trim(),
       });
       const businesses = await aiService.searchBusinesses({
-        quoi: quoi.trim(),
-        ou: ou?.trim() || '',
+        quoi: normalizedQuoi,
+        ou: normalizedOu,
         budget: await currencyService.clampBudget(budget, currency),
         currency,
         refine: refine || '',
         avoid: Array.isArray(avoid) ? avoid : [],
+        count: businessConfig.projectSuggestionsCount,
         memoryContext,
       });
       if (!businesses.length) {

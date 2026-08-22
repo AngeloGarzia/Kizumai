@@ -43,6 +43,14 @@ export const SearchBusinessesRequestDto = {
   },
 };
 
+export const LocationSuggestQueryDto = {
+  from(query = {}) {
+    return {
+      q: optionalString(query.q, { max: 120 }) || '',
+    };
+  },
+};
+
 export const SearchTrainingsRequestDto = {
   from(body = {}) {
     return {

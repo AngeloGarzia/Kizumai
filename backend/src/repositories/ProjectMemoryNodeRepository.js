@@ -33,6 +33,8 @@ export function mapMemoryNode(row) {
     importance: row.importance != null ? Number(row.importance) : 0.5,
     confidence: row.confidence != null ? Number(row.confidence) : 1,
     decayRate: row.decay_rate != null ? Number(row.decay_rate) : 0.01,
+    memoryKind: row.memory_kind || 'durable',
+    sensitivity: row.sensitivity || 'normal',
     accessCount: row.access_count ?? 0,
     lastAccessedAt: row.last_accessed_at,
     archivedAt: row.archived_at,
@@ -78,6 +80,8 @@ export const ProjectMemoryNodeRepository = {
     importance = 0.5,
     confidence = 1,
     decayRate = 0.01,
+    memoryKind = 'durable',
+    sensitivity = 'normal',
     embedding = null,
   }) {
     const emb = formatEmbedding(embedding);
@@ -86,9 +90,9 @@ export const ProjectMemoryNodeRepository = {
       const { rows } = await pool.query(
         `INSERT INTO project_memory_nodes
            (project_id, node_type, source_entity_type, source_entity_id, content,
-            embedding, importance, confidence, decay_rate,
+            embedding, importance, confidence, decay_rate, memory_kind, sensitivity,
             access_count, last_accessed_at)
-         VALUES ($1, $2, $3, $4, $5, $6::vector, $7, $8, $9, 1, NOW())
+         VALUES ($1, $2, $3, $4, $5, $6::vector, $7, $8, $9, $10, $11, 1, NOW())
          ON CONFLICT (project_id, source_entity_type, source_entity_id, node_type)
            WHERE source_entity_id IS NOT NULL AND archived_at IS NULL
          DO UPDATE SET
@@ -97,6 +101,8 @@ export const ProjectMemoryNodeRepository = {
            importance = LEAST(1, GREATEST(project_memory_nodes.importance, EXCLUDED.importance) + 0.05),
            confidence = GREATEST(project_memory_nodes.confidence, EXCLUDED.confidence),
            decay_rate = LEAST(project_memory_nodes.decay_rate, EXCLUDED.decay_rate),
+           memory_kind = EXCLUDED.memory_kind,
+           sensitivity = EXCLUDED.sensitivity,
            access_count = project_memory_nodes.access_count + 1,
            last_accessed_at = NOW(),
            updated_at = NOW()
@@ -111,6 +117,8 @@ export const ProjectMemoryNodeRepository = {
           importance,
           confidence,
           decayRate,
+          memoryKind,
+          sensitivity,
         ]
       );
       return mapMemoryNode(rows[0]);
@@ -118,11 +126,11 @@ export const ProjectMemoryNodeRepository = {
 
     const { rows } = await pool.query(
       `INSERT INTO project_memory_nodes
-         (project_id, node_type, content, embedding, importance, confidence, decay_rate,
+         (project_id, node_type, content, embedding, importance, confidence, decay_rate, memory_kind, sensitivity,
           access_count, last_accessed_at)
-       VALUES ($1, $2, $3, $4::vector, $5, $6, $7, 1, NOW())
+       VALUES ($1, $2, $3, $4::vector, $5, $6, $7, $8, $9, 1, NOW())
        RETURNING *`,
-      [Number(projectId), nodeType, content, emb, importance, confidence, decayRate]
+      [Number(projectId), nodeType, content, emb, importance, confidence, decayRate, memoryKind, sensitivity]
     );
     return mapMemoryNode(rows[0]);
   },
@@ -228,7 +236,7 @@ export const ProjectMemoryNodeRepository = {
              )
            ),
            updated_at = NOW()
-       WHERE archived_at IS NULL
+       WHERE archived_at IS NULL AND memory_kind <> 'permanent'
        RETURNING id, importance`
     );
     return rows.length;
@@ -238,7 +246,7 @@ export const ProjectMemoryNodeRepository = {
     const { rows } = await pool.query(
       `UPDATE project_memory_nodes
        SET archived_at = NOW(), updated_at = NOW()
-       WHERE archived_at IS NULL AND importance < $1
+       WHERE archived_at IS NULL AND memory_kind <> 'permanent' AND importance < $1
        RETURNING id`,
       [Number(threshold)]
     );

@@ -196,6 +196,7 @@ export function createContainer() {
     locationRepository,
     aiService,
     currencyService,
+    settingsService,
     projectMemoryUpdateService,
     projectMemoryRecallService,
     projectMemoryScanService,
@@ -213,6 +214,7 @@ export function createContainer() {
     locationRepository,
     storageService,
     aiService,
+    settingsService,
     projectMemoryUpdateService,
     projectMemoryRecallService,
   });
@@ -265,6 +267,7 @@ export function createContainer() {
     aiPromptRepository,
     userRepository,
     connectionService,
+    aiService,
   });
 
   const contactService = createContactService({

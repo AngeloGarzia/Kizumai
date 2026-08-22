@@ -3,12 +3,13 @@ export const AI_PROVIDERS = [
     id: 'gemini',
     name: 'Google Gemini',
     envKey: 'geminiApiKey',
-    defaultModel: 'gemini-2.0-flash',
+    defaultModel: 'gemini-3.6-flash',
     models: [
-      { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
-      { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-      { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite' },
-      { id: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite' },
+      { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash' },
+      { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash' },
+      { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash Lite' },
+      { id: 'gemini-flash-latest', label: 'Gemini Flash Latest' },
+      { id: 'gemini-flash-lite-latest', label: 'Gemini Flash Lite Latest' },
     ],
   },
   {

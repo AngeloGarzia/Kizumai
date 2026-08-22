@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import BrandLogo from '../components/BrandLogo.jsx';
 import Button from '../components/Button.jsx';
 import Input from '../components/Input.jsx';
 import BudgetField from '../components/BudgetField.jsx';
-import { saveSearchSeed } from '../services/projectService.js';
+import { projectService, saveSearchSeed } from '../services/projectService.js';
 import { IconChevronRight } from '../components/icons.jsx';
 
 export default function CreateFuture() {
@@ -16,24 +16,61 @@ export default function CreateFuture() {
   const [currency, setCurrency] = useState('EUR');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [locationSuggestions, setLocationSuggestions] = useState([]);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
+  const locationRequestRef = useRef(0);
 
   const hasQuoi = Boolean(quoi.trim());
-  const canLaunch = hasQuoi;
+  const hasOu = Boolean(ou.trim());
+  const canLaunch = hasQuoi || hasOu;
+
+  useEffect(() => {
+    const query = ou.trim();
+    const requestId = locationRequestRef.current + 1;
+    locationRequestRef.current = requestId;
+
+    if (query.length < 2) {
+      setLocationSuggestions([]);
+      setLocationLoading(false);
+      return undefined;
+    }
+
+    setLocationLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const suggestions = await projectService.suggestLocations(query);
+        if (locationRequestRef.current === requestId) {
+          setLocationSuggestions(suggestions);
+        }
+      } catch {
+        if (locationRequestRef.current === requestId) {
+          setLocationSuggestions([]);
+        }
+      } finally {
+        if (locationRequestRef.current === requestId) {
+          setLocationLoading(false);
+        }
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [ou]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
 
     if (!canLaunch) {
-      setError('Une idée est nécessaire !');
+      setError('Indiquez au moins une idée ou un lieu pour lancer la recherche.');
       return;
     }
 
     setSubmitting(true);
 
-    // Lieu optionnel. Budget jamais à 0 : minimum 500 € (EUR).
+    // Idée et lieu optionnels séparément. Budget jamais à 0 : minimum 500 € (EUR).
     saveSearchSeed({
-      quoi: quoi.trim(),
+      quoi: quoi.trim() || null,
       ou: ou.trim() || null,
       budget: budget != null && Number(budget) > 0 ? Number(budget) : 500,
       currency,
@@ -69,8 +106,8 @@ export default function CreateFuture() {
             Démarrez votre projet
           </h1>
           <p className="mt-2 text-sm sm:text-base text-prune-500">
-            Une idée suffit pour démarrer. Le lieu et le budget (minimum 500&nbsp;€)
-            peuvent être précisés ensuite.
+            Une idée ou un lieu suffit pour démarrer. Le budget (minimum 500&nbsp;€)
+            peut être précisé ensuite.
           </p>
         </section>
 
@@ -82,16 +119,49 @@ export default function CreateFuture() {
               value={quoi}
               onChange={(e) => setQuoi(e.target.value)}
               placeholder="Ex : Boutique de produits locaux bio"
-              required
             />
 
-            <Input
-              id="ou"
-              label="Où ?"
-              value={ou}
-              onChange={(e) => setOu(e.target.value)}
-              placeholder="Ex : Lyon, quartier Part-Dieu"
-            />
+            <div className="relative">
+              <Input
+                id="ou"
+                label="Où ?"
+                value={ou}
+                onChange={(e) => {
+                  setOu(e.target.value);
+                  setShowLocationSuggestions(true);
+                }}
+                onFocus={() => setShowLocationSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowLocationSuggestions(false), 120)}
+                placeholder="Ex : Lyon, quartier Part-Dieu"
+                autoComplete="off"
+              />
+              {showLocationSuggestions && (locationLoading || locationSuggestions.length > 0) && (
+                <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-xl border border-prune-100 bg-white shadow-lg">
+                  {locationLoading && (
+                    <p className="px-4 py-3 text-sm text-prune-500">Recherche de lieux existants…</p>
+                  )}
+                  {!locationLoading && locationSuggestions.map((location) => (
+                    <button
+                      key={`${location.label}-${location.latitude}-${location.longitude}`}
+                      type="button"
+                      className="block w-full px-4 py-3 text-left text-sm text-prune-800 hover:bg-prune-50"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setOu(location.label);
+                        setShowLocationSuggestions(false);
+                      }}
+                    >
+                      <span className="font-medium">{location.label}</span>
+                      {location.displayName && location.displayName !== location.label && (
+                        <span className="mt-0.5 block truncate text-xs text-prune-500">
+                          {location.displayName}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <BudgetField
               budget={budget}
@@ -101,7 +171,7 @@ export default function CreateFuture() {
             />
 
             <p className="text-xs text-prune-600 bg-prune-50 border border-prune-200 rounded-xl px-4 py-3">
-              Une idée est nécessaire !
+              Donnez une idée, un lieu, ou les deux : l&apos;IA proposera des business adaptés.
             </p>
 
             {error && <p className="alert-error">{error}</p>}

@@ -20,6 +20,7 @@ export function createAdminService({
   aiPromptRepository,
   userRepository,
   connectionService,
+  aiService,
 }) {
   async function loadAiSettings({ forceRefresh = false } = {}) {
     const settings = await settingsRepository.getAsObject();
@@ -95,6 +96,28 @@ export function createAdminService({
       return loadAiSettings({ forceRefresh: false });
     },
 
+    async testAiEngine({ aiProvider, aiModel, aiTemperature } = {}) {
+      if (aiProvider && !getProviderById(aiProvider)) {
+        throw new AppError('Fournisseur IA invalide', 400);
+      }
+      if (aiModel) {
+        const providerId = aiProvider || (await settingsRepository.findByKey('ai_provider'))?.value
+          || config.ai.defaultProvider;
+        await assertModelAllowed(providerId, aiModel);
+      }
+      if (aiTemperature != null) {
+        const temp = Number(aiTemperature);
+        if (Number.isNaN(temp) || temp < 0 || temp > 2) {
+          throw new AppError('La température doit être comprise entre 0 et 2', 400);
+        }
+      }
+      return aiService.testCurrentEngine({
+        provider: aiProvider,
+        model: aiModel,
+        temperature: aiTemperature,
+      });
+    },
+
     /** Bundle Setup : tous les paramètres app_settings + prompts. */
     async getSetup() {
       const rows = await settingsRepository.findAll();
@@ -141,6 +164,12 @@ export function createAdminService({
           config.ai.defaultProvider;
         await assertModelAllowed(provider, String(value));
       }
+      if (k === 'business_project_suggestions_count') {
+        const count = Number(value);
+        if (!Number.isInteger(count) || count < 1 || count > 8) {
+          throw new AppError('Le nombre de projets proposés doit être un entier entre 1 et 8', 400);
+        }
+      }
 
       const row = await settingsRepository.upsert(k, String(value));
       return { key: row.key, value: row.value, updatedAt: row.updated_at };
@@ -154,6 +183,7 @@ export function createAdminService({
         'ai_temperature',
         'budget_eur_min',
         'budget_eur_max',
+        'business_project_suggestions_count',
       ]);
       if (protectedKeys.has(k)) {
         throw new AppError('Ce paramètre système ne peut pas être supprimé', 400);

@@ -1,6 +1,7 @@
 import {
   BuildProposalsRequestDto,
   CreateProjectRequestDto,
+  LocationSuggestQueryDto,
   ProjectIdParamDto,
   ProjectPreviewRequestDto,
   ProjectResponseDto,
@@ -33,6 +34,12 @@ export function createProjectController({ projectService }) {
       const dto = SearchBusinessesRequestDto.from(req.body);
       const businesses = await projectService.searchBusinesses(withUserContext(dto, req));
       successResponse(res, { businesses });
+    }),
+
+    suggestLocations: asyncHandler(async (req, res) => {
+      const dto = LocationSuggestQueryDto.from(req.query);
+      const locations = await projectService.suggestLocations(dto);
+      successResponse(res, { locations });
     }),
 
     searchTrainings: asyncHandler(async (req, res) => {

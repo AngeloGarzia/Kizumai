@@ -16,6 +16,7 @@ export function createAdminRoutes({
 
   router.get('/settings', adminController.getSettings);
   router.put('/settings', adminController.updateSettings);
+  router.post('/settings/test-ai', adminController.testAiEngine);
   router.get('/setup', adminController.getSetup);
   router.put('/app-settings/:key', adminController.upsertAppSetting);
   router.delete('/app-settings/:key', adminController.deleteAppSetting);

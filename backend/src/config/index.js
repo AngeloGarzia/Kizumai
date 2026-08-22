@@ -134,7 +134,7 @@ export const config = {
     mistralApiKey: process.env.MISTRAL_API_KEY || '',
     openrouterApiKey: process.env.OPENROUTER_API_KEY || '',
     defaultProvider: process.env.AI_DEFAULT_PROVIDER || 'gemini',
-    defaultModel: process.env.AI_DEFAULT_MODEL || 'gemini-2.0-flash',
+    defaultModel: process.env.AI_DEFAULT_MODEL || 'gemini-3.6-flash',
   },
 
   appUrl,

@@ -1,4 +1,5 @@
 import { config } from '../config/index.js';
+import { classifyMemoryKind, classifyMemorySensitivity } from './projectMemoryMath.js';
 
 const KEY_CONTACT_CATEGORIES = new Set([
   'expert_comptable',
@@ -70,6 +71,8 @@ export function createProjectMemoryUpdateService({
       importance = 0.5,
       confidence = 1,
       decayRate = null,
+      memoryKind = null,
+      sensitivity = null,
       relatedNodeIds = [],
       relationType = 'relates_to',
       triggerSnapshot = true,
@@ -77,10 +80,14 @@ export function createProjectMemoryUpdateService({
       if (!projectId || !content?.trim()) return null;
 
       const text = String(content).trim().slice(0, 6000);
+      const resolvedMemoryKind = memoryKind || classifyMemoryKind({ sourceEntityType, nodeType });
+      const resolvedSensitivity = sensitivity || classifyMemorySensitivity(text);
       const resolvedDecay =
         decayRate != null
           ? decayRate
-          : STRUCTURAL_SOURCES.has(sourceEntityType)
+          : resolvedMemoryKind === 'permanent' || STRUCTURAL_SOURCES.has(sourceEntityType)
+            ? 0
+            : resolvedMemoryKind === 'durable'
             ? 0.002
             : 0.01;
 
@@ -94,6 +101,8 @@ export function createProjectMemoryUpdateService({
         importance,
         confidence,
         decayRate: resolvedDecay,
+        memoryKind: resolvedMemoryKind,
+        sensitivity: resolvedSensitivity,
         embedding,
       });
 
