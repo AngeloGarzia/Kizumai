@@ -52,7 +52,16 @@ export function createProjectRoutes({
   aiAnonRedisQuota,
   scanRedisQuota,
   uploadDocument,
+  uploadRateLimiter,
+  uploadRedisQuota,
+  previewTextRateLimiter,
+  previewTextRedisQuota,
 }) {
+  const noop = (_r, _s, n) => n();
+  const uploadGate = (req, res, next) =>
+    (uploadRedisQuota || noop)(req, res, () => uploadRateLimiter(req, res, next));
+  const previewGate = (req, res, next) =>
+    (previewTextRedisQuota || noop)(req, res, () => previewTextRateLimiter(req, res, next));
   const router = Router();
   const publicAi = aiGate(
     optionalAuth,
@@ -98,10 +107,23 @@ export function createProjectRoutes({
   router.get('/:id/resources', authenticate, requirePaid, documentController.listResources);
   router.get('/:id/resource-categories', authenticate, requirePaid, documentController.listCategories);
   router.get('/:id/documents', authenticate, requirePaid, documentController.list);
-  router.post('/:id/documents', authenticate, requirePaid, uploadDocument, documentController.upload);
+  router.post(
+    '/:id/documents',
+    authenticate,
+    requirePaid,
+    uploadGate,
+    uploadDocument,
+    documentController.upload
+  );
   router.get('/:id/documents/:docId', authenticate, requirePaid, documentController.getOne);
   router.patch('/:id/documents/:docId', authenticate, requirePaid, documentController.update);
-  router.get('/:id/documents/:docId/preview-text', authenticate, requirePaid, documentController.textPreview);
+  router.get(
+    '/:id/documents/:docId/preview-text',
+    authenticate,
+    requirePaid,
+    previewGate,
+    documentController.textPreview
+  );
   router.post('/:id/documents/:docId/contacts', authenticate, requirePaid, documentController.linkContact);
   router.delete('/:id/documents/:docId/contacts/:contactId', authenticate, requirePaid, documentController.unlinkContact);
   router.get('/:id/documents/:docId/download', authenticate, requirePaid, documentController.download);

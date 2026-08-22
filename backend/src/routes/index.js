@@ -21,6 +21,16 @@ import {
   aiRedisQuota,
   aiAnonRedisQuota,
   scanRedisQuota,
+  loginRedisQuota,
+  registerRedisQuota,
+  refreshRedisQuota,
+  authActionRedisQuota,
+  uploadRateLimiter,
+  uploadRedisQuota,
+  previewTextRateLimiter,
+  previewTextRedisQuota,
+  adminRateLimiter,
+  adminRedisQuota,
 } from '../middleware/rateLimiter.js';
 
 import { requireAdmin } from '../middleware/requireAdmin.js';
@@ -53,6 +63,10 @@ export function createApiRouter(container) {
     registerRateLimiter,
     refreshRateLimiter,
     authActionRateLimiter,
+    loginRedisQuota,
+    registerRedisQuota,
+    refreshRedisQuota,
+    authActionRedisQuota,
   }));
   router.use('/currencies', createCurrencyRoutes({
     currencyController: controllers.currencyController,
@@ -72,11 +86,17 @@ export function createApiRouter(container) {
     aiAnonRedisQuota,
     scanRedisQuota,
     uploadDocument,
+    uploadRateLimiter,
+    uploadRedisQuota,
+    previewTextRateLimiter,
+    previewTextRedisQuota,
   }));
   router.use('/admin', createAdminRoutes({
     adminController: controllers.adminController,
     authenticate: middleware.authenticate,
     requireAdmin,
+    adminRateLimiter,
+    adminRedisQuota,
   }));
   router.use('/notifications', createNotificationRoutes({
     notificationController: controllers.notificationController,

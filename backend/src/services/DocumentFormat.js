@@ -1,6 +1,8 @@
 import path from 'path';
 import { fileTypeFromBuffer, fileTypeFromFile } from 'file-type';
 import { AppError } from '../utils/AppError.js';
+import { assertSafeZipArchive } from '../utils/archiveGuard.js';
+import { isZipBasedOfficeExt } from '../utils/imageLimits.js';
 
 /**
  * Whitelist stricte des uploads (magic bytes + extension).
@@ -118,12 +120,13 @@ export function isAllowedUploadMime(mime = '') {
 
 function looksLikeHtmlOrScript(buffer) {
   if (!buffer || !Buffer.isBuffer(buffer) || buffer.length === 0) return false;
-  const head = buffer.subarray(0, Math.min(512, buffer.length)).toString('utf8').toLowerCase();
+  const scanLen = Math.min(4096, buffer.length);
+  const head = buffer.subarray(0, scanLen).toString('utf8').toLowerCase();
   const trimmed = head.replace(/^\uFEFF/, '').trimStart();
   if (trimmed.startsWith('<!doctype html') || trimmed.startsWith('<html')) return true;
-  if (/<\s*script[\s>]/i.test(trimmed)) return true;
-  if (/<\s*svg[\s>]/i.test(trimmed)) return true;
-  if (trimmed.startsWith('<?xml') && /svg/i.test(trimmed.slice(0, 200))) return true;
+  if (/<\s*script[\s>]/i.test(head)) return true;
+  if (/<\s*svg[\s>]/i.test(head)) return true;
+  if (trimmed.startsWith('<?xml') && /svg/i.test(head.slice(0, 400))) return true;
   return false;
 }
 
@@ -260,6 +263,17 @@ export function assertAllowedUploadFormat(format, { originalName = '', buffer = 
     if (mime.startsWith('text/') || mime === 'application/rtf' || mime === 'text/markdown') {
       throw new AppError('Contenu HTML/script/SVG refusé', 400);
     }
+  }
+
+  const zipExt = ext || format.ext || '';
+  if (
+    buffer &&
+    (isZipBasedOfficeExt(zipExt) ||
+      zipExt === 'epub' ||
+      mime === 'application/epub+zip' ||
+      mime.includes('openxmlformats'))
+  ) {
+    assertSafeZipArchive(buffer);
   }
 
   return { mimeType: mime, ext: format.ext || ext || null, source: format.source };

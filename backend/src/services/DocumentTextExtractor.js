@@ -3,8 +3,13 @@ import path from 'path';
 import officeParser from 'officeparser';
 import Tesseract from 'tesseract.js';
 import WordExtractor from 'word-extractor';
-
-const MAX_TEXT = 45_000;
+import { assertSafeZipBuffer } from '../utils/archiveGuard.js';
+import { assertImageWithinOcrLimits, isZipBasedOfficeExt } from '../utils/imageLimits.js';
+import { withProcessingTimeout } from '../utils/withProcessingTimeout.js';
+import {
+  DOCUMENT_LIMITS,
+  DocumentProcessingError,
+} from './documentProcessingLimits.js';
 
 const IMAGE_EXTS = new Set([
   'png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'tif', 'tiff', 'heic', 'heif',
@@ -51,9 +56,6 @@ function isOfficeMime(mime = '') {
   );
 }
 
-/**
- * Classifie le fichier pour la colonne documents.type (STI).
- */
 export function detectDocumentType(mimeType, fileName) {
   const mime = (mimeType || '').toLowerCase();
   const ext = extensionOf(fileName);
@@ -86,84 +88,78 @@ export function detectDocumentType(mimeType, fileName) {
   return 'other';
 }
 
-async function extractPdf(absPath) {
+async function extractPdf(absPath, limits) {
   const { createRequire } = await import('module');
   const require = createRequire(import.meta.url);
   const pdfParse = require('pdf-parse');
   const buffer = await readFile(absPath);
-  const parsed = await pdfParse(buffer);
-  return String(parsed?.text || '').slice(0, MAX_TEXT);
+  if (buffer.length > limits.pdfMaxBytes) {
+    throw new DocumentProcessingError('PDF trop volumineux pour l\'extraction', 'pdf_too_large');
+  }
+  const parsed = await pdfParse(buffer, { max: limits.pdfMaxPages });
+  if (parsed.numpages > limits.pdfMaxPages) {
+    throw new DocumentProcessingError(
+      `PDF : trop de pages (${parsed.numpages} > ${limits.pdfMaxPages})`,
+      'pdf_too_many_pages'
+    );
+  }
+  return String(parsed?.text || '').slice(0, limits.maxTextChars);
 }
 
-async function extractPlainText(absPath) {
+async function extractPlainText(absPath, limits) {
   const text = await readFile(absPath, 'utf8');
-  return text.slice(0, MAX_TEXT);
+  return text.slice(0, limits.maxTextChars);
 }
 
-async function extractLegacyDoc(absPath) {
+async function extractLegacyDoc(absPath, limits) {
   const extractor = new WordExtractor();
   const doc = await extractor.extract(absPath);
-  return String(doc.getBody() || '').slice(0, MAX_TEXT);
+  return String(doc.getBody() || '').slice(0, limits.maxTextChars);
 }
 
-async function extractWithOfficeParser(absPath, { withOcr = false } = {}) {
-  const config = withOcr
-    ? {
-        extractAttachments: false,
-        ocr: true,
-        ocrConfig: {
-          language: 'fra+eng',
-        },
-      }
-    : { extractAttachments: false };
+async function extractWithOfficeParser(absPath, ext, limits) {
+  const buffer = await readFile(absPath);
+  if (isZipBasedOfficeExt(ext) || ext === 'epub') {
+    assertSafeZipBuffer(buffer, limits);
+  }
 
-  const ast = await officeParser.parseOffice(absPath, config);
+  const ast = await officeParser.parseOffice(absPath, { extractAttachments: false });
   const out = await ast.to('text');
-  return String(out?.value || '').slice(0, MAX_TEXT);
+  return String(out?.value || '').slice(0, limits.maxTextChars);
 }
 
-async function extractImageOcr(absPath) {
+async function extractImageOcr(absPath, limits) {
+  const buffer = await readFile(absPath);
+  assertImageWithinOcrLimits(buffer, limits);
   const result = await Tesseract.recognize(absPath, 'fra+eng', {
     logger: () => {},
   });
-  return String(result?.data?.text || '').slice(0, MAX_TEXT);
+  return String(result?.data?.text || '').slice(0, limits.maxTextChars);
 }
 
 /**
- * Extraction de texte multi-formats pour scan IA / aperçu / excerpt.
- * Formats : PDF, Word (.doc/.docx), Excel, PowerPoint, OpenDocument,
- * Markdown, HTML, CSV, RTF, images (OCR Tesseract local fra+eng).
- * Aucune clé API externe requise.
- *
- * @param {boolean} [opts.fast] saute OCR (upload HTTP) ; le scan async fait le travail complet
+ * Extraction de texte (worker / file d'attente uniquement — ne pas appeler depuis HTTP).
  */
 export async function extractDocumentText(
   absPath,
-  { mimeType = '', fileName = '', fast = false } = {}
+  { mimeType = '', fileName = '', limits = DOCUMENT_LIMITS } = {}
 ) {
   const mime = (mimeType || '').toLowerCase();
   const ext = extensionOf(fileName, absPath);
 
-  try {
+  const run = async () => {
     if (mime.startsWith('image/') || IMAGE_EXTS.has(ext)) {
-      if (fast) return '';
-      return await extractImageOcr(absPath);
+      return extractImageOcr(absPath, limits);
     }
 
-    // PDF via pdf-parse (évite pdfjs-dist vulnérable d'officeparser).
     if (ext === 'pdf' || mime === 'application/pdf') {
-      try {
-        return await extractPdf(absPath);
-      } catch (pdfErr) {
-        console.warn('[text-extract] pdf-parse:', pdfErr.message);
-        return '';
-      }
+      return extractPdf(absPath, limits);
     }
 
     if (ext === 'doc' || mime === 'application/msword') {
       if (ext === 'doc' || !mime.includes('openxml')) {
         try {
-          return await extractLegacyDoc(absPath);
+          return await extractLegacyDoc(absPath, limits);
         } catch (err) {
           console.warn('[text-extract] word-extractor:', err.message);
         }
@@ -176,11 +172,7 @@ export async function extractDocumentText(
       ext === 'xls' ||
       ext === 'ppt'
     ) {
-      try {
-        return await extractWithOfficeParser(absPath, { withOcr: false });
-      } catch (err) {
-        console.warn('[text-extract] officeparser:', err.message);
-      }
+      return extractWithOfficeParser(absPath, ext, limits);
     }
 
     if (
@@ -189,11 +181,11 @@ export async function extractDocumentText(
       mime === 'application/json' ||
       mime === 'application/xml'
     ) {
-      return await extractPlainText(absPath);
+      return extractPlainText(absPath, limits);
     }
 
     try {
-      const text = await extractPlainText(absPath);
+      const text = await extractPlainText(absPath, limits);
       if (text && /[\p{L}\p{N}]/u.test(text.slice(0, 500))) {
         return text;
       }
@@ -202,10 +194,9 @@ export async function extractDocumentText(
     }
 
     return '';
-  } catch (err) {
-    console.warn('[text-extract]', err.message);
-    return '';
-  }
+  };
+
+  return withProcessingTimeout(run(), limits.jobTimeoutMs, 'Extraction document');
 }
 
 export const SUPPORTED_EXTRACT_HINT =

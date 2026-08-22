@@ -1,4 +1,4 @@
-import { optionalId, optionalString, parseId, pick } from './helpers.js';
+import { optionalId, optionalString, parseId } from './helpers.js';
 
 export const DocumentParamsDto = {
   from(params) {
@@ -22,7 +22,13 @@ export const UploadDocumentRequestDto = {
 
 export const UpdateDocumentRequestDto = {
   from(body = {}) {
-    const out = pick(body, ['title', 'description', 'excerpt']);
+    const out = {};
+    if (body.title !== undefined) {
+      out.title = optionalString(body.title, { max: 255 });
+    }
+    if (body.description !== undefined) {
+      out.description = optionalString(body.description, { max: 5000 });
+    }
     if (body.categoryId !== undefined) {
       out.categoryId = body.categoryId == null || body.categoryId === ''
         ? null
@@ -51,10 +57,23 @@ export const DocumentContactParamsDto = {
   },
 };
 
+function enrichDocument(document) {
+  if (!document) return null;
+  const attrs = document.attributes || {};
+  const processingStatus =
+    document.processingStatus ||
+    attrs.processingStatus ||
+    (document.excerpt ? 'ready' : null);
+  return {
+    ...document,
+    processingStatus,
+    processingError: document.processingError ?? attrs.processingError ?? null,
+  };
+}
+
 export const DocumentResponseDto = {
   from(document) {
-    if (!document) return null;
-    return document;
+    return enrichDocument(document);
   },
   fromMany(documents) {
     return (documents || []).map((d) => DocumentResponseDto.from(d));

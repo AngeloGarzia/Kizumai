@@ -209,6 +209,7 @@ export function createAdminService({
 
       const user = await userRepository.updateRole(targetId, role);
       if (!user) throw new AppError('Utilisateur introuvable', 404);
+      await userRepository.incrementRefreshTokenVersion(targetId);
       return UserResponseDto.from(user);
     },
 

@@ -887,35 +887,43 @@ export function createAiService({ settingsService, currencyService }) {
      * Embedding OpenAI text-embedding-3-small (1536). Null si clé absente.
      */
     async embedText(text) {
-      const apiKey = providerApiKey('openai') || config.ai.openaiApiKey;
-      if (!apiKey) return null;
-      const input = String(text || '').slice(0, 8000).trim();
-      if (!input) return null;
+      return withAiGuard(async () => {
+        const apiKey = providerApiKey('openai') || config.ai.openaiApiKey;
+        if (!apiKey) return null;
+        const input = String(text || '').slice(0, 8000).trim();
+        if (!input) return null;
 
-      try {
-        const response = await fetchWithTimeout(
-          `${OPENAI_COMPAT_BASES.openai}/embeddings`,
-          {
-            method: 'POST',
-            headers: openAiCompatHeaders(apiKey, 'openai'),
-            body: JSON.stringify({
-              model: process.env.AI_EMBEDDING_MODEL || 'text-embedding-3-small',
-              input,
-            }),
+        try {
+          const response = await fetchWithTimeout(
+            `${OPENAI_COMPAT_BASES.openai}/embeddings`,
+            {
+              method: 'POST',
+              headers: openAiCompatHeaders(apiKey, 'openai'),
+              body: JSON.stringify({
+                model: process.env.AI_EMBEDDING_MODEL || 'text-embedding-3-small',
+                input,
+              }),
+            }
+          );
+          if (!response.ok) {
+            const errBody = await response.text().catch(() => '');
+            console.warn(`[ai] embeddings ${response.status}: ${errBody.slice(0, 200)}`);
+            return null;
           }
-        );
-        if (!response.ok) {
-          const errBody = await response.text().catch(() => '');
-          console.warn(`[ai] embeddings ${response.status}: ${errBody.slice(0, 200)}`);
+          const data = await response.json();
+          const vector = data?.data?.[0]?.embedding;
+          return Array.isArray(vector) ? vector : null;
+        } catch (err) {
+          console.warn('[ai] embedText:', err.message);
           return null;
         }
-        const data = await response.json();
-        const vector = data?.data?.[0]?.embedding;
-        return Array.isArray(vector) ? vector : null;
-      } catch (err) {
-        console.warn('[ai] embedText:', err.message);
-        return null;
-      }
+      }).catch((err) => {
+        if (err instanceof AppError && (err.statusCode === 429 || err.statusCode === 503)) {
+          console.warn('[ai] embedText guard:', err.message);
+          return null;
+        }
+        throw err;
+      });
     },
 
     /**

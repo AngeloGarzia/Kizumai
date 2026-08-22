@@ -1,6 +1,7 @@
 import { readFile } from 'fs/promises';
 import { AppError } from '../utils/AppError.js';
 import { withTempFile } from '../utils/tempFile.js';
+import { enqueueDocumentScan } from '../queue/documentQueue.js';
 import {
   extractDocumentText,
   SUPPORTED_EXTRACT_HINT,
@@ -184,11 +185,8 @@ export function createDocumentScanService({
         promptKey: 'document_scan',
       });
 
-      // Async fire-and-forget (fonctionne sans Redis).
-      setImmediate(() => {
-        this.processScan(scan.id).catch((err) => {
-          console.warn(`[document-scan] scan #${scan.id} échoué :`, err.message);
-        });
+      await enqueueDocumentScan({ scanId: scan.id }).catch((err) => {
+        console.warn(`[document-scan] enqueue scan #${scan.id} :`, err.message);
       });
 
       return scan;
@@ -209,13 +207,16 @@ export function createDocumentScanService({
         const doc = await documentRepository.findById(scan.documentId);
         if (!doc) throw new AppError('Document introuvable', 404);
 
-        const buffer = await loadDocumentBuffer(doc);
-        const text = await withTempFile(buffer, doc.fileName || 'file.bin', async (abs) =>
-          extractDocumentText(abs, {
-            mimeType: doc.mimeType,
-            fileName: doc.fileName || doc.title,
-          })
-        );
+        let text = String(doc.excerpt || '').trim();
+        if (!text) {
+          const buffer = await loadDocumentBuffer(doc);
+          text = await withTempFile(buffer, doc.fileName || 'file.bin', async (abs) =>
+            extractDocumentText(abs, {
+              mimeType: doc.mimeType,
+              fileName: doc.fileName || doc.title,
+            })
+          );
+        }
 
         if (!text.trim()) {
           await documentScanRepository.deleteSuggestedItems(scanId);

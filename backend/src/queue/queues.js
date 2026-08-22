@@ -5,10 +5,13 @@ import { getRedisConnection } from './connection.js';
 // Noms logiques des files et des types de jobs.
 export const QUEUE_NAMES = {
   NOTIFICATIONS: 'notifications',
+  DOCUMENTS: 'documents',
 };
 
 export const JOB_TYPES = {
   PLANNER_REMINDER: 'planner-reminder',
+  DOCUMENT_EXTRACT: 'document-extract',
+  DOCUMENT_SCAN: 'document-scan',
 };
 
 const queues = new Map();

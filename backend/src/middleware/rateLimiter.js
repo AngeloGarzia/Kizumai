@@ -162,3 +162,74 @@ export const scanRedisQuota = redisQuotaMiddleware({
 });
 
 export const authRateLimiter = loginRateLimiter;
+
+export const uploadRateLimiter = buildLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: Number(process.env.UPLOAD_RATE_MAX) || 25,
+  message: 'Trop de téléversements, réessayez dans 15 minutes',
+  prefix: 'upload',
+});
+
+export const previewTextRateLimiter = buildLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: Number(process.env.PREVIEW_TEXT_RATE_MAX) || 40,
+  message: 'Trop de demandes d’aperçu texte, réessayez plus tard',
+  prefix: 'preview-text',
+});
+
+export const adminRateLimiter = buildLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: Number(process.env.ADMIN_RATE_MAX) || 120,
+  message: 'Trop de requêtes admin, réessayez plus tard',
+  prefix: 'admin',
+});
+
+/** Quotas Redis distribués (empilés sur les limiters in-memory — défense en profondeur). */
+export const loginRedisQuota = redisQuotaMiddleware({
+  prefix: 'login',
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  failClosed: true,
+});
+
+export const registerRedisQuota = redisQuotaMiddleware({
+  prefix: 'register',
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  failClosed: true,
+});
+
+export const refreshRedisQuota = redisQuotaMiddleware({
+  prefix: 'refresh',
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  failClosed: true,
+});
+
+export const authActionRedisQuota = redisQuotaMiddleware({
+  prefix: 'auth-action',
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  failClosed: true,
+});
+
+export const uploadRedisQuota = redisQuotaMiddleware({
+  prefix: 'upload',
+  windowMs: 15 * 60 * 1000,
+  max: Number(process.env.UPLOAD_RATE_MAX) || 25,
+  failClosed: true,
+});
+
+export const previewTextRedisQuota = redisQuotaMiddleware({
+  prefix: 'preview-text',
+  windowMs: 15 * 60 * 1000,
+  max: Number(process.env.PREVIEW_TEXT_RATE_MAX) || 40,
+  failClosed: true,
+});
+
+export const adminRedisQuota = redisQuotaMiddleware({
+  prefix: 'admin',
+  windowMs: 15 * 60 * 1000,
+  max: Number(process.env.ADMIN_RATE_MAX) || 120,
+  failClosed: true,
+});

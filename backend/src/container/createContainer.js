@@ -326,6 +326,7 @@ export function createContainer() {
       userRepository,
       projectRepository,
       refreshTokenRepository,
+      documentRepository,
     },
     services: {
       userService,

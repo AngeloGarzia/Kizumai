@@ -1,9 +1,18 @@
 import { Router } from 'express';
 
-export function createAdminRoutes({ adminController, authenticate, requireAdmin }) {
+export function createAdminRoutes({
+  adminController,
+  authenticate,
+  requireAdmin,
+  adminRateLimiter,
+  adminRedisQuota,
+}) {
   const router = Router();
+  const noop = (_r, _s, n) => n();
+  const adminGate = (req, res, next) =>
+    (adminRedisQuota || noop)(req, res, () => adminRateLimiter(req, res, next));
 
-  router.use(authenticate, requireAdmin);
+  router.use(authenticate, requireAdmin, adminGate);
 
   router.get('/settings', adminController.getSettings);
   router.put('/settings', adminController.updateSettings);

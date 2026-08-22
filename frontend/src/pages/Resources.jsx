@@ -125,6 +125,7 @@ function DocumentRow({ doc, selected, onSelect }) {
         </span>
         <span className="block text-sm text-prune-500 mt-0.5 truncate">
           {typeLabel(doc.type)}
+          {doc.processingStatus === 'processing' ? ' · Extraction…' : ''}
           {doc.sizeBytes != null ? ` · ${formatSize(doc.sizeBytes)}` : ''}
           {doc.createdAt ? ` · ${formatDate(doc.createdAt)}` : ''}
         </span>
@@ -156,11 +157,13 @@ function PreviewPane({ projectId, doc, textPreview, loadingPreview }) {
   const url = projectService.documentDownloadUrl(projectId, doc.id);
   const safeImage = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(doc.mimeType);
   const isPdf = doc.mimeType === 'application/pdf';
+  const isProcessing = doc.processingStatus === 'processing';
   const isText =
     doc.mimeType === 'text/plain' ||
     doc.mimeType === 'text/markdown' ||
     doc.mimeType === 'text/csv' ||
-    Boolean(doc.excerpt);
+    Boolean(doc.excerpt) ||
+    isProcessing;
 
   return (
     <div className="animate-[fadeIn_280ms_ease-out] space-y-5">
@@ -209,7 +212,11 @@ function PreviewPane({ projectId, doc, textPreview, loadingPreview }) {
         )}
         {!safeImage && !isPdf && isText && (
           <pre className="p-5 text-sm text-prune-800 whitespace-pre-wrap max-h-[28rem] overflow-auto font-sans leading-relaxed">
-            {loadingPreview ? 'Chargement…' : textPreview || doc.excerpt || 'Aperçu indisponible.'}
+            {isProcessing && !textPreview && !doc.excerpt
+              ? 'Extraction du texte en cours…'
+              : loadingPreview
+                ? 'Chargement…'
+                : textPreview || doc.excerpt || 'Aperçu indisponible.'}
           </pre>
         )}
         {!safeImage && !isPdf && !isText && (
@@ -472,27 +479,51 @@ export default function Resources() {
   useEffect(() => {
     if (!project?.id || !selected) return undefined;
     const mime = selected.mimeType || '';
-    if (!mime.startsWith('text/') && mime !== 'text/csv' && !selected.excerpt) {
+    const needsPreview =
+      selected.processingStatus === 'processing' ||
+      mime.startsWith('text/') ||
+      mime === 'text/csv' ||
+      Boolean(selected.excerpt);
+    if (!needsPreview) {
       setTextPreview('');
       return undefined;
     }
     let active = true;
-    setLoadingPreview(true);
-    projectService
-      .getDocumentTextPreview(project.id, selected.id)
-      .then((data) => {
-        if (active) setTextPreview(data.text || '');
-      })
-      .catch(() => {
-        if (active) setTextPreview(selected.excerpt || '');
-      })
-      .finally(() => {
-        if (active) setLoadingPreview(false);
-      });
+    let timer;
+
+    const fetchPreview = () => {
+      setLoadingPreview(true);
+      projectService
+        .getDocumentTextPreview(project.id, selected.id)
+        .then((data) => {
+          if (!active) return;
+          if (data.status === 'processing') {
+            setTextPreview('');
+            timer = setTimeout(fetchPreview, 2500);
+            return;
+          }
+          setTextPreview(data.text || '');
+        })
+        .catch(() => {
+          if (active) setTextPreview(selected.excerpt || '');
+        })
+        .finally(() => {
+          if (active) setLoadingPreview(false);
+        });
+    };
+
+    fetchPreview();
     return () => {
       active = false;
+      if (timer) clearTimeout(timer);
     };
-  }, [project?.id, selected?.id, selected?.mimeType, selected?.excerpt]);
+  }, [
+    project?.id,
+    selected?.id,
+    selected?.mimeType,
+    selected?.excerpt,
+    selected?.processingStatus,
+  ]);
 
   const handleUpload = async (e) => {
     const file = e.target.files?.[0];

@@ -2,6 +2,12 @@ import dotenv from 'dotenv';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { parseDurationMs } from '../utils/duration.js';
+import {
+  parseCorsOrigins,
+  validateAppUrl,
+  validateRedisUrl,
+  validateProductionEnvironment,
+} from './envValidation.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '../..');
@@ -14,22 +20,8 @@ const envFile = isProd ? '.env.production' : '.env.development';
 dotenv.config({ path: join(rootDir, envFile) });
 dotenv.config({ path: join(rootDir, '.env') });
 
-const WEAK_SECRET_PATTERNS = [
-  /^change.?me/i,
-  /^your.?secret/i,
-  /^secret$/i,
-  /^password$/i,
-  /kizumai/i,
-  /^test/i,
-  /^dev-/i,
-  /^example/i,
-];
-
-function isWeakSecret(value) {
-  const s = String(value || '');
-  if (s.length < 32) return true;
-  return WEAK_SECRET_PATTERNS.some((re) => re.test(s));
-}
+const allowInsecureCors = process.env.ALLOW_INSECURE_CORS === 'true';
+const allowInsecureRedis = process.env.ALLOW_INSECURE_REDIS === 'true';
 
 function buildDatabaseUrl() {
   if (process.env.DATABASE_URL) {
@@ -49,65 +41,23 @@ function buildDatabaseUrl() {
   return `postgresql://${user}:${password}@${host}:${port}/${name}`;
 }
 
-const requiredInProduction = [
-  'JWT_ACCESS_SECRET',
-  'JWT_REFRESH_SECRET',
-  'CORS_ORIGIN',
-  'DATABASE_URL',
-];
+validateProductionEnvironment(process.env);
 
-function validateConfig() {
-  if (!isProd) return;
+const corsOrigin = parseCorsOrigins(process.env.CORS_ORIGIN, {
+  isProd,
+  allowInsecure: allowInsecureCors,
+});
 
-  const missing = requiredInProduction.filter((key) => !process.env[key]?.trim());
-  if (missing.length > 0) {
-    throw new Error(
-      `Variables d'environnement manquantes en production : ${missing.join(', ')}`
-    );
-  }
+const appUrl = validateAppUrl(process.env.APP_URL, {
+  isProd,
+  allowInsecure: allowInsecureCors,
+  fallback: typeof corsOrigin === 'string' ? corsOrigin : corsOrigin[0],
+});
 
-  const access = process.env.JWT_ACCESS_SECRET;
-  const refresh = process.env.JWT_REFRESH_SECRET;
-
-  if (isWeakSecret(access) || isWeakSecret(refresh)) {
-    throw new Error(
-      'Secrets JWT trop faibles en production (min. 32 caractères, non triviaux)'
-    );
-  }
-  if (access === refresh) {
-    throw new Error('JWT_ACCESS_SECRET et JWT_REFRESH_SECRET doivent être distincts');
-  }
-
-  const cors = process.env.CORS_ORIGIN.trim();
-  if (!/^https:\/\//i.test(cors) && process.env.ALLOW_INSECURE_CORS !== 'true') {
-    throw new Error('CORS_ORIGIN doit être une origine https:// en production');
-  }
-  if (/localhost|127\.0\.0\.1/i.test(cors) && process.env.ALLOW_INSECURE_CORS !== 'true') {
-    throw new Error('CORS_ORIGIN ne doit pas pointer vers localhost en production');
-  }
-
-  const dbUrl = process.env.DATABASE_URL;
-  if (/:(kizumai|password|postgres|admin)@/i.test(dbUrl) || /:CHANGE_ME/i.test(dbUrl)) {
-    throw new Error('DATABASE_URL semble utiliser un mot de passe par défaut — refuse le démarrage');
-  }
-
-  if (process.env.REDIS_URL) {
-    const redisUrl = process.env.REDIS_URL.trim();
-    const withoutScheme = redisUrl.replace(/^rediss?:\/\//i, '');
-    const hasAuth =
-      withoutScheme.startsWith(':') || // redis://:password@host
-      /^[^:/@]+:[^@]+@/.test(withoutScheme); // redis://user:pass@host
-    if (!hasAuth && process.env.ALLOW_INSECURE_REDIS !== 'true') {
-      throw new Error('REDIS_URL sans mot de passe interdit en production');
-    }
-  }
-
-  if (process.env.ALLOW_SELF_SERVE_PAID === 'true') {
-    console.warn('[config] ALLOW_SELF_SERVE_PAID=true en production');
-  }
-}
-
-validateConfig();
+const redisUrl = validateRedisUrl(process.env.REDIS_URL, {
+  isProd,
+  allowInsecure: allowInsecureRedis,
+});
 
 const devSecrets = {
   access: 'dev-access-secret-change-in-production-32chars',
@@ -116,14 +66,6 @@ const devSecrets = {
 
 if (isDev && (!process.env.JWT_ACCESS_SECRET || !process.env.JWT_REFRESH_SECRET)) {
   console.warn('[config] Secrets JWT par défaut utilisés — réservé au développement local');
-}
-
-function parseCorsOrigin(raw) {
-  const value = raw || 'http://localhost:5173';
-  if (value.includes(',')) {
-    return value.split(',').map((s) => s.trim()).filter(Boolean);
-  }
-  return value;
 }
 
 export const config = {
@@ -144,7 +86,7 @@ export const config = {
   },
 
   cors: {
-    origin: parseCorsOrigin(process.env.CORS_ORIGIN),
+    origin: corsOrigin,
     credentials: true,
   },
 
@@ -195,7 +137,7 @@ export const config = {
     defaultModel: process.env.AI_DEFAULT_MODEL || 'gemini-2.0-flash',
   },
 
-  appUrl: process.env.APP_URL || process.env.CORS_ORIGIN || 'http://localhost:5173',
+  appUrl,
 
   storage: {
     driver: process.env.STORAGE_DRIVER || 'local',
@@ -216,7 +158,7 @@ export const config = {
   },
 
   redis: {
-    url: process.env.REDIS_URL || '',
+    url: redisUrl,
   },
 
   queue: {

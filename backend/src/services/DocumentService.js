@@ -2,16 +2,13 @@ import { readFile } from 'fs/promises';
 import { AppError } from '../utils/AppError.js';
 import { config } from '../config/index.js';
 import { makeStorageKey } from '../middleware/upload.js';
-import { withTempFile } from '../utils/tempFile.js';
+import { enqueueDocumentExtract } from '../queue/documentQueue.js';
 import {
   assertAllowedUploadFormat,
   resolveUploadedFileFormat,
   safeDownloadMime,
 } from './DocumentFormat.js';
-import {
-  detectDocumentType,
-  extractDocumentText,
-} from './DocumentTextExtractor.js';
+import { detectDocumentType } from './DocumentTextExtractor.js';
 
 function canPreviewInline(doc) {
   if (!doc?.mimeType && !doc?.fileName) return false;
@@ -23,6 +20,13 @@ function canPreviewInline(doc) {
     mime === 'image/webp' ||
     mime === 'image/gif'
   );
+}
+
+function processingStatusOf(doc) {
+  const status = doc?.attributes?.processingStatus;
+  if (status) return status;
+  if (doc?.excerpt) return 'ready';
+  return null;
 }
 
 function groupByCategory(documents, categories) {
@@ -126,20 +130,6 @@ export function createDocumentService({
       });
       const mimeType = format.mimeType;
 
-      let excerpt = null;
-      try {
-        excerpt = await withTempFile(buffer, file.originalname, async (abs) => {
-          const text = await extractDocumentText(abs, {
-            mimeType,
-            fileName: file.originalname,
-            fast: true,
-          });
-          return text.trim() ? text.slice(0, 2000) : null;
-        });
-      } catch {
-        excerpt = null;
-      }
-
       const doc = await documentRepository.create({
         projectId,
         uploadedBy: userId,
@@ -151,12 +141,19 @@ export function createDocumentService({
         sizeBytes: buffer.length,
         categoryId: resolvedCategoryId,
         description: description || null,
-        excerpt,
+        excerpt: null,
         content: buffer,
+        attributes: {
+          processingStatus: 'processing',
+          processingError: null,
+        },
+      });
+
+      await enqueueDocumentExtract({ documentId: doc.id }).catch((err) => {
+        console.warn('[documents] enqueue extract :', err.message);
       });
 
       let scan = null;
-      // Auto-scan IA désactivé par défaut (coût) — activer avec DOCUMENT_AUTO_SCAN=true.
       if (documentScanService && process.env.DOCUMENT_AUTO_SCAN === 'true') {
         try {
           scan = await documentScanService.startScan({
@@ -170,7 +167,6 @@ export function createDocumentService({
       }
 
       if (projectMemoryUpdateService) {
-        const excerpt = String(doc.excerpt || doc.description || '').trim().slice(0, 1200);
         projectMemoryUpdateService.recordEventSafe({
           projectId,
           nodeType: 'fact',
@@ -178,17 +174,21 @@ export function createDocumentService({
             `Document ajouté : ${doc.title || doc.fileName}`,
             doc.type ? `type ${doc.type}` : null,
             doc.category?.title ? `catégorie ${doc.category.title}` : null,
-            excerpt ? `extrait : ${excerpt}` : null,
           ]
             .filter(Boolean)
             .join(' — '),
           sourceEntityType: 'document',
           sourceEntityId: doc.id,
-          importance: excerpt ? 0.65 : 0.55,
+          importance: 0.55,
         });
       }
 
-      return { ...doc, scanId: scan?.id ?? null, scanStatus: scan?.status ?? null };
+      return {
+        ...doc,
+        processingStatus: 'processing',
+        scanId: scan?.id ?? null,
+        scanStatus: scan?.status ?? null,
+      };
     },
 
     async getDocumentBytes({ userId, projectId, documentId }) {
@@ -214,6 +214,7 @@ export function createDocumentService({
         const contacts = await contactLinkRepository.findContactsForEntity('document', doc.id);
         enriched.push({
           ...doc,
+          processingStatus: processingStatusOf(doc),
           previewable: canPreviewInline(doc),
           contacts,
         });
@@ -246,6 +247,7 @@ export function createDocumentService({
       const contacts = await contactLinkRepository.findContactsForEntity('document', doc.id);
       return {
         ...doc,
+        processingStatus: processingStatusOf(doc),
         previewable: canPreviewInline(doc),
         contacts,
       };
@@ -259,7 +261,12 @@ export function createDocumentService({
       }
       const updated = await documentRepository.update(documentId, fields);
       const contacts = await contactLinkRepository.findContactsForEntity('document', documentId);
-      return { ...updated, previewable: canPreviewInline(updated), contacts };
+      return {
+        ...updated,
+        processingStatus: processingStatusOf(updated),
+        previewable: canPreviewInline(updated),
+        contacts,
+      };
     },
 
     async linkContact({ userId, projectId, documentId, contactId, role, note }) {
@@ -267,6 +274,12 @@ export function createDocumentService({
       const contact = await contactRepository.findById(contactId);
       if (!contact || contact.userId !== Number(userId)) {
         throw new AppError('Contact introuvable', 404);
+      }
+      if (
+        contact.projectId != null &&
+        Number(contact.projectId) !== Number(projectId)
+      ) {
+        throw new AppError('Contact hors périmètre du projet', 400);
       }
       await contactLinkRepository.link({
         contactId,
@@ -291,23 +304,30 @@ export function createDocumentService({
 
     async getTextPreview({ userId, projectId, documentId }) {
       const doc = await this.getDocumentForUser({ userId, projectId, documentId });
-      if (doc.excerpt) return { text: doc.excerpt, truncated: true };
-      try {
-        const buffer = await resolveDocumentBuffer(doc);
-        const text = await withTempFile(buffer, doc.fileName || 'file.bin', async (abs) =>
-          extractDocumentText(abs, {
-            mimeType: doc.mimeType,
-            fileName: doc.fileName || doc.title,
-          })
-        );
-        if (!text.trim()) {
-          throw new AppError('Aperçu texte non disponible pour ce fichier', 400);
-        }
-        return { text: text.slice(0, 8000), truncated: text.length > 8000 };
-      } catch (err) {
-        if (err instanceof AppError) throw err;
-        throw new AppError('Impossible de lire le fichier', 500);
+      const status = processingStatusOf(doc);
+
+      if (doc.excerpt) {
+        return { status: 'ready', text: doc.excerpt, truncated: true };
       }
+      if (status === 'processing') {
+        return {
+          status: 'processing',
+          text: null,
+          message: 'Extraction en cours…',
+        };
+      }
+      if (status === 'failed') {
+        throw new AppError(
+          doc.attributes?.processingError || 'Aperçu texte non disponible pour ce fichier',
+          400
+        );
+      }
+
+      return {
+        status: 'processing',
+        text: null,
+        message: 'Extraction en cours…',
+      };
     },
 
     async deleteDocument({ userId, projectId, documentId }) {
