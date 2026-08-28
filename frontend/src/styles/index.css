@@ -4,3 +4,14 @@
 @import "./base.css";
 @import "./components.css";
 @import "./planner.css";
+
+@keyframes fabulous-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-fabulous-spin {
+  animation: fabulous-spin 2.2s linear infinite;
+  transform-origin: center center;
+}

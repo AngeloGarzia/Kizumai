@@ -4,6 +4,8 @@ import BrandLogo from '../components/BrandLogo.jsx';
 import FeasibilityGauge, {
   averageFeasibility,
   computeJourneyFeasibility,
+  feasibilityAccentColor,
+  feasibilityTileStyle,
 } from '../components/FeasibilityGauge.jsx';
 import {
   projectService,
@@ -12,6 +14,9 @@ import {
   saveProjectDraft,
 } from '../services/projectService.js';
 import { IconChevronRight } from '../components/icons.jsx';
+import FranceImplantationModal from '../components/FranceImplantationModal.jsx';
+import FabulousThinking from '../components/FabulousThinking.jsx';
+import { assistantPhrases } from '../constants/assistant.js';
 
 const STEPS = [
   { key: 'businesses', label: 'Business' },
@@ -108,7 +113,7 @@ function RefineBar({ placeholder, value, onChange, onSubmit, disabled }) {
         disabled={disabled}
         className="btn-secondary whitespace-nowrap disabled:opacity-50"
       >
-        Affiner avec l&apos;IA
+        {assistantPhrases.refineWith}
       </button>
     </form>
   );
@@ -170,7 +175,7 @@ function TrainingModal({
         {error && <p className="alert-error mb-3">{error}</p>}
 
         {loading ? (
-          <p className="py-10 text-center text-sm text-prune-500">L&apos;IA prépare des formations…</p>
+          <FabulousThinking message={assistantPhrases.preparingTrainings} />
         ) : trainings.length === 0 && !error ? (
           <p className="py-8 text-center text-sm text-prune-500 mb-4">
             Aucune formation pour le moment. Affinez ou réessayez.
@@ -261,8 +266,15 @@ export default function ProjectSearch() {
   const [trainingRefine, setTrainingRefine] = useState('');
   const [savedTraining, setSavedTraining] = useState(null);
 
+  const [mapOpen, setMapOpen] = useState(false);
+  const [mapLoading, setMapLoading] = useState(false);
+  const [mapError, setMapError] = useState('');
+  const [mapSummary, setMapSummary] = useState('');
+  const [mapRegions, setMapRegions] = useState([]);
+  const [mapSelectedCode, setMapSelectedCode] = useState(null);
+
   const proposalKindLabel = (kind) => {
-    if (kind === 'budget_ideal') return 'Budget idéal (IA)';
+    if (kind === 'budget_ideal') return assistantPhrases.idealBudget;
     if (kind === 'budget_flexible') return 'Budget flexible';
     if (kind === 'budget_ajuste') return 'Budget ajusté';
     return 'Votre budget';
@@ -302,6 +314,18 @@ export default function ProjectSearch() {
     proposals,
     budgetAssessment,
   ]);
+
+  const sortedBusinesses = useMemo(
+    () =>
+      [...businesses].sort((a, b) => {
+        const fa = Number(a?.feasibility);
+        const fb = Number(b?.feasibility);
+        const sa = Number.isFinite(fa) ? fa : -1;
+        const sb = Number.isFinite(fb) ? fb : -1;
+        return sb - sa;
+      }),
+    [businesses]
+  );
 
   const fetchBusinesses = useCallback(async (refineText = '', avoid = []) => {
     const seed = seedRef.current;
@@ -422,13 +446,52 @@ export default function ProjectSearch() {
     fetchBusinesses('', []);
   }, [navigate, fetchBusinesses]);
 
-  const handleSelectBusiness = (business) => {
-    setSelectedBusiness(business);
+  const goToLocations = (business, zone) => {
+    if (zone && seedRef.current) {
+      seedRef.current = { ...seedRef.current, ou: zone };
+    }
     setSelectedLocation(null);
     setLocations([]);
     setRefine('');
     setStep('locations');
+    setMapOpen(false);
     fetchLocations(business, '', []);
+  };
+
+  const fetchFranceMap = useCallback(async (business) => {
+    const seed = seedRef.current;
+    setMapLoading(true);
+    setMapError('');
+    setMapSummary('');
+    setMapRegions([]);
+    setMapSelectedCode(null);
+    try {
+      const result = await projectService.evaluateFranceImplantation({
+        business: business.title,
+        businessActivity: business.activity,
+        businessPitch: business.pitch,
+        businessRationale: business.rationale,
+        budget: seed.budget,
+        currency: seed.currency,
+      });
+      setMapSummary(result.summary || '');
+      setMapRegions(result.regions || []);
+    } catch (err) {
+      setMapError(err.message || 'Impossible de charger la carte.');
+    } finally {
+      setMapLoading(false);
+    }
+  }, []);
+
+  const handleSelectBusiness = (business) => {
+    setSelectedBusiness(business);
+    const hasPlace = Boolean(seedRef.current?.ou?.trim());
+    if (!hasPlace) {
+      setMapOpen(true);
+      fetchFranceMap(business);
+      return;
+    }
+    goToLocations(business, null);
   };
 
   const handleSelectLocation = (location) => {
@@ -552,37 +615,40 @@ export default function ProjectSearch() {
               {step === 'proposals' && 'Choisissez votre projet'}
             </h1>
             <p className="mt-1 text-sm text-prune-500">
-              {step === 'businesses' &&
-                "Idées générées par l'IA. Choisissez-en une, ou demandez une formation utile avant de continuer."}
+              {step === 'businesses' && assistantPhrases.ideasBy}
               {step === 'locations' &&
                 `Lieux adaptés à « ${selectedBusiness?.title} »${seed?.ou ? ` autour de ${seed.ou}` : ''}. Sélectionnez-en un ou affinez.`}
               {step === 'proposals' &&
                 (budgetAssessment?.adjustedProposed
-                  ? '4 projets : votre budget, flexible, idéal IA, et un budget ajusté plus bas jugé viable.'
-                  : '3 projets : votre budget, un budget flexible, et le budget idéal IA. Un 4ᵉ « ajusté » n’apparaît que si un budget plus bas est viable.')}
+                  ? `4 projets : votre budget, flexible, ${assistantPhrases.idealBudgetShort}, et un budget ajusté plus bas jugé viable.`
+                  : `3 projets : votre budget, un budget flexible, et le budget ${assistantPhrases.idealBudgetShort}. Un 4ᵉ « ajusté » n’apparaît que si un budget plus bas est viable.`)}
             </p>
           </header>
 
           {loading ? (
-            <div className="py-16 text-center text-prune-500 text-sm">
-              L&apos;IA réfléchit…
-            </div>
+            <FabulousThinking message={assistantPhrases.thinking} />
           ) : (
             <>
               {step === 'businesses' && (
                 <div className="grid gap-4">
-                  {businesses.map((business, index) => {
+                  {sortedBusinesses.map((business, index) => {
                     const hasSaved =
                       savedTraining?.businessTitle === business.title && savedTraining?.title;
+                    const tileStyle = feasibilityTileStyle(business.feasibility);
+                    const accent = feasibilityAccentColor(business.feasibility);
                     return (
                       <div
                         key={index}
-                        className="rounded-2xl border border-prune-100 bg-white p-5 hover:border-prune-300 hover:shadow-sm transition-all"
+                        className="rounded-2xl border border-prune-100 bg-white p-5 hover:shadow-sm transition-all"
+                        style={tileStyle}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <h3 className="font-semibold text-prune-900">{business.title}</h3>
                           {business.feasibility != null && (
-                            <span className="shrink-0 text-xs font-bold tabular-nums text-prune-600">
+                            <span
+                              className="shrink-0 text-[15px] font-bold tabular-nums"
+                              style={{ color: accent }}
+                            >
                               {business.feasibility}%
                             </span>
                           )}
@@ -711,6 +777,40 @@ export default function ProjectSearch() {
           )}
         </section>
       </main>
+
+      {mapOpen && selectedBusiness && (
+        <FranceImplantationModal
+          business={selectedBusiness}
+          loading={mapLoading}
+          error={mapError}
+          summary={mapSummary}
+          regions={mapRegions}
+          selectedCode={mapSelectedCode}
+          onSelectRegion={(region) => setMapSelectedCode(region.code)}
+          onConfirmCity={(region, city) => {
+            const zone = [city.name, region?.name].filter(Boolean).join(' — ');
+            goToLocations(selectedBusiness, zone);
+          }}
+          onEvaluateCity={async ({ city, region }) => {
+            const seed = seedRef.current;
+            return projectService.evaluateCityImplantation({
+              business: selectedBusiness.title,
+              businessActivity: selectedBusiness.activity,
+              businessPitch: selectedBusiness.pitch,
+              businessRationale: selectedBusiness.rationale,
+              city,
+              region,
+              budget: seed?.budget,
+              currency: seed?.currency,
+            });
+          }}
+          onSkip={() => goToLocations(selectedBusiness, null)}
+          onClose={() => {
+            setMapOpen(false);
+            setMapError('');
+          }}
+        />
+      )}
 
       {trainingBusiness && (
         <TrainingModal

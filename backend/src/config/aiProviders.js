@@ -5,9 +5,13 @@ export const AI_PROVIDERS = [
     envKey: 'geminiApiKey',
     defaultModel: 'gemini-3.6-flash',
     models: [
+      { id: 'gemini-3.7-flash', label: 'Gemini 3.7 Flash' },
       { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash' },
       { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash' },
+      { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash Lite' },
+      { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro Preview' },
       { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash Lite' },
+      { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash Preview' },
       { id: 'gemini-flash-latest', label: 'Gemini Flash Latest' },
       { id: 'gemini-flash-lite-latest', label: 'Gemini Flash Lite Latest' },
     ],
@@ -67,6 +71,19 @@ export function getProviderById(id) {
   return AI_PROVIDERS.find((p) => p.id === id);
 }
 
+/** Modèles Gemini encore listés par Google mais refusés aux nouveaux comptes. */
+export function isRetiredGeminiModel(id) {
+  return /^gemini-(1\.5|2\.0|2\.5)([.-]|$)/i.test(String(id || ''));
+}
+
+/** Remplace un modèle Gemini retiré par un équivalent 3.x. */
+export function remapRetiredGeminiModel(modelId) {
+  const id = String(modelId || '').trim();
+  if (!isRetiredGeminiModel(id)) return id;
+  if (/pro/i.test(id)) return 'gemini-3.1-pro-preview';
+  return 'gemini-3.6-flash';
+}
+
 export function getProviderCatalog(aiConfig) {
   return AI_PROVIDERS.map((provider) => ({
     id: provider.id,
@@ -87,7 +104,7 @@ export function resolveModel(providerId, modelId) {
   const provider = getProviderById(providerId);
   if (!provider) return null;
   const trimmed = modelId != null ? String(modelId).trim() : '';
-  // Accepte le modèle enregistré en base (catalogue live ou legacy).
-  if (trimmed) return trimmed;
-  return provider.defaultModel;
+  if (!trimmed) return provider.defaultModel;
+  if (providerId === 'gemini') return remapRetiredGeminiModel(trimmed);
+  return trimmed;
 }

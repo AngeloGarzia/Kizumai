@@ -32,7 +32,7 @@ import { createSettingsService } from '../services/SettingsService.js';
 import { createConnectionService } from '../services/ConnectionService.js';
 import { createUserService } from '../services/UserService.js';
 import { createAuthService } from '../services/AuthService.js';
-import { createAiService } from '../services/AiService.js';
+import { createAiService, bindAiUsageLogRepository } from '../services/AiService.js';
 import { createProjectService } from '../services/ProjectService.js';
 import { createDocumentService } from '../services/DocumentService.js';
 import { createLearningRecordService } from '../services/LearningRecordService.js';
@@ -43,6 +43,7 @@ import { createAdminService } from '../services/AdminService.js';
 import { createContactService } from '../services/ContactService.js';
 import { createCompanyService } from '../services/CompanyService.js';
 import { createAccountingProfileService } from '../services/AccountingProfileService.js';
+import { AiUsageLogRepository } from '../repositories/AiUsageLogRepository.js';
 
 import { createAuthenticate, createOptionalAuth } from '../middleware/auth.js';
 import { createAuthController } from '../controllers/AuthController.js';
@@ -91,6 +92,7 @@ export function createContainer() {
   const accountingProfileRepository = AccountingProfileRepository;
   const settingsRepository = SettingsRepository;
   const aiPromptRepository = AiPromptRepository;
+  const aiUsageLogRepository = AiUsageLogRepository;
   const connectionRepository = ConnectionRepository;
   const pushSubscriptionRepository = PushSubscriptionRepository;
   const projectStageRepository = ProjectStageRepository;
@@ -128,6 +130,7 @@ export function createContainer() {
     settingsService,
     currencyService,
   });
+  bindAiUsageLogRepository(aiUsageLogRepository);
 
   const projectMemoryDecayJob = createProjectMemoryDecayJob({
     projectMemoryNodeRepository,
@@ -266,8 +269,13 @@ export function createContainer() {
     settingsRepository,
     aiPromptRepository,
     userRepository,
+    projectRepository,
+    documentRepository,
+    projectMemorySnapshotRepository,
+    storageService,
     connectionService,
     aiService,
+    aiUsageLogRepository,
   });
 
   const contactService = createContactService({

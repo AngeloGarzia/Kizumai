@@ -15,7 +15,29 @@ function mixColor(t) {
   const r = Math.round(TAUPE.r + (WASABI.r - TAUPE.r) * t);
   const g = Math.round(TAUPE.g + (WASABI.g - TAUPE.g) * t);
   const b = Math.round(TAUPE.b + (WASABI.b - TAUPE.b) * t);
+  return { r, g, b };
+}
+
+function mixColorCss(t) {
+  const { r, g, b } = mixColor(t);
   return `rgb(${r}, ${g}, ${b})`;
+}
+
+/** Rouge ≤ 40 %, reste bien rouge jusqu’à ~70 %, puis vert marqué dès 80 %. */
+function feasibilityTone(score) {
+  const s = clamp(score);
+  if (s == null) return null;
+  if (s <= 40) return 0;
+  if (s <= 70) {
+    // 40 → 0, 70 → 0.14 (encore nettement rouge)
+    return ((s - 40) / 30) * 0.14;
+  }
+  if (s < 80) {
+    // 70 → 0.14, 80 → 0.32
+    return 0.14 + ((s - 70) / 10) * 0.18;
+  }
+  // 80 → 0.32, 100 → 1
+  return 0.32 + ((s - 80) / 20) * 0.68;
 }
 
 export function feasibilityLabel(score) {
@@ -26,11 +48,28 @@ export function feasibilityLabel(score) {
   return 'Projet réalisable plus facilement';
 }
 
+/** Fond / bordure teintés selon la faisabilité (rouge &lt; 40 % → vert à 100 %). */
+export function feasibilityTileStyle(score) {
+  const t = feasibilityTone(score);
+  if (t == null) return undefined;
+  const { r, g, b } = mixColor(t);
+  return {
+    backgroundColor: `rgba(${r}, ${g}, ${b}, 0.22)`,
+    borderColor: `rgba(${r}, ${g}, ${b}, 0.55)`,
+  };
+}
+
+export function feasibilityAccentColor(score) {
+  const t = feasibilityTone(score);
+  if (t == null) return undefined;
+  return mixColorCss(t);
+}
+
 export default function FeasibilityGauge({ score, compact = false }) {
   const value = clamp(score);
   const display = value ?? 0;
   const t = display / 100;
-  const color = mixColor(t);
+  const color = mixColorCss(t);
   const label = feasibilityLabel(value);
   const ready = value != null;
 

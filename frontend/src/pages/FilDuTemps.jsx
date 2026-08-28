@@ -7,12 +7,14 @@ import Input from '../components/Input.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useProject } from '../context/ProjectContext.jsx';
 import { projectService } from '../services/projectService.js';
+import { assistantPhrases } from '../constants/assistant.js';
+import FabulousThinking from '../components/FabulousThinking.jsx';
 
 const FILTERS = [
   { id: 'all', label: 'Tout' },
   { id: 'document', label: 'Docs' },
   { id: 'stage', label: 'Parcours' },
-  { id: 'ai', label: 'IA' },
+  { id: 'ai', label: assistantPhrases.filterLabel },
   { id: 'contact', label: 'Contacts' },
   { id: 'planner', label: 'Agenda' },
   { id: 'learning', label: 'Compétences' },
@@ -348,7 +350,7 @@ export default function FilDuTemps() {
       const result = await projectService.getSituationSummaryForProject(timeline.projectId);
       setSituation(result);
     } catch (err) {
-      setAiError(err.message || 'Échec du résumé IA');
+      setAiError(err.message || assistantPhrases.summaryFailed);
     } finally {
       setSituationBusy(false);
     }
@@ -430,8 +432,18 @@ export default function FilDuTemps() {
                   onClick={runSituation}
                   className="inline-flex items-center gap-2"
                 >
-                  <IconBrain className="w-4 h-4" />
-                  {situationBusy ? 'Résumé…' : 'Où j’en suis'}
+                  {situationBusy ? (
+                    <FabulousThinking
+                      compact
+                      size="sm"
+                      message={assistantPhrases.summarizing}
+                    />
+                  ) : (
+                    <>
+                      <IconBrain className="w-4 h-4" />
+                      Où j’en suis
+                    </>
+                  )}
                 </Button>
                 <Button
                   type="button"
@@ -454,7 +466,7 @@ export default function FilDuTemps() {
               {situation?.summary && (
                 <div className="mt-4 rounded-2xl bg-prune-50 border border-prune-100 p-4">
                   <p className="text-xs font-bold uppercase tracking-wider text-prune-500 mb-2">
-                    Résumé IA
+                    {assistantPhrases.summary}
                   </p>
                   <p className="text-sm text-prune-800 whitespace-pre-wrap leading-relaxed">
                     {situation.summary}

@@ -47,6 +47,7 @@ export const LocationSuggestQueryDto = {
   from(query = {}) {
     return {
       q: optionalString(query.q, { max: 120 }) || '',
+      countrycodes: optionalString(query.countrycodes, { max: 20 }) || '',
     };
   },
 };
@@ -79,6 +80,34 @@ export const SearchLocationsRequestDto = {
       ...normalizeBudgetCurrency(body),
       refine: optionalString(body.refine, { max: 400 }) || '',
       avoid: Array.isArray(body.avoid) ? body.avoid : [],
+      projectId: optionalProjectId(body),
+    };
+  },
+};
+
+export const FranceImplantationRequestDto = {
+  from(body = {}) {
+    return {
+      business: optionalString(body.business, { max: 200 }),
+      businessActivity: optionalString(body.businessActivity, { max: 200 }) || '',
+      businessPitch: optionalString(body.businessPitch, { max: 500 }) || '',
+      businessRationale: optionalString(body.businessRationale, { max: 500 }) || '',
+      ...normalizeBudgetCurrency(body),
+      projectId: optionalProjectId(body),
+    };
+  },
+};
+
+export const CityImplantationRequestDto = {
+  from(body = {}) {
+    return {
+      business: optionalString(body.business, { max: 200 }),
+      businessActivity: optionalString(body.businessActivity, { max: 200 }) || '',
+      businessPitch: optionalString(body.businessPitch, { max: 500 }) || '',
+      businessRationale: optionalString(body.businessRationale, { max: 500 }) || '',
+      city: optionalString(body.city, { max: 120 }),
+      region: optionalString(body.region, { max: 120 }) || '',
+      ...normalizeBudgetCurrency(body),
       projectId: optionalProjectId(body),
     };
   },

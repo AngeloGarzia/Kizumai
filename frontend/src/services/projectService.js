@@ -35,10 +35,12 @@ export const projectService = {
     return data.businesses;
   },
 
-  async suggestLocations(query) {
+  async suggestLocations(query, { countrycodes = 'fr' } = {}) {
     const q = String(query || '').trim();
     if (q.length < 2) return [];
-    const { data } = await api.get(`/projects/locations/suggest?q=${encodeURIComponent(q)}`);
+    const params = new URLSearchParams({ q });
+    if (countrycodes) params.set('countrycodes', countrycodes);
+    const { data } = await api.get(`/projects/locations/suggest?${params.toString()}`);
     return data.locations || [];
   },
 
@@ -96,6 +98,52 @@ export const projectService = {
       projectId,
     });
     return data.locations;
+  },
+
+  async evaluateFranceImplantation({
+    business,
+    businessActivity,
+    businessPitch,
+    businessRationale,
+    budget,
+    currency,
+    projectId,
+  }) {
+    const { data } = await api.post('/projects/search/france-map', {
+      business,
+      businessActivity,
+      businessPitch,
+      businessRationale,
+      budget,
+      currency,
+      projectId,
+    });
+    return data;
+  },
+
+  async evaluateCityImplantation({
+    business,
+    businessActivity,
+    businessPitch,
+    businessRationale,
+    city,
+    region,
+    budget,
+    currency,
+    projectId,
+  }) {
+    const { data } = await api.post('/projects/search/city-eval', {
+      business,
+      businessActivity,
+      businessPitch,
+      businessRationale,
+      city,
+      region,
+      budget,
+      currency,
+      projectId,
+    });
+    return data.city;
   },
 
   async buildProposals({ business, location, budget, currency, refine, projectId }) {

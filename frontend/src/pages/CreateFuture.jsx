@@ -6,6 +6,7 @@ import Input from '../components/Input.jsx';
 import BudgetField from '../components/BudgetField.jsx';
 import { projectService, saveSearchSeed } from '../services/projectService.js';
 import { IconChevronRight } from '../components/icons.jsx';
+import { assistantPhrases } from '../constants/assistant.js';
 
 export default function CreateFuture() {
   const navigate = useNavigate();
@@ -98,17 +99,12 @@ export default function CreateFuture() {
       </header>
 
       <main className="page-container flex-1 py-6 sm:py-10 max-w-[50.4rem]">
-        <section className="text-center sm:text-left mb-6 sm:mb-8">
-          <p className="text-xs sm:text-sm font-semibold tracking-widest text-prune-600 uppercase">
-            Nouveau projet
-          </p>
-          <h1 className="mt-2 text-2xl sm:text-3xl font-bold text-prune-900">
-            Démarrez votre projet
-          </h1>
-          <p className="mt-2 text-sm sm:text-base text-prune-500">
-            Une idée ou un lieu suffit pour démarrer. Le budget (minimum 500&nbsp;€)
-            peut être précisé ensuite.
-          </p>
+        <section className="mb-6 sm:mb-8">
+          <div className="rounded-2xl px-5 py-6 sm:px-8 sm:py-7 text-center sm:text-left bg-gradient-to-r from-topaz-500 to-topaz-400 shadow-md shadow-topaz-500/25">
+            <h1 className="text-2xl sm:text-3xl font-bold text-white">
+              Mieux qu&apos;un post-it
+            </h1>
+          </div>
         </section>
 
         <div className="card p-5 sm:p-8">
@@ -171,7 +167,7 @@ export default function CreateFuture() {
             />
 
             <p className="text-xs text-prune-600 bg-prune-50 border border-prune-200 rounded-xl px-4 py-3">
-              Donnez une idée, un lieu, ou les deux : l&apos;IA proposera des business adaptés.
+              {assistantPhrases.willPropose}
             </p>
 
             {error && <p className="alert-error">{error}</p>}

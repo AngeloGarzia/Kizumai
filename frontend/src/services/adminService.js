@@ -25,12 +25,25 @@ export const adminService = {
     return api.get('/admin/users').then((r) => r.data);
   },
 
+  getUserDetails(id) {
+    return api.get(`/admin/users/${id}`).then((r) => r.data);
+  },
+
+  deleteUser(id) {
+    return api.delete(`/admin/users/${id}`).then((r) => r.data);
+  },
+
   updateUserRole(id, role) {
     return api.patch(`/admin/users/${id}/role`, { role }).then((r) => r.data);
   },
 
   getConnections() {
     return api.get('/admin/connections').then((r) => r.data);
+  },
+
+  getAiUsage(days = 30) {
+    const q = new URLSearchParams({ days: String(days) }).toString();
+    return api.get(`/admin/ai-usage?${q}`).then((r) => r.data);
   },
 
   broadcastNotification(payload) {

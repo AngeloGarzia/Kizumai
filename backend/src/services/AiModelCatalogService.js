@@ -1,5 +1,5 @@
 import { config } from '../config/index.js';
-import { AI_PROVIDERS, getProviderById } from '../config/aiProviders.js';
+import { AI_PROVIDERS, getProviderById, isRetiredGeminiModel } from '../config/aiProviders.js';
 
 const FETCH_TIMEOUT_MS = 12_000;
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -81,18 +81,72 @@ function isMistralChatModel(model) {
   return true;
 }
 
+function isGeminiChatModel(id) {
+  const lower = String(id || '').toLowerCase();
+  if (!lower) return false;
+  // Exclut image / audio / outils non chat (encombrent la liste admin).
+  if (
+    /image|tts|lyria|computer-use|embedding|aqa|gecko|native-audio|live-api|robotics|veo|imagen|nano-banana|clip-preview|deep-research|antigravity|transcribe/.test(
+      lower
+    )
+  ) {
+    return false;
+  }
+  // Google refuse encore ces ids aux nouveaux comptes (404 NO LONGER AVAILABLE)
+  // alors qu'ils restent listés dans /v1beta/models.
+  if (isRetiredGeminiModel(lower)) {
+    return false;
+  }
+  return /^(gemini|gemma)/.test(lower);
+}
+
+/** Score de tri : modèles Gemini récents en tête. */
+function geminiSortScore(id) {
+  const lower = String(id || '').toLowerCase();
+  let score = 0;
+  const ver = lower.match(/gemini-(\d+(?:\.\d+)?)/);
+  if (ver) score += Number(ver[1]) * 1000;
+  if (lower.includes('flash')) score += 30;
+  if (lower.includes('pro')) score += 20;
+  if (lower.includes('lite')) score -= 5;
+  if (lower.includes('preview')) score -= 2;
+  if (lower.includes('latest')) score += 40;
+  return score;
+}
+
 async function fetchGeminiModels(apiKey) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000&key=${encodeURIComponent(apiKey)}`;
-  const json = await fetchJson(url);
-  const models = (json.models || [])
-    .filter((m) => Array.isArray(m.supportedGenerationMethods)
-      && m.supportedGenerationMethods.includes('generateContent'))
-    .map((m) => {
+  const collected = [];
+  let pageToken = '';
+  let pages = 0;
+  do {
+    pages += 1;
+    const url = new URL('https://generativelanguage.googleapis.com/v1beta/models');
+    url.searchParams.set('pageSize', '100');
+    url.searchParams.set('key', apiKey);
+    if (pageToken) url.searchParams.set('pageToken', pageToken);
+
+    const json = await fetchJson(url.toString());
+    for (const m of json.models || []) {
+      if (
+        !Array.isArray(m.supportedGenerationMethods) ||
+        !m.supportedGenerationMethods.includes('generateContent')
+      ) {
+        continue;
+      }
       const id = String(m.name || '').replace(/^models\//, '');
-      return toModelEntry(id, m.displayName || id);
-    })
-    .filter(Boolean);
-  return dedupeModels(models);
+      if (!isGeminiChatModel(id)) continue;
+      const entry = toModelEntry(id, m.displayName || id);
+      if (entry) collected.push(entry);
+    }
+    pageToken = json.nextPageToken || '';
+  } while (pageToken && pages < 20);
+
+  const models = dedupeModels(collected);
+  return models.sort((a, b) => {
+    const d = geminiSortScore(b.id) - geminiSortScore(a.id);
+    if (d !== 0) return d;
+    return a.label.localeCompare(b.label, 'fr');
+  });
 }
 
 async function fetchOpenAiCompatModels(baseUrl, apiKey, { filter, extraHeaders = {} } = {}) {
@@ -167,6 +221,7 @@ const FETCHERS = {
 function ensureSelectedModel(models, selectedModelId, fallbackModels) {
   const list = models?.length ? models : fallbackModels;
   if (!selectedModelId) return list;
+  if (isRetiredGeminiModel(selectedModelId)) return list;
   if (list.some((m) => m.id === selectedModelId)) return list;
   return dedupeModels([
     ...list,
@@ -230,6 +285,10 @@ async function fetchProviderCatalogEntry(provider, aiConfig, selectedByProvider 
 export async function getLiveProviderCatalog(opts = {}) {
   const { force = false, selectedProvider, selectedModel } = opts;
   const now = Date.now();
+
+  if (force) {
+    cache = null;
+  }
 
   if (!force && cache && now - cache.at < CACHE_TTL_MS) {
     return {

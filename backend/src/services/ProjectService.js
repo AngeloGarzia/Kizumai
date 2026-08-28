@@ -1,10 +1,11 @@
 import { AppError } from '../utils/AppError.js';
 import { hasPaidAccess } from '../constants/plans.js';
 import { computeProjectProgress } from '../constants/projectStages.js';
+import { withAiUsageContext } from '../utils/aiUsage.js';
 
 const LOCATION_SUGGEST_TIMEOUT_MS = 4500;
 
-async function fetchLocationSuggestions(query) {
+async function fetchLocationSuggestions(query, { countrycodes = '' } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), LOCATION_SUGGEST_TIMEOUT_MS);
   try {
@@ -12,9 +13,13 @@ async function fetchLocationSuggestions(query) {
       q: query,
       format: 'jsonv2',
       addressdetails: '1',
-      limit: '6',
+      limit: '8',
       'accept-language': 'fr',
     });
+    const cc = String(countrycodes || '').trim().toLowerCase();
+    if (/^[a-z]{2}(,[a-z]{2}){0,4}$/.test(cc)) {
+      params.set('countrycodes', cc);
+    }
     const res = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
       method: 'GET',
       headers: {
@@ -111,11 +116,11 @@ export function createProjectService({
   }
 
   return {
-    async suggestLocations({ q }) {
+    async suggestLocations({ q, countrycodes = '' }) {
       const query = q?.trim() || '';
       if (query.length < 2) return [];
 
-      const rows = await fetchLocationSuggestions(query);
+      const rows = await fetchLocationSuggestions(query, { countrycodes });
       const seen = new Set();
       return rows
         .map(formatLocationSuggestion)
@@ -126,7 +131,7 @@ export function createProjectService({
           seen.add(key);
           return true;
         })
-        .slice(0, 5);
+        .slice(0, 6);
     },
 
     async previewProject({ quoi, ou, budget, currency = 'EUR', userId = null, projectId = null }) {
@@ -136,13 +141,17 @@ export function createProjectService({
         projectId,
         intent: `Compl?ter / affiner le projet : ${quoi || ''} ${ou || ''}`.trim(),
       });
-      const resolved = await aiService.completeProject({
-        quoi,
-        ou,
-        budget,
-        currency,
-        memoryContext,
-      });
+      const resolved = await withAiUsageContext(
+        { userId, projectId, purpose: 'complete_project' },
+        () =>
+          aiService.completeProject({
+            quoi,
+            ou,
+            budget,
+            currency,
+            memoryContext,
+          })
+      );
 
       if (!resolved.quoi || !resolved.ou || resolved.budget == null) {
         throw new AppError('Impossible de compl?ter le projet', 422);
@@ -185,16 +194,21 @@ export function createProjectService({
         projectId,
         intent: `Recherche d'id?es business : ${normalizedQuoi} ${normalizedOu}`.trim(),
       });
-      const businesses = await aiService.searchBusinesses({
-        quoi: normalizedQuoi,
-        ou: normalizedOu,
-        budget: await currencyService.clampBudget(budget, currency),
-        currency,
-        refine: refine || '',
-        avoid: Array.isArray(avoid) ? avoid : [],
-        count: businessConfig.projectSuggestionsCount,
-        memoryContext,
-      });
+      const clampedBudget = await currencyService.clampBudget(budget, currency);
+      const businesses = await withAiUsageContext(
+        { userId, projectId, purpose: 'search_businesses' },
+        () =>
+          aiService.searchBusinesses({
+            quoi: normalizedQuoi,
+            ou: normalizedOu,
+            budget: clampedBudget,
+            currency,
+            refine: refine || '',
+            avoid: Array.isArray(avoid) ? avoid : [],
+            count: businessConfig.projectSuggestionsCount,
+            memoryContext,
+          })
+      );
       if (!businesses.length) {
         throw new AppError('Aucune id?e de business g?n?r?e. R?essayez.', 422);
       }
@@ -224,19 +238,23 @@ export function createProjectService({
         projectId,
         intent: `Recherche de formations pour ${business}`,
       });
-      const trainings = await aiService.searchTrainings({
-        business: business.trim(),
-        businessActivity: businessActivity || '',
-        businessPitch: businessPitch || '',
-        businessRationale: businessRationale || '',
-        quoi: quoi || '',
-        ou: ou?.trim() || '',
-        budget: await currencyService.clampBudget(budget, currency),
-        currency,
-        refine: refine || '',
-        avoid: Array.isArray(avoid) ? avoid : [],
-        memoryContext,
-      });
+      const trainings = await withAiUsageContext(
+        { userId, projectId, purpose: 'search_trainings' },
+        async () =>
+          aiService.searchTrainings({
+            business: business.trim(),
+            businessActivity: businessActivity || '',
+            businessPitch: businessPitch || '',
+            businessRationale: businessRationale || '',
+            quoi: quoi || '',
+            ou: ou?.trim() || '',
+            budget: await currencyService.clampBudget(budget, currency),
+            currency,
+            refine: refine || '',
+            avoid: Array.isArray(avoid) ? avoid : [],
+            memoryContext,
+          })
+      );
       if (!trainings.length) {
         throw new AppError('Aucune formation g?n?r?e. R?essayez.', 422);
       }
@@ -265,22 +283,97 @@ export function createProjectService({
         projectId,
         intent: `Recherche de lieux pour ${business} pr?s de ${ou || ''}`,
       });
-      const locations = await aiService.searchLocations({
-        business: business.trim(),
-        businessActivity: businessActivity || '',
-        businessPitch: businessPitch || '',
-        businessRationale: businessRationale || '',
-        ou: ou?.trim() || '',
-        budget: await currencyService.clampBudget(budget, currency),
-        currency,
-        refine: refine || '',
-        avoid: Array.isArray(avoid) ? avoid : [],
-        memoryContext,
-      });
+      const locations = await withAiUsageContext(
+        { userId, projectId, purpose: 'search_locations' },
+        async () =>
+          aiService.searchLocations({
+            business: business.trim(),
+            businessActivity: businessActivity || '',
+            businessPitch: businessPitch || '',
+            businessRationale: businessRationale || '',
+            ou: ou?.trim() || '',
+            budget: await currencyService.clampBudget(budget, currency),
+            currency,
+            refine: refine || '',
+            avoid: Array.isArray(avoid) ? avoid : [],
+            memoryContext,
+          })
+      );
       if (!locations.length) {
-        throw new AppError('Aucun lieu g?n?r?. R?essayez.', 422);
+        throw new AppError('Aucun lieu généré. Réessayez.', 422);
       }
       return locations;
+    },
+
+    async evaluateFranceImplantation({
+      business,
+      businessActivity,
+      businessPitch,
+      businessRationale,
+      budget,
+      currency = 'EUR',
+      userId = null,
+      projectId = null,
+    }) {
+      if (!business?.trim()) {
+        throw new AppError('Sélectionnez un business pour évaluer les régions.', 400);
+      }
+      await currencyService.getCurrencyData();
+      const memoryContext = await resolveMemoryContext({
+        userId,
+        projectId,
+        intent: `Carte d'implantation France pour ${business}`,
+      });
+      return withAiUsageContext({ userId, projectId, purpose: 'france_implantation' }, async () =>
+        aiService.evaluateFranceImplantation({
+          business: business.trim(),
+          businessActivity: businessActivity || '',
+          businessPitch: businessPitch || '',
+          businessRationale: businessRationale || '',
+          budget: await currencyService.clampBudget(budget, currency),
+          currency,
+          memoryContext,
+        })
+      );
+    },
+
+    async evaluateCityImplantation({
+      business,
+      businessActivity,
+      businessPitch,
+      businessRationale,
+      city,
+      region,
+      budget,
+      currency = 'EUR',
+      userId = null,
+      projectId = null,
+    }) {
+      if (!business?.trim()) {
+        throw new AppError('Sélectionnez un business pour évaluer une ville.', 400);
+      }
+      if (!city?.trim()) {
+        throw new AppError('Indiquez une ville à évaluer.', 400);
+      }
+      await currencyService.getCurrencyData();
+      const memoryContext = await resolveMemoryContext({
+        userId,
+        projectId,
+        intent: `Évaluation implantation ${business} à ${city}`,
+      });
+      return withAiUsageContext({ userId, projectId, purpose: 'city_implantation' }, async () =>
+        aiService.evaluateCityImplantation({
+          business: business.trim(),
+          businessActivity: businessActivity || '',
+          businessPitch: businessPitch || '',
+          businessRationale: businessRationale || '',
+          city: city.trim(),
+          region: region || '',
+          budget: await currencyService.clampBudget(budget, currency),
+          currency,
+          memoryContext,
+        })
+      );
     },
 
     async buildProposals({
@@ -301,14 +394,18 @@ export function createProjectService({
         projectId,
         intent: `Propositions budget pour ${business} ? ${location}`,
       });
-      const { proposals, assessment } = await aiService.buildProposals({
-        business: business.trim(),
-        location: location.trim(),
-        budget: await currencyService.clampBudget(budget, currency),
-        currency,
-        refine: refine || '',
-        memoryContext,
-      });
+      const { proposals, assessment } = await withAiUsageContext(
+        { userId, projectId, purpose: 'build_proposals' },
+        async () =>
+          aiService.buildProposals({
+            business: business.trim(),
+            location: location.trim(),
+            budget: await currencyService.clampBudget(budget, currency),
+            currency,
+            refine: refine || '',
+            memoryContext,
+          })
+      );
       if (!proposals.length) {
         throw new AppError('Aucune proposition de projet g?n?r?e. R?essayez.', 422);
       }
@@ -347,13 +444,17 @@ export function createProjectService({
           userId: user.id,
           intent: `Cr?ation projet : ${quoi || ''}`,
         });
-        resolved = await aiService.completeProject({
-          quoi,
-          ou,
-          budget,
-          currency,
-          memoryContext,
-        });
+        resolved = await withAiUsageContext(
+          { userId: user.id, purpose: 'complete_project' },
+          () =>
+            aiService.completeProject({
+              quoi,
+              ou,
+              budget,
+              currency,
+              memoryContext,
+            })
+        );
       }
 
       if (!resolved.quoi || !resolved.ou || resolved.budget == null) {

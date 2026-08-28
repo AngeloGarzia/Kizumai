@@ -3,6 +3,7 @@ import { sanitizeUsers } from '../utils/sanitize.js';
 import { UserResponseDto } from '../dto/user.dto.js';
 import { ROLES } from '../constants/roles.js';
 import { config } from '../config/index.js';
+import pool from '../database/pool.js';
 import {
   getProviderById,
   isModelValidForProvider,
@@ -19,8 +20,13 @@ export function createAdminService({
   settingsRepository,
   aiPromptRepository,
   userRepository,
+  projectRepository,
+  documentRepository,
+  projectMemorySnapshotRepository,
+  storageService,
   connectionService,
   aiService,
+  aiUsageLogRepository,
 }) {
   async function loadAiSettings({ forceRefresh = false } = {}) {
     const settings = await settingsRepository.getAsObject();
@@ -218,6 +224,163 @@ export function createAdminService({
       };
     },
 
+    async getUserDetails(userId) {
+      const targetId = Number(userId);
+      const target = await userRepository.findById(targetId);
+      if (!target) throw new AppError('Utilisateur introuvable', 404);
+
+      const projects = await projectRepository.findByUserId(targetId);
+      const enrichedProjects = await Promise.all(
+        projects.map(async (project) => {
+          const [documents, memorySnapshot, related] = await Promise.all([
+            documentRepository.findByProjectId(project.id),
+            projectMemorySnapshotRepository.findByProjectId(project.id),
+            pool.query(
+              `SELECT
+                 (SELECT COUNT(*)::int FROM project_memory_nodes WHERE project_id = $1) AS memory_nodes,
+                 (SELECT COUNT(*)::int FROM project_memory_edges WHERE project_id = $1) AS memory_edges,
+                 (SELECT COUNT(*)::int FROM contacts WHERE project_id = $1) AS contacts,
+                 (SELECT COUNT(*)::int FROM companies WHERE project_id = $1) AS companies,
+                 (SELECT COUNT(*)::int FROM planner_events WHERE project_id = $1) AS planner_events,
+                 (SELECT COUNT(*)::int FROM learning_records WHERE project_id = $1) AS learning_records,
+                 (SELECT COUNT(*)::int FROM document_scans WHERE project_id = $1) AS document_scans,
+                 (SELECT COUNT(*)::int FROM project_stage_runs WHERE project_id = $1) AS stage_runs`,
+              [project.id]
+            ),
+          ]);
+          const counts = related.rows[0] || {};
+          return {
+            id: project.id,
+            title: project.title,
+            status: project.status,
+            stage: project.stage,
+            budget: project.budget,
+            currency: project.currency,
+            legalForm: project.legalForm,
+            description: project.description,
+            report: project.report,
+            sections: project.sections,
+            metadata: project.metadata,
+            source: project.source,
+            aiPrompt: project.aiPrompt,
+            quoi: project.quoi,
+            ou: project.ou,
+            activity: project.activity,
+            location: project.location,
+            createdAt: project.createdAt,
+            updatedAt: project.updatedAt,
+            counts: {
+              documents: documents.length,
+              memoryNodes: counts.memory_nodes || 0,
+              memoryEdges: counts.memory_edges || 0,
+              contacts: counts.contacts || 0,
+              companies: counts.companies || 0,
+              plannerEvents: counts.planner_events || 0,
+              learningRecords: counts.learning_records || 0,
+              documentScans: counts.document_scans || 0,
+              stageRuns: counts.stage_runs || 0,
+            },
+            documents: documents.map((d) => ({
+              id: d.id,
+              title: d.title,
+              type: d.type,
+              fileName: d.fileName,
+              mimeType: d.mimeType,
+              sizeBytes: d.sizeBytes,
+              storageKey: d.storageKey,
+              category: d.category,
+              createdAt: d.createdAt,
+              updatedAt: d.updatedAt,
+            })),
+            memorySnapshot: memorySnapshot
+              ? {
+                  id: memorySnapshot.id,
+                  summary: memorySnapshot.summary,
+                  keyFacts: memorySnapshot.keyFacts,
+                  activeBlockers: memorySnapshot.activeBlockers,
+                  nextActions: memorySnapshot.nextActions,
+                  generatedAt: memorySnapshot.generatedAt,
+                  modelUsed: memorySnapshot.modelUsed,
+                  tokenCount: memorySnapshot.tokenCount,
+                  eventsSinceSnapshot: memorySnapshot.eventsSinceSnapshot,
+                  updatedAt: memorySnapshot.updatedAt,
+                }
+              : null,
+          };
+        })
+      );
+
+      const { rows: statRows } = await pool.query(
+        `SELECT
+           (SELECT COUNT(*)::int FROM projects WHERE user_id = $1) AS projects,
+           (SELECT COUNT(*)::int FROM contacts WHERE user_id = $1) AS contacts,
+           (SELECT COUNT(*)::int FROM planner_events WHERE user_id = $1) AS planner_events,
+           (SELECT COUNT(*)::int FROM learning_records WHERE user_id = $1) AS learning_records,
+           (SELECT COUNT(*)::int FROM document_scans WHERE user_id = $1) AS document_scans,
+           (SELECT COUNT(*)::int FROM push_subscriptions WHERE user_id = $1) AS push_subscriptions,
+           (SELECT COUNT(*)::int FROM refresh_tokens WHERE user_id = $1) AS refresh_tokens,
+           (SELECT COUNT(*)::int FROM user_connections WHERE user_id = $1) AS connections,
+           (SELECT COUNT(*)::int FROM ai_usage_logs WHERE user_id = $1) AS ai_usage,
+           (SELECT COUNT(*)::int FROM documents d
+              INNER JOIN projects p ON p.id = d.project_id
+              WHERE p.user_id = $1) AS documents`,
+        [targetId]
+      );
+      const s = statRows[0] || {};
+
+      return {
+        user: UserResponseDto.from(target),
+        stats: {
+          projects: s.projects || 0,
+          contacts: s.contacts || 0,
+          plannerEvents: s.planner_events || 0,
+          learningRecords: s.learning_records || 0,
+          documentScans: s.document_scans || 0,
+          documents: s.documents || 0,
+          pushSubscriptions: s.push_subscriptions || 0,
+          refreshTokens: s.refresh_tokens || 0,
+          connections: s.connections || 0,
+          aiUsage: s.ai_usage || 0,
+        },
+        projects: enrichedProjects,
+      };
+    },
+
+    async deleteUser(userId, currentUserId) {
+      const targetId = Number(userId);
+      if (currentUserId != null && Number(currentUserId) === targetId) {
+        throw new AppError('Vous ne pouvez pas supprimer votre propre compte', 400);
+      }
+
+      const target = await userRepository.findById(targetId);
+      if (!target) throw new AppError('Utilisateur introuvable', 404);
+
+      if (target.role === ROLES.ADMIN) {
+        const admins = await userRepository.findByRole(ROLES.ADMIN);
+        if (admins.length <= 1) {
+          throw new AppError('Impossible de supprimer le dernier administrateur', 400);
+        }
+      }
+
+      const projects = await projectRepository.findByUserId(targetId);
+      const storageKeys = [];
+      for (const project of projects) {
+        const docs = await documentRepository.findByProjectId(project.id);
+        for (const doc of docs) {
+          if (doc.storageKey) storageKeys.push(doc.storageKey);
+        }
+      }
+
+      const deleted = await userRepository.delete(targetId);
+      if (!deleted) throw new AppError('Utilisateur introuvable', 404);
+
+      if (storageService?.remove) {
+        await Promise.allSettled(storageKeys.map((key) => storageService.remove(key)));
+      }
+
+      return { deleted: true, id: targetId };
+    },
+
     async updateUserRole(userId, role, currentUserId) {
       if (![ROLES.USER, ROLES.ADMIN].includes(role)) {
         throw new AppError('Rôle invalide', 400);
@@ -245,6 +408,16 @@ export function createAdminService({
 
     async getConnections(limit = 100) {
       return connectionService.getRecentConnections(limit);
+    },
+
+    async getAiUsage({ days = 30 } = {}) {
+      const safeDays = Math.min(90, Math.max(1, Number(days) || 30));
+      const [totals, byDay, recent] = await Promise.all([
+        aiUsageLogRepository.totals({ days: safeDays }),
+        aiUsageLogRepository.summarizeByDay({ days: safeDays }),
+        aiUsageLogRepository.findRecent({ limit: 40 }),
+      ]);
+      return { totals, byDay, recent };
     },
   };
 }

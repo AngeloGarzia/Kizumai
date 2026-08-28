@@ -62,6 +62,16 @@ export function createAdminController({ adminService, notificationService }) {
       successResponse(res, overview);
     }),
 
+    getUserDetails: asyncHandler(async (req, res) => {
+      const data = await adminService.getUserDetails(req.params.id);
+      successResponse(res, data);
+    }),
+
+    deleteUser: asyncHandler(async (req, res) => {
+      const result = await adminService.deleteUser(req.params.id, req.user.id);
+      successResponse(res, result);
+    }),
+
     updateUserRole: asyncHandler(async (req, res) => {
       const dto = UpdateUserRoleRequestDto.from(req.params, req.body);
       const user = await adminService.updateUserRole(dto.id, dto.role, req.user.id);
@@ -71,6 +81,12 @@ export function createAdminController({ adminService, notificationService }) {
     getConnections: asyncHandler(async (req, res) => {
       const connections = await adminService.getConnections();
       successResponse(res, connections);
+    }),
+
+    getAiUsage: asyncHandler(async (req, res) => {
+      const days = req.query?.days;
+      const data = await adminService.getAiUsage({ days });
+      successResponse(res, data);
     }),
 
     broadcastNotification: asyncHandler(async (req, res) => {

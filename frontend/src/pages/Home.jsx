@@ -59,7 +59,7 @@ export default function Home() {
       {
         id: 'fil-du-temps',
         title: 'Fil du temps',
-        subtitle: 'Journal, documents & mémoire IA',
+        subtitle: 'Journal, documents & mémoire Fabulous',
         percent: project?.progress?.percent ?? 0,
         icon: IconRocket,
         path: '/fil-du-temps',

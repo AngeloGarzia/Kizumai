@@ -2,6 +2,7 @@ import { readFile } from 'fs/promises';
 import { AppError } from '../utils/AppError.js';
 import { withTempFile } from '../utils/tempFile.js';
 import { enqueueDocumentScan } from '../queue/documentQueue.js';
+import { withAiUsageContext } from '../utils/aiUsage.js';
 import {
   extractDocumentText,
   SUPPORTED_EXTRACT_HINT,
@@ -244,12 +245,16 @@ export function createDocumentScanService({
           }
         }
 
-        const result = await aiService.analyzeDocumentExtract({
-          documentTitle: doc.title || doc.fileName,
-          mimeType: doc.mimeType,
-          text,
-          memoryContext,
-        });
+        const result = await withAiUsageContext(
+          { userId: scan.userId, projectId: scan.projectId, purpose: 'document_scan' },
+          () =>
+            aiService.analyzeDocumentExtract({
+              documentTitle: doc.title || doc.fileName,
+              mimeType: doc.mimeType,
+              text,
+              memoryContext,
+            })
+        );
 
         let items = buildItemsFromAi(result);
         for (const item of items) {

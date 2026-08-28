@@ -1,5 +1,5 @@
 /**
- * Texte utilisateur / IA affiché en React (nœuds texte).
+ * Texte utilisateur / Fabulous affiché en React (nœuds texte).
  * Défense en profondeur : retire contrôles / null bytes (React échappe déjà le HTML).
  */
 export function sanitizeDisplayText(value, { max = 50_000 } = {}) {

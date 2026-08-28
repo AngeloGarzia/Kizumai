@@ -12,6 +12,7 @@ import {
 } from '../services/projectService.js';
 import { authService } from '../services/authService.js';
 import { IconChevronRight } from '../components/icons.jsx';
+import { ASSISTANT_NAME } from '../constants/assistant.js';
 
 export default function ProjectPreview() {
   const navigate = useNavigate();
@@ -19,7 +20,7 @@ export default function ProjectPreview() {
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [selfServePaid, setSelfServePaid] = useState(false);
+  const [confirmUpgradeOpen, setConfirmUpgradeOpen] = useState(false);
 
   useEffect(() => {
     const draft = getProjectDraft();
@@ -29,21 +30,6 @@ export default function ProjectPreview() {
     }
     setPreview(draft);
   }, [navigate]);
-
-  useEffect(() => {
-    let active = true;
-    authService
-      .getBillingConfig()
-      .then((cfg) => {
-        if (active) setSelfServePaid(Boolean(cfg?.selfServePaidEnabled));
-      })
-      .catch(() => {
-        if (active) setSelfServePaid(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
 
   const handleContinuePaid = async () => {
     if (!preview) return;
@@ -55,14 +41,14 @@ export default function ProjectPreview() {
       clearProjectDraft();
       navigate('/');
     } catch (err) {
-      setError(err.message || 'Impossible d\'enregistrer le projet');
+      setError(err.message || "Impossible d'enregistrer le projet");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleUpgrade = async () => {
-    if (!preview || !selfServePaid) return;
+  const handleConfirmUpgrade = async () => {
+    if (!preview) return;
     setError('');
     setSubmitting(true);
 
@@ -71,9 +57,11 @@ export default function ProjectPreview() {
       await loadUser();
       await projectService.createProject(preview);
       clearProjectDraft();
+      setConfirmUpgradeOpen(false);
       navigate('/');
     } catch (err) {
-      setError(err.message || 'Impossible d\'activer le compte payant');
+      setError(err.message || "Impossible d'activer le compte payant");
+      setConfirmUpgradeOpen(false);
     } finally {
       setSubmitting(false);
     }
@@ -81,7 +69,7 @@ export default function ProjectPreview() {
 
   const sourceLabel = useMemo(() => {
     if (!preview) return '';
-    if (preview.source === 'ai') return 'Complété par intelligence artificielle';
+    if (preview.source === 'ai') return `Complété par ${ASSISTANT_NAME}`;
     if (preview.source === 'heuristic') return 'Estimation automatique';
     return 'Synthèse de vos informations';
   }, [preview]);
@@ -143,22 +131,22 @@ export default function ProjectPreview() {
                 <p className="text-sm text-prune-600">
                   Votre compte ({user?.email}) n&apos;inclut pas encore l&apos;accès au parcours complet.
                 </p>
-                {selfServePaid ? (
-                  <Button type="button" onClick={handleUpgrade} disabled={submitting}>
-                    {submitting ? 'Activation...' : 'Activer le compte payant'}
-                  </Button>
-                ) : (
-                  <p className="text-sm text-prune-500 bg-prune-50 border border-prune-100 rounded-xl px-4 py-3">
-                    L&apos;activation payante se fait côté serveur (paiement / admin). Contactez le support
-                    pour débloquer votre accès.
-                  </p>
-                )}
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setError('');
+                    setConfirmUpgradeOpen(true);
+                  }}
+                  disabled={submitting}
+                >
+                  Passer en compte payant
+                </Button>
               </div>
             ) : (
               <div className="space-y-3">
                 <p className="text-sm text-prune-600">
-                  Créez un compte pour poursuivre, puis activez l&apos;accès payant via le parcours de
-                  facturation.
+                  Créez un compte pour poursuivre, puis activez l&apos;accès payant pour enregistrer
+                  votre projet.
                 </p>
                 <Link to="/register" className="btn-primary block text-center">
                   Créer un compte
@@ -183,6 +171,52 @@ export default function ProjectPreview() {
           <IconChevronRight className="w-4 h-4 rotate-180" />
         </button>
       </main>
+
+      {confirmUpgradeOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="upgrade-paid-title"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 bg-prune-900/50"
+            aria-label="Fermer"
+            disabled={submitting}
+            onClick={() => {
+              if (!submitting) setConfirmUpgradeOpen(false);
+            }}
+          />
+          <div className="relative w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-white shadow-xl p-5 sm:p-6 space-y-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-prune-500">
+                Accès parcours
+              </p>
+              <h2 id="upgrade-paid-title" className="text-lg font-bold text-prune-900 mt-1">
+                Confirmer le passage en compte payant ?
+              </h2>
+              <p className="text-sm text-prune-500 mt-2">
+                Votre projet sera enregistré et vous pourrez enchaîner sur le parcours complet
+                (étapes, ressources, mémoire projet).
+              </p>
+            </div>
+            <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={submitting}
+                onClick={() => setConfirmUpgradeOpen(false)}
+              >
+                Annuler
+              </Button>
+              <Button type="button" onClick={handleConfirmUpgrade} disabled={submitting}>
+                {submitting ? 'Activation...' : 'Confirmer'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

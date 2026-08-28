@@ -1,4 +1,5 @@
 import { config } from '../config/index.js';
+import { withAiUsageContext } from '../utils/aiUsage.js';
 
 /**
  * Régénération du snapshot consolidé via l'IA.
@@ -47,10 +48,14 @@ export function createProjectMemorySnapshotService({
 
       let result;
       try {
-        result = await aiService.generateMemorySnapshot({
-          memoriesText,
-          priorSummary: prior?.summary || '',
-        });
+        result = await withAiUsageContext(
+          { projectId, purpose: 'memory_snapshot' },
+          () =>
+            aiService.generateMemorySnapshot({
+              memoriesText,
+              priorSummary: prior?.summary || '',
+            })
+        );
       } catch (err) {
         console.warn('[memory] snapshot IA échoué, fallback heuristique:', err.message);
         result = {

@@ -23,8 +23,11 @@ export function createAdminRoutes({
   router.get('/prompts', adminController.getPrompts);
   router.put('/prompts/:key', adminController.updatePrompt);
   router.get('/users', adminController.getUsers);
+  router.get('/users/:id', adminController.getUserDetails);
+  router.delete('/users/:id', adminController.deleteUser);
   router.patch('/users/:id/role', adminController.updateUserRole);
   router.get('/connections', adminController.getConnections);
+  router.get('/ai-usage', adminController.getAiUsage);
   router.post('/notifications/broadcast', adminController.broadcastNotification);
 
   return router;

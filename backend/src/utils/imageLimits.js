@@ -53,7 +53,7 @@ const RIFF = Buffer.from('RIFF');
 const WEBP = Buffer.from('WEBP');
 
 function isGifBuffer(buffer) {
-  return buffer.length >= 6 && buffer.subarray(0, 3).equals(GIF_SIG);
+  return buffer.length >= 6 && buffer.subarray(0, 4).equals(GIF_SIG);
 }
 
 function isWebpBuffer(buffer) {

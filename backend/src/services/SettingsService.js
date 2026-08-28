@@ -25,11 +25,18 @@ export function createSettingsService({ settingsRepository, aiPromptRepository }
       const ideeSystemPrompt = await aiPromptRepository.findByKey('idee_system');
       const userPrompt = await aiPromptRepository.findByKey('project_user');
       const lieuxPrompt = await aiPromptRepository.findByKey('lieux');
+      const carteImplantationPrompt = await aiPromptRepository.findByKey('carte_implantation');
+      const villeImplantationPrompt = await aiPromptRepository.findByKey('ville_implantation');
       const budgetPrompt = await aiPromptRepository.findByKey('budget');
       const formationPrompt = await aiPromptRepository.findByKey('formation');
       const documentScanPrompt = await aiPromptRepository.findByKey('document_scan');
       const memorySnapshotPrompt = await aiPromptRepository.findByKey('memory_snapshot');
       const memoryRecallPrompt = await aiPromptRepository.findByKey('memory_recall');
+      const trustedSystemPrompt = await aiPromptRepository.findByKey('ai_trusted_system');
+      const jsonSystemPrompt = await aiPromptRepository.findByKey('ai_json_system');
+      const jsonRetryPrompt = await aiPromptRepository.findByKey('ai_json_retry');
+      const franceSystemExtraPrompt = await aiPromptRepository.findByKey('ai_france_system_extra');
+      const memoryContextPrefixPrompt = await aiPromptRepository.findByKey('ai_memory_context_prefix');
 
       const provider = settings.ai_provider || config.ai.defaultProvider;
       const providerDef = getProviderById(provider);
@@ -44,11 +51,18 @@ export function createSettingsService({ settingsRepository, aiPromptRepository }
         ideeSystemPrompt: ideeSystemPrompt?.content || null,
         userPromptTemplate: userPrompt?.content || null,
         lieuxPrompt: lieuxPrompt?.content || null,
+        carteImplantationPrompt: carteImplantationPrompt?.content || null,
+        villeImplantationPrompt: villeImplantationPrompt?.content || null,
         budgetPrompt: budgetPrompt?.content || null,
         formationPrompt: formationPrompt?.content || null,
         documentScanPrompt: documentScanPrompt?.content || null,
         memorySnapshotPrompt: memorySnapshotPrompt?.content || null,
         memoryRecallPrompt: memoryRecallPrompt?.content || null,
+        trustedSystemPrompt: trustedSystemPrompt?.content || null,
+        jsonSystemPrompt: jsonSystemPrompt?.content || null,
+        jsonRetryPrompt: jsonRetryPrompt?.content || null,
+        franceSystemExtraPrompt: franceSystemExtraPrompt?.content || null,
+        memoryContextPrefixPrompt: memoryContextPrefixPrompt?.content || null,
       };
     },
 

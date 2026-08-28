@@ -61,3 +61,24 @@ test('suggestLocations retourne des lieux existants normalisés', async () => {
     globalThis.fetch = previousFetch;
   }
 });
+
+test('suggestLocations passe countrycodes à Nominatim', async () => {
+  const previousFetch = globalThis.fetch;
+  let calledUrl = '';
+  globalThis.fetch = async (url) => {
+    calledUrl = String(url);
+    return {
+      ok: true,
+      json: async () => [],
+    };
+  };
+
+  try {
+    const service = createService();
+    await service.suggestLocations({ q: 'Nantes', countrycodes: 'fr' });
+    assert.match(calledUrl, /countrycodes=fr/);
+    assert.match(calledUrl, /q=Nantes/);
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+});

@@ -1,6 +1,8 @@
 import {
   BuildProposalsRequestDto,
   CreateProjectRequestDto,
+  FranceImplantationRequestDto,
+  CityImplantationRequestDto,
   LocationSuggestQueryDto,
   ProjectIdParamDto,
   ProjectPreviewRequestDto,
@@ -52,6 +54,18 @@ export function createProjectController({ projectService }) {
       const dto = SearchLocationsRequestDto.from(req.body);
       const locations = await projectService.searchLocations(withUserContext(dto, req));
       successResponse(res, { locations });
+    }),
+
+    evaluateFranceImplantation: asyncHandler(async (req, res) => {
+      const dto = FranceImplantationRequestDto.from(req.body);
+      const map = await projectService.evaluateFranceImplantation(withUserContext(dto, req));
+      successResponse(res, map);
+    }),
+
+    evaluateCityImplantation: asyncHandler(async (req, res) => {
+      const dto = CityImplantationRequestDto.from(req.body);
+      const city = await projectService.evaluateCityImplantation(withUserContext(dto, req));
+      successResponse(res, { city });
     }),
 
     buildProposals: asyncHandler(async (req, res) => {

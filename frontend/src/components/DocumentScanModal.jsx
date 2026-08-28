@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { projectService } from '../services/projectService.js';
+import { assistantPhrases } from '../constants/assistant.js';
+import FabulousThinking from './FabulousThinking.jsx';
 
 const TYPE_LABEL = {
   contact: 'Contact',
@@ -40,7 +42,7 @@ function itemSubtitle(item) {
 }
 
 /**
- * Modal de revue après scan IA d'un document.
+ * Modal de revue après scan Fabulous d'un document.
  * Poll jusqu'à status ready|failed|dismissed, puis propose d'accepter / ignorer.
  */
 export default function DocumentScanModal({
@@ -183,7 +185,7 @@ export default function DocumentScanModal({
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-topaz-600">
-              Scan IA
+              {assistantPhrases.scan}
             </p>
             <h2 id="doc-scan-title" className="text-lg font-bold text-prune-900 mt-0.5">
               {title}
@@ -200,13 +202,10 @@ export default function DocumentScanModal({
         </div>
 
         {(status === 'pending' || status === 'processing' || !payload) && (
-          <div className="py-10 text-center">
-            <div className="mx-auto mb-3 h-8 w-8 rounded-full border-2 border-topaz-400 border-t-transparent animate-spin" />
-            <p className="text-prune-800 font-medium">Analyse du document…</p>
-            <p className="text-sm text-prune-500 mt-1">
-              Recherche de contacts, dates et adresses
-            </p>
-          </div>
+          <FabulousThinking
+            message={assistantPhrases.analyzingDocument}
+            className="py-6"
+          />
         )}
 
         {status === 'failed' && (
