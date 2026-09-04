@@ -69,6 +69,7 @@ import { createProjectMemoryDecayJob } from '../services/ProjectMemoryDecayJob.j
 import { createProjectMemorySnapshotService } from '../services/ProjectMemorySnapshotService.js';
 import { createProjectMemoryRecallService } from '../services/ProjectMemoryRecallService.js';
 import { createProjectMemoryScanService } from '../services/ProjectMemoryScanService.js';
+import { createProjectMemoryLoginEvalService } from '../services/ProjectMemoryLoginEvalService.js';
 import { createProjectTimelineService } from '../services/ProjectTimelineService.js';
 
 export function createContainer() {
@@ -178,6 +179,14 @@ export function createContainer() {
     projectMemoryEdgeRepository,
     projectMemorySnapshotService,
     aiService,
+  });
+
+  const projectMemoryLoginEvalService = createProjectMemoryLoginEvalService({
+    projectRepository,
+    projectMemorySnapshotRepository,
+    projectMemoryNodeRepository,
+    projectMemoryScanService,
+    settingsService,
   });
 
   const projectTimelineService = createProjectTimelineService({
@@ -307,7 +316,11 @@ export function createContainer() {
   const authenticate = createAuthenticate({ authService });
   const optionalAuth = createOptionalAuth({ authService });
 
-  const authController = createAuthController({ authService, connectionService });
+  const authController = createAuthController({
+    authService,
+    connectionService,
+    projectMemoryLoginEvalService,
+  });
   const userController = createUserController({ userService });
   const projectController = createProjectController({ projectService });
   const documentController = createDocumentController({

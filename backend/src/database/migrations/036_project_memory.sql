@@ -1,7 +1,5 @@
 -- Mémoire synaptique projet pour l'IA API (nœuds + arêtes + snapshots).
--- Extension pgvector pour embeddings (cosine). Sans pgvector, embedding reste NULL.
-
-CREATE EXTENSION IF NOT EXISTS vector;
+-- Extension pgvector (vector) : provisionnée au déploiement Docker (docker/postgres/init/00-vector.sql).
 
 CREATE TABLE IF NOT EXISTS project_memory_nodes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

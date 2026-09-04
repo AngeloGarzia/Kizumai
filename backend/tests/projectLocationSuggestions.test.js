@@ -62,6 +62,70 @@ test('suggestLocations retourne des lieux existants normalisés', async () => {
   }
 });
 
+test('suggestLocations inclut le quartier dans le libellé', async () => {
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => [
+      {
+        display_name: 'Part-Dieu, Lyon 3e Arrondissement, Lyon, France',
+        lat: '45.7606',
+        lon: '4.8495',
+        address: {
+          suburb: 'Part-Dieu',
+          city: 'Lyon',
+          state: 'Auvergne-Rhône-Alpes',
+          country: 'France',
+        },
+      },
+    ],
+  });
+
+  try {
+    const service = createService();
+    const locations = await service.suggestLocations({ q: 'Part-Dieu' });
+
+    assert.equal(locations.length, 1);
+    assert.match(locations[0].label, /Part-Dieu/);
+    assert.match(locations[0].label, /Lyon/);
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+});
+
+test('suggestLocations retente sans filtre pays si aucun résultat', async () => {
+  const previousFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url) => {
+    calls.push(String(url));
+    const hasCountry = String(url).includes('countrycodes=fr');
+    return {
+      ok: true,
+      json: async () => (hasCountry && calls.length === 1
+        ? []
+        : [
+            {
+              display_name: 'Genève, Suisse',
+              lat: '46.2044',
+              lon: '6.1432',
+              address: { city: 'Genève', country: 'Suisse' },
+            },
+          ]),
+    };
+  };
+
+  try {
+    const service = createService();
+    const locations = await service.suggestLocations({ q: 'Genève', countrycodes: 'fr' });
+
+    assert.equal(locations.length, 1);
+    assert.equal(calls.length, 2);
+    assert.doesNotMatch(calls[1], /countrycodes=/);
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+});
+
 test('suggestLocations passe countrycodes à Nominatim', async () => {
   const previousFetch = globalThis.fetch;
   let calledUrl = '';
@@ -69,7 +133,14 @@ test('suggestLocations passe countrycodes à Nominatim', async () => {
     calledUrl = String(url);
     return {
       ok: true,
-      json: async () => [],
+      json: async () => [
+        {
+          display_name: 'Nantes, France',
+          lat: '47.218',
+          lon: '-1.554',
+          address: { city: 'Nantes', country: 'France' },
+        },
+      ],
     };
   };
 

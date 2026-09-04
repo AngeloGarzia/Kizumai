@@ -78,6 +78,7 @@ const mapProject = (row) => {
     metadata: row.metadata ?? {},
     source: row.source,
     aiPrompt: row.ai_prompt,
+    memoryLoginEvalAt: row.memory_login_eval_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -131,6 +132,17 @@ export const ProjectRepository = {
       [Number(userId)]
     );
     return rows.map(mapProject);
+  },
+
+  async touchMemoryLoginEvalAt(projectId) {
+    const { rows } = await pool.query(
+      `UPDATE projects
+       SET memory_login_eval_at = NOW()
+       WHERE id = $1
+       RETURNING memory_login_eval_at`,
+      [Number(projectId)]
+    );
+    return rows[0]?.memory_login_eval_at ?? null;
   },
 
   async findById(id) {

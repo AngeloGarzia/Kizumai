@@ -6,7 +6,8 @@ import {
   notificationService,
 } from '../services/notificationService.js';
 
-export default function NotificationSettings() {
+export default function NotificationSettings({ className = '', variant = 'default' }) {
+  const isSidebar = variant === 'sidebar';
   const [supported, setSupported] = useState(true);
   const [subscribed, setSubscribed] = useState(false);
   const [serverEnabled, setServerEnabled] = useState(true);
@@ -68,9 +69,21 @@ export default function NotificationSettings() {
     }
   };
 
+  const outerClass = isSidebar
+    ? `p-3 rounded-lg bg-prune-50 border border-prune-100 ${className}`
+    : `mt-6 sm:mt-8 p-4 sm:p-5 rounded-xl bg-prune-50 border border-prune-100 ${className}`;
+
   return (
-    <div className="mt-6 sm:mt-8 p-4 sm:p-5 rounded-xl bg-prune-50 border border-prune-100">
-      <p className="text-xs font-semibold text-prune-500 uppercase tracking-wide">Notifications</p>
+    <div className={outerClass.trim()}>
+      <p
+        className={
+          isSidebar
+            ? 'text-xs font-semibold text-prune-700'
+            : 'text-xs font-semibold text-prune-500 uppercase tracking-wide'
+        }
+      >
+        Notifications
+      </p>
 
       {!supported && (
         <p className="text-sm text-prune-700 mt-2">
@@ -108,7 +121,7 @@ export default function NotificationSettings() {
                 type="button"
                 onClick={disable}
                 disabled={busy}
-                className="btn-secondary w-auto text-sm"
+                className={`btn-secondary text-sm ${isSidebar ? 'w-full' : 'w-auto'}`}
               >
                 {busy ? '...' : 'Désactiver'}
               </button>
@@ -117,7 +130,7 @@ export default function NotificationSettings() {
                 type="button"
                 onClick={enable}
                 disabled={busy}
-                className="btn-primary w-auto text-sm"
+                className={`btn-primary text-sm ${isSidebar ? 'w-full' : 'w-auto'}`}
               >
                 {busy ? 'Activation...' : 'Activer les notifications'}
               </button>

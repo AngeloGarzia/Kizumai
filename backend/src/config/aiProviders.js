@@ -105,6 +105,10 @@ export function resolveModel(providerId, modelId) {
   if (!provider) return null;
   const trimmed = modelId != null ? String(modelId).trim() : '';
   if (!trimmed) return provider.defaultModel;
-  if (providerId === 'gemini') return remapRetiredGeminiModel(trimmed);
-  return trimmed;
+  let resolved = trimmed;
+  if (providerId === 'gemini') resolved = remapRetiredGeminiModel(trimmed);
+  if (!isModelValidForProvider(providerId, resolved)) {
+    return provider.defaultModel;
+  }
+  return resolved;
 }

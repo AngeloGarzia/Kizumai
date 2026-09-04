@@ -53,7 +53,7 @@ export function issueCsrfToken(res) {
     secure: config.cookies.secure,
     sameSite: config.cookies.sameSite,
     domain: config.cookies.domain,
-    path: '/',
+    path: config.cookies.csrfPath,
     maxAge: config.cookies.refreshMaxAge,
   });
   return token;
@@ -65,7 +65,7 @@ export function clearCsrfCookie(res) {
     secure: config.cookies.secure,
     sameSite: config.cookies.sameSite,
     domain: config.cookies.domain,
-    path: '/',
+    path: config.cookies.csrfPath,
   });
 }
 

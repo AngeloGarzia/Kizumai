@@ -39,21 +39,69 @@ async function fetchLocationSuggestions(query, { countrycodes = '' } = {}) {
 
 function formatLocationSuggestion(item) {
   const address = item?.address || {};
+  const suburb =
+    address.suburb ||
+    address.neighbourhood ||
+    address.quarter ||
+    address.city_district ||
+    address.district ||
+    '';
   const city = address.city || address.town || address.village || address.municipality || '';
   const region = address.state || address.region || address.county || '';
   const country = address.country || '';
-  const parts = [city, region, country].filter(Boolean);
-  const label = parts.length ? parts.join(', ') : String(item?.display_name || '').split(',').slice(0, 3).join(',').trim();
+  const labelParts = [
+    suburb && suburb !== city ? suburb : null,
+    city,
+    region,
+    country,
+  ].filter(Boolean);
+  const uniqueParts = labelParts.filter(
+    (part, index) => labelParts.indexOf(part) === index
+  );
+  const label = uniqueParts.length
+    ? uniqueParts.slice(0, 3).join(', ')
+    : String(item?.display_name || '').split(',').slice(0, 3).join(',').trim();
 
   return {
     label,
     displayName: String(item?.display_name || label),
-    city,
+    city: city || suburb,
     region,
     country,
     latitude: item?.lat != null ? Number(item.lat) : null,
     longitude: item?.lon != null ? Number(item.lon) : null,
+    source: 'nominatim',
   };
+}
+
+function formatDbLocationSuggestion(location) {
+  const label = [location.label, location.city, location.region, location.country]
+    .filter(Boolean)
+    .filter((part, index, arr) => arr.indexOf(part) === index)
+    .slice(0, 3)
+    .join(', ');
+
+  return {
+    label: label || location.label,
+    displayName: location.label,
+    city: location.city || null,
+    region: location.region || null,
+    country: location.country || null,
+    latitude: location.latitude,
+    longitude: location.longitude,
+    source: 'database',
+  };
+}
+
+function dedupeLocationSuggestions(locations) {
+  const seen = new Set();
+  return locations.filter((location) => {
+    if (!location?.label) return false;
+    const key = location.label.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export function createProjectService({
@@ -120,18 +168,19 @@ export function createProjectService({
       const query = q?.trim() || '';
       if (query.length < 2) return [];
 
-      const rows = await fetchLocationSuggestions(query, { countrycodes });
-      const seen = new Set();
-      return rows
-        .map(formatLocationSuggestion)
-        .filter((location) => {
-          if (!location.label) return false;
-          const key = location.label.toLowerCase();
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        })
-        .slice(0, 6);
+      const dbRows = locationRepository?.searchByLabel
+        ? await locationRepository.searchByLabel(query, { limit: 6 }).catch(() => [])
+        : [];
+
+      let rows = await fetchLocationSuggestions(query, { countrycodes });
+      if (!rows.length && countrycodes) {
+        rows = await fetchLocationSuggestions(query, { countrycodes: '' });
+      }
+
+      return dedupeLocationSuggestions([
+        ...dbRows.map(formatDbLocationSuggestion),
+        ...rows.map(formatLocationSuggestion),
+      ]).slice(0, 8);
     },
 
     async previewProject({ quoi, ou, budget, currency = 'EUR', userId = null, projectId = null }) {
@@ -179,11 +228,12 @@ export function createProjectService({
       avoid,
       userId = null,
       projectId = null,
+      temperature = null,
     }) {
       const normalizedQuoi = quoi?.trim() || '';
       const normalizedOu = ou?.trim() || '';
       if (!normalizedQuoi && !normalizedOu) {
-        throw new AppError("Une id?e ou un lieu est requis pour lancer la recherche.", 400);
+        throw new AppError("Une idée ou un lieu est requis pour lancer la recherche.", 400);
       }
       await currencyService.getCurrencyData();
       const businessConfig = settingsService
@@ -192,7 +242,7 @@ export function createProjectService({
       const memoryContext = await resolveMemoryContext({
         userId,
         projectId,
-        intent: `Recherche d'id?es business : ${normalizedQuoi} ${normalizedOu}`.trim(),
+        intent: `Recherche d'idées business : ${normalizedQuoi} ${normalizedOu}`.trim(),
       });
       const clampedBudget = await currencyService.clampBudget(budget, currency);
       const businesses = await withAiUsageContext(
@@ -207,10 +257,11 @@ export function createProjectService({
             avoid: Array.isArray(avoid) ? avoid : [],
             count: businessConfig.projectSuggestionsCount,
             memoryContext,
+            temperature,
           })
       );
       if (!businesses.length) {
-        throw new AppError('Aucune id?e de business g?n?r?e. R?essayez.', 422);
+        throw new AppError('Aucune idée de business générée. Réessayez.', 422);
       }
       return businesses;
     },
@@ -228,9 +279,10 @@ export function createProjectService({
       avoid,
       userId = null,
       projectId = null,
+      temperature = null,
     }) {
       if (!business?.trim()) {
-        throw new AppError('S?lectionnez un business pour demander une formation.', 400);
+        throw new AppError('Sélectionnez un business pour demander une formation.', 400);
       }
       await currencyService.getCurrencyData();
       const memoryContext = await resolveMemoryContext({
@@ -253,10 +305,11 @@ export function createProjectService({
             refine: refine || '',
             avoid: Array.isArray(avoid) ? avoid : [],
             memoryContext,
+            temperature,
           })
       );
       if (!trainings.length) {
-        throw new AppError('Aucune formation g?n?r?e. R?essayez.', 422);
+        throw new AppError('Aucune formation générée. Réessayez.', 422);
       }
       return trainings;
     },
@@ -273,15 +326,16 @@ export function createProjectService({
       avoid,
       userId = null,
       projectId = null,
+      temperature = null,
     }) {
       if (!business?.trim()) {
-        throw new AppError('S?lectionnez un business avant de chercher un lieu.', 400);
+        throw new AppError('Sélectionnez un business avant de chercher un lieu.', 400);
       }
       await currencyService.getCurrencyData();
       const memoryContext = await resolveMemoryContext({
         userId,
         projectId,
-        intent: `Recherche de lieux pour ${business} pr?s de ${ou || ''}`,
+        intent: `Recherche de lieux pour ${business} près de ${ou || ''}`,
       });
       const locations = await withAiUsageContext(
         { userId, projectId, purpose: 'search_locations' },
@@ -297,6 +351,7 @@ export function createProjectService({
             refine: refine || '',
             avoid: Array.isArray(avoid) ? avoid : [],
             memoryContext,
+            temperature,
           })
       );
       if (!locations.length) {
@@ -314,6 +369,7 @@ export function createProjectService({
       currency = 'EUR',
       userId = null,
       projectId = null,
+      temperature = null,
     }) {
       if (!business?.trim()) {
         throw new AppError('Sélectionnez un business pour évaluer les régions.', 400);
@@ -333,6 +389,7 @@ export function createProjectService({
           budget: await currencyService.clampBudget(budget, currency),
           currency,
           memoryContext,
+          temperature,
         })
       );
     },
@@ -348,6 +405,7 @@ export function createProjectService({
       currency = 'EUR',
       userId = null,
       projectId = null,
+      temperature = null,
     }) {
       if (!business?.trim()) {
         throw new AppError('Sélectionnez un business pour évaluer une ville.', 400);
@@ -372,6 +430,7 @@ export function createProjectService({
           budget: await currencyService.clampBudget(budget, currency),
           currency,
           memoryContext,
+          temperature,
         })
       );
     },
@@ -384,15 +443,16 @@ export function createProjectService({
       refine,
       userId = null,
       projectId = null,
+      temperature = null,
     }) {
       if (!business?.trim() || !location?.trim()) {
-        throw new AppError('Business et lieu sont requis pour g?n?rer les projets.', 400);
+        throw new AppError('Business et lieu sont requis pour générer les projets.', 400);
       }
       await currencyService.getCurrencyData();
       const memoryContext = await resolveMemoryContext({
         userId,
         projectId,
-        intent: `Propositions budget pour ${business} ? ${location}`,
+        intent: `Propositions budget pour ${business} à ${location}`,
       });
       const { proposals, assessment } = await withAiUsageContext(
         { userId, projectId, purpose: 'build_proposals' },
@@ -404,10 +464,11 @@ export function createProjectService({
             currency,
             refine: refine || '',
             memoryContext,
+            temperature,
           })
       );
       if (!proposals.length) {
-        throw new AppError('Aucune proposition de projet g?n?r?e. R?essayez.', 422);
+        throw new AppError('Aucune proposition de projet générée. Réessayez.', 422);
       }
       return { proposals, assessment };
     },

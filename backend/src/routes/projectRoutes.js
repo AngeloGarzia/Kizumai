@@ -1,17 +1,17 @@
 import { Router } from 'express';
-import { config } from '../config/index.js';
 import { AppError } from '../utils/AppError.js';
 
 /**
- * En production, l’IA publique est refusée sauf ALLOW_ANON_AI=true.
+ * Règle métier : un visiteur sans compte peut lancer « Créer son avenir »
+ * (recherche IA publique). Couper explicitement avec ALLOW_ANON_AI=false.
  */
 function requireAuthForAiInProd() {
   return (req, _res, next) => {
-    if (!config.isProd || process.env.ALLOW_ANON_AI === 'true') {
-      return next();
+    if (process.env.ALLOW_ANON_AI === 'false') {
+      if (req.user?.id) return next();
+      return next(new AppError('Connexion requise pour la recherche IA', 401));
     }
-    if (req.user?.id) return next();
-    return next(new AppError('Connexion requise pour la recherche IA', 401));
+    return next();
   };
 }
 

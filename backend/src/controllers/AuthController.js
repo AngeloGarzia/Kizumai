@@ -16,7 +16,11 @@ function requestMeta(req) {
   };
 }
 
-export function createAuthController({ authService, connectionService }) {
+export function createAuthController({
+  authService,
+  connectionService,
+  projectMemoryLoginEvalService = null,
+}) {
   return {
     csrf: asyncHandler(async (req, res) => {
       const token = issueCsrfToken(res);
@@ -36,6 +40,8 @@ export function createAuthController({ authService, connectionService }) {
       const { user, tokens } = await authService.login(dto, requestMeta(req));
       setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
       await connectionService.log(req, { userId: user.id, email: user.email, action: 'login' });
+      // Éval silencieuse du contexte projet (login strict uniquement — pas refresh/me).
+      projectMemoryLoginEvalService?.scheduleAfterLogin(user);
       successResponse(res, AuthResponseDto.fromUser(user));
     }),
 

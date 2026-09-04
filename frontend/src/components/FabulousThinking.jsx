@@ -1,4 +1,5 @@
 import { assistantPhrases } from '../constants/assistant.js';
+import { publicAssetUrl } from '../config/appBase.js';
 
 const SIZE_CLASS = {
   sm: 'h-9 w-9',
@@ -27,7 +28,7 @@ export default function FabulousThinking({
       aria-busy="true"
     >
       <img
-        src="/fabulous.svg"
+        src={publicAssetUrl('fabulous.svg')}
         alt=""
         width={size === 'lg' ? 96 : size === 'sm' ? 36 : 64}
         height={size === 'lg' ? 96 : size === 'sm' ? 36 : 64}

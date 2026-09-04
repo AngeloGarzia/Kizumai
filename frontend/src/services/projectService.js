@@ -22,7 +22,7 @@ export const projectService = {
 
   // --- Parcours de recherche en 3 phases ---
 
-  async searchBusinesses({ quoi, ou, budget, currency, refine, avoid, projectId }) {
+  async searchBusinesses({ quoi, ou, budget, currency, refine, avoid, projectId, temperature }) {
     const { data } = await api.post('/projects/search/businesses', {
       quoi,
       ou,
@@ -31,6 +31,7 @@ export const projectService = {
       refine,
       avoid,
       projectId,
+      temperature,
     });
     return data.businesses;
   },
@@ -56,6 +57,7 @@ export const projectService = {
     refine,
     avoid,
     projectId,
+    temperature,
   }) {
     const { data } = await api.post('/projects/search/trainings', {
       business,
@@ -69,6 +71,7 @@ export const projectService = {
       refine,
       avoid,
       projectId,
+      temperature,
     });
     return data.trainings;
   },
@@ -84,6 +87,7 @@ export const projectService = {
     refine,
     avoid,
     projectId,
+    temperature,
   }) {
     const { data } = await api.post('/projects/search/locations', {
       business,
@@ -96,6 +100,7 @@ export const projectService = {
       refine,
       avoid,
       projectId,
+      temperature,
     });
     return data.locations;
   },
@@ -108,6 +113,7 @@ export const projectService = {
     budget,
     currency,
     projectId,
+    temperature,
   }) {
     const { data } = await api.post('/projects/search/france-map', {
       business,
@@ -117,6 +123,7 @@ export const projectService = {
       budget,
       currency,
       projectId,
+      temperature,
     });
     return data;
   },
@@ -131,6 +138,7 @@ export const projectService = {
     budget,
     currency,
     projectId,
+    temperature,
   }) {
     const { data } = await api.post('/projects/search/city-eval', {
       business,
@@ -142,11 +150,12 @@ export const projectService = {
       budget,
       currency,
       projectId,
+      temperature,
     });
     return data.city;
   },
 
-  async buildProposals({ business, location, budget, currency, refine, projectId }) {
+  async buildProposals({ business, location, budget, currency, refine, projectId, temperature }) {
     const { data } = await api.post('/projects/search/proposals', {
       business,
       location,
@@ -154,6 +163,7 @@ export const projectService = {
       currency,
       refine,
       projectId,
+      temperature,
     });
     return {
       proposals: data.proposals || [],

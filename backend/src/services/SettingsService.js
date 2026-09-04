@@ -87,6 +87,11 @@ export function createSettingsService({ settingsRepository, aiPromptRepository }
         decayCron: String(s.memory_decay_cron || env.decayCron || '0 */6 * * *'),
         snapshotCron: String(s.memory_snapshot_cron || env.snapshotCron || '15 */6 * * *'),
         defaultDecayRate: num(s.memory_default_decay_rate, 0.01),
+        loginEvalEnabled: bool(s.memory_login_eval_enabled, true),
+        loginEvalMinIntervalHours: num(
+          s.memory_login_eval_min_interval_hours,
+          env.loginEvalMinIntervalHours ?? 12
+        ),
       };
     },
 

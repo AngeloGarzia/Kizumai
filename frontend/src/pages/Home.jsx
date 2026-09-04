@@ -134,6 +134,7 @@ export default function Home() {
               navigate(isPaid ? '/parcours' : isAuthenticated ? '/projet/apercu' : '/register')
             }
           />
+
         </main>
       </div>
 

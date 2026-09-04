@@ -9,6 +9,7 @@ import ProjectStage from './pages/ProjectStage.jsx';
 import Resources from './pages/Resources.jsx';
 import Planner from './pages/Planner.jsx';
 import AdminRoute from './components/AdminRoute.jsx';
+import AuthRoute from './components/AuthRoute.jsx';
 import Home from './pages/Home.jsx';
 import Parcours from './pages/Parcours.jsx';
 import CreateFuture from './pages/CreateFuture.jsx';
@@ -18,6 +19,8 @@ import Admin from './pages/Admin.jsx';
 import Competences from './pages/Competences.jsx';
 import Geographie from './pages/Geographie.jsx';
 import FilDuTemps from './pages/FilDuTemps.jsx';
+import Setup from './pages/Setup.jsx';
+import { routerBasename } from './config/appBase.js';
 
 function EtudeMarcheRedirect() {
   const { id } = useParams();
@@ -27,7 +30,7 @@ function EtudeMarcheRedirect() {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <BrowserRouter basename={routerBasename}>
         <ProjectProvider>
           <Routes>
             <Route path="/" element={<Home />} />
@@ -38,6 +41,9 @@ export default function App() {
             <Route path="/projet/apercu" element={<ProjectPreview />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route element={<AuthRoute />}>
+              <Route path="/setup" element={<Setup />} />
+            </Route>
             <Route element={<PaidRoute />}>
               <Route path="/planner" element={<Planner />} />
               <Route path="/competences" element={<Competences />} />

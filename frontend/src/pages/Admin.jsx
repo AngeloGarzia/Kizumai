@@ -65,6 +65,16 @@ const SETUP_SECTIONS = [
         label: 'Cron snapshot',
         hint: 'Expression cron — redémarrer le backend après modification',
       },
+      {
+        key: 'memory_login_eval_enabled',
+        label: 'Éval mémoire au login',
+        hint: 'true / false — lance un scan IA si le contexte projet est stale',
+      },
+      {
+        key: 'memory_login_eval_min_interval_hours',
+        label: 'Intervalle mini éval login (h)',
+        hint: 'Évite un scan à chaque reconnexion (ex. 12)',
+      },
     ],
   },
   {

@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
   IconHome,
@@ -15,11 +15,11 @@ function IconAdmin({ className = 'w-5 h-5' }) {
   );
 }
 
-function IconLogout({ className = 'w-5 h-5' }) {
+function IconSetup({ className = 'w-5 h-5' }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M10 17l5-5-5-5M15 12H3" />
+      <circle cx="12" cy="12" r="3" />
+      <path strokeLinecap="round" d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
     </svg>
   );
 }
@@ -51,11 +51,13 @@ const navItems = [
 
 export default function BottomNav() {
   const location = useLocation();
-  const navigate = useNavigate();
-  const { isAuthenticated, isAdmin, user, logout } = useAuth();
+  const { isAuthenticated, isAdmin, user } = useAuth();
 
   const items = [
     ...navItems,
+    ...(isAuthenticated
+      ? [{ id: 'setup', label: 'Setup', icon: IconSetup, path: '/setup' }]
+      : []),
     ...(isAdmin
       ? [{ id: 'admin', label: 'Admin', icon: IconAdmin, path: '/admin' }]
       : []),
@@ -73,19 +75,12 @@ export default function BottomNav() {
     if (item.id === 'timeline') return location.pathname.startsWith('/fil-du-temps');
     if (item.id === 'resources') return location.pathname.startsWith('/ressources');
     if (item.id === 'agenda') return location.pathname.startsWith('/planner');
+    if (item.id === 'setup') return location.pathname.startsWith('/setup');
     if (item.id === 'admin') return location.pathname.startsWith('/admin');
     return location.pathname === item.path;
   };
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-    } finally {
-      navigate('/');
-    }
-  };
-
-  const accountButtonClass = [
+  const setupLinkClass = [
     'flex flex-col items-center justify-center gap-0.5 py-1.5 px-2 sm:py-2 flex-1 lg:flex-none',
     'lg:flex-row lg:justify-start lg:gap-3 lg:px-4 lg:py-3 lg:rounded-xl lg:w-full',
     'transition-colors text-prune-500 hover:bg-prune-50 lg:hover:bg-prune-50',
@@ -109,7 +104,7 @@ export default function BottomNav() {
           {items.map((item) => {
             const isActive = isItemActive(item);
             const Icon = item.icon;
-            const hideLabelMobile = item.id === 'admin' || item.id === 'setup';
+            const hideLabelMobile = item.id === 'admin';
 
             return (
               <li key={item.id} className="flex-1 lg:flex-none min-w-[3.25rem]">
@@ -143,46 +138,37 @@ export default function BottomNav() {
             );
           })}
 
-          <li className="flex-1 lg:hidden min-w-[3.25rem]">
-            {isAuthenticated ? (
-              <button type="button" onClick={handleLogout} className={accountButtonClass}>
-                <span className="flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-2xl text-prune-500">
-                  <IconLogout className="w-5 h-5" />
-                </span>
-                <span className="text-xs sm:text-sm font-medium text-prune-500">Compte</span>
-              </button>
-            ) : (
-              <Link to="/login" className={accountButtonClass}>
+          {!isAuthenticated && (
+            <li className="flex-1 lg:hidden min-w-[3.25rem]">
+              <Link to="/login" className={setupLinkClass}>
                 <span className="flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-2xl text-prune-500">
                   <IconUser className="w-5 h-5" />
                 </span>
                 <span className="text-xs sm:text-sm font-medium text-prune-500">Compte</span>
               </Link>
-            )}
-          </li>
+            </li>
+          )}
         </ul>
 
         <div className="hidden lg:block mt-auto pt-4 border-t border-prune-100 shrink-0">
           {isAuthenticated ? (
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="flex items-center gap-3 px-3 py-2 rounded-xl w-full text-left
+            <Link
+              to="/setup"
+              className="flex items-center gap-3 px-3 py-2 rounded-xl w-full
                          hover:bg-prune-50 transition-colors"
-              title="Déconnexion"
             >
               <span className="flex items-center justify-center w-9 h-9 rounded-full bg-prune-100 text-prune-700 shrink-0">
-                <IconUser className="w-5 h-5" />
+                <IconSetup className="w-5 h-5" />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-medium text-prune-900 truncate">
-                  {user?.name || user?.email || 'Compte'}
+                  {user?.name || user?.email || 'Setup'}
                 </span>
-                <span className="block text-xs text-prune-500">
-                  {isAdmin ? 'Administrateur · Déconnexion' : 'Déconnexion'}
+                <span className="block text-xs text-prune-500 truncate">
+                  Setup · {isAdmin ? 'Administrateur' : 'Mon compte'}
                 </span>
               </span>
-            </button>
+            </Link>
           ) : (
             <Link
               to="/login"

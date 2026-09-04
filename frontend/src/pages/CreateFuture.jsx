@@ -4,9 +4,12 @@ import BrandLogo from '../components/BrandLogo.jsx';
 import Button from '../components/Button.jsx';
 import Input from '../components/Input.jsx';
 import BudgetField from '../components/BudgetField.jsx';
+import TemperatureGauge, {
+  TEMP_DEFAULT,
+  clampSearchTemperature,
+} from '../components/TemperatureGauge.jsx';
 import { projectService, saveSearchSeed } from '../services/projectService.js';
 import { IconChevronRight } from '../components/icons.jsx';
-import { assistantPhrases } from '../constants/assistant.js';
 
 export default function CreateFuture() {
   const navigate = useNavigate();
@@ -15,10 +18,12 @@ export default function CreateFuture() {
   const [ou, setOu] = useState('');
   const [budget, setBudget] = useState(null);
   const [currency, setCurrency] = useState('EUR');
+  const [temperature, setTemperature] = useState(TEMP_DEFAULT);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [locationSuggestions, setLocationSuggestions] = useState([]);
   const [locationLoading, setLocationLoading] = useState(false);
+  const [locationError, setLocationError] = useState('');
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
   const locationRequestRef = useRef(0);
 
@@ -34,10 +39,12 @@ export default function CreateFuture() {
     if (query.length < 2) {
       setLocationSuggestions([]);
       setLocationLoading(false);
+      setLocationError('');
       return undefined;
     }
 
     setLocationLoading(true);
+    setLocationError('');
     const timer = setTimeout(async () => {
       try {
         const suggestions = await projectService.suggestLocations(query);
@@ -47,6 +54,7 @@ export default function CreateFuture() {
       } catch {
         if (locationRequestRef.current === requestId) {
           setLocationSuggestions([]);
+          setLocationError('Suggestions indisponibles. Vous pouvez saisir le lieu manuellement.');
         }
       } finally {
         if (locationRequestRef.current === requestId) {
@@ -75,6 +83,7 @@ export default function CreateFuture() {
       ou: ou.trim() || null,
       budget: budget != null && Number(budget) > 0 ? Number(budget) : 500,
       currency,
+      temperature: clampSearchTemperature(temperature),
     });
 
     navigate('/projet/recherche');
@@ -102,7 +111,7 @@ export default function CreateFuture() {
         <section className="mb-6 sm:mb-8">
           <div className="rounded-2xl px-5 py-6 sm:px-8 sm:py-7 text-center sm:text-left bg-gradient-to-r from-topaz-500 to-topaz-400 shadow-md shadow-topaz-500/25">
             <h1 className="text-2xl sm:text-3xl font-bold text-white">
-              Mieux qu&apos;un post-it
+              Ici commence ton futur
             </h1>
           </div>
         </section>
@@ -131,10 +140,18 @@ export default function CreateFuture() {
                 placeholder="Ex : Lyon, quartier Part-Dieu"
                 autoComplete="off"
               />
-              {showLocationSuggestions && (locationLoading || locationSuggestions.length > 0) && (
+              {showLocationSuggestions && ou.trim().length >= 2 && (
                 <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-xl border border-prune-100 bg-white shadow-lg">
                   {locationLoading && (
-                    <p className="px-4 py-3 text-sm text-prune-500">Recherche de lieux existants…</p>
+                    <p className="px-4 py-3 text-sm text-prune-500">Recherche de lieux…</p>
+                  )}
+                  {!locationLoading && locationError && (
+                    <p className="px-4 py-3 text-sm text-amber-700">{locationError}</p>
+                  )}
+                  {!locationLoading && !locationError && locationSuggestions.length === 0 && (
+                    <p className="px-4 py-3 text-sm text-prune-500">
+                      Aucun lieu trouvé pour « {ou.trim()} ». Vous pouvez continuer avec cette saisie.
+                    </p>
                   )}
                   {!locationLoading && locationSuggestions.map((location) => (
                     <button
@@ -166,9 +183,7 @@ export default function CreateFuture() {
               onCurrencyChange={setCurrency}
             />
 
-            <p className="text-xs text-prune-600 bg-prune-50 border border-prune-200 rounded-xl px-4 py-3">
-              {assistantPhrases.willPropose}
-            </p>
+            <TemperatureGauge value={temperature} onChange={setTemperature} />
 
             {error && <p className="alert-error">{error}</p>}
 

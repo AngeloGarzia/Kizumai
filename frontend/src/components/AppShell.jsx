@@ -32,19 +32,28 @@ const IconAdmin = (props) => (
   </svg>
 );
 
+function IconSetup({ className = 'w-5 h-5' }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="3" />
+      <path strokeLinecap="round" d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+    </svg>
+  );
+}
+
 const NAV_LINKS = [
   { to: '/', label: 'Accueil', Icon: IconDashboard },
   { to: '/parcours', label: 'Parcours', Icon: IconSearch },
   { to: '/fil-du-temps', label: 'Fil du temps', Icon: IconDashboard },
   { to: '/ressources', label: 'Ressources', Icon: IconSearch },
   { to: '/planner', label: 'Agenda', Icon: IconCalendar },
+  { to: '/setup', label: 'Setup', Icon: IconSetup },
   { to: '/admin', label: 'Administration', Icon: IconAdmin, adminOnly: true },
 ];
 
-export default function AppShell({ children, onLogout }) {
-  const { user, isAdmin, logout } = useAuth();
+export default function AppShell({ children }) {
+  const { user, isAdmin } = useAuth();
   const [open, setOpen] = useState(false);
-  const handleLogout = onLogout || logout;
 
   const links = NAV_LINKS.filter((link) => !link.adminOnly || isAdmin);
 
@@ -96,12 +105,14 @@ export default function AppShell({ children, onLogout }) {
         </nav>
 
         <div className="border-t border-prune-100 p-3">
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="flex items-center gap-3 px-2 py-2 rounded-xl w-full text-left
-                       hover:bg-prune-50 transition-colors"
-            title="Déconnexion"
+          <NavLink
+            to="/setup"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-2 py-2 rounded-xl w-full transition-colors ${
+                isActive ? 'bg-topaz-50 text-topaz-700' : 'hover:bg-prune-50 text-prune-900'
+              }`
+            }
+            onClick={() => setOpen(false)}
           >
             <span className="flex items-center justify-center w-9 h-9 rounded-full bg-prune-100 text-prune-700 shrink-0">
               <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
@@ -110,14 +121,14 @@ export default function AppShell({ children, onLogout }) {
               </svg>
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-medium text-prune-900 truncate">
+              <span className="block text-sm font-medium truncate">
                 {user?.name || 'Utilisateur'}
               </span>
               <span className="block text-xs text-prune-500 truncate">
-                {user?.email || 'Déconnexion'}
+                {user?.email || 'Setup'}
               </span>
             </span>
-          </button>
+          </NavLink>
         </div>
       </aside>
 

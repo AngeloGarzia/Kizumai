@@ -1,0 +1,124 @@
+# Déploiement LAN — http://192.168.1.11/kizumai
+# Usage :
+#   cp .env.lan.example .env
+#   cp backend/.env.production.lan.example backend/.env.production.lan
+#   docker compose -f docker-compose.lan.yml up -d --build
+
+name: kizumai
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16-bookworm
+    container_name: kizumai-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER requis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requis}
+      POSTGRES_DB: ${POSTGRES_DB:-kizumai}
+      POSTGRES_APP_USER: ${POSTGRES_APP_USER:-kizumai_app}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?POSTGRES_APP_PASSWORD requis}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - kizumai_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.4.2-alpine
+    container_name: kizumai-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - ${REDIS_PASSWORD:?REDIS_PASSWORD requis}
+      - --protected-mode
+      - "yes"
+      - --bind
+      - "0.0.0.0"
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD requis}
+    volumes:
+      - redis_data:/data
+    networks:
+      - kizumai_internal
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: kizumai-api:lan
+    container_name: kizumai-api
+    restart: unless-stopped
+    env_file:
+      - path: ./backend/.env.production.lan
+        required: true
+    environment:
+      NODE_ENV: production
+      POSTGRES_APP_USER: ${POSTGRES_APP_USER:-kizumai_app}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?POSTGRES_APP_PASSWORD requis}
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-kizumai}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD requis}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      DB_SSL: "false"
+      TRUST_PROXY: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - kizumai_internal
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+      - /app/uploads:size=512m
+    user: "1001:1001"
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.lan
+      args:
+        VITE_API_URL: ${LAN_PUBLIC_URL:-http://192.168.1.11}/kizumai/api
+        VITE_BASE_PATH: /kizumai/
+    image: kizumai-web:lan
+    container_name: kizumai-web
+    restart: unless-stopped
+    networks:
+      - kizumai_internal
+
+  gateway:
+    image: nginx:1.27.4-alpine
+    container_name: kizumai-gateway
+    restart: unless-stopped
+    ports:
+      - "${LAN_HTTP_PORT:-80}:80"
+    volumes:
+      - ./docker/nginx/lan-gateway.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - api
+      - web
+    networks:
+      - kizumai_internal
+
+networks:
+  kizumai_internal:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

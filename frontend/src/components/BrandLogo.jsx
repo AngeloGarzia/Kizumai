@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { publicAssetUrl } from '../config/appBase.js';
 
 const SIZE_CLASS = {
   sm: 'h-9 sm:h-10',
@@ -20,7 +21,7 @@ export default function BrandLogo({
 }) {
   const img = (
     <img
-      src="/kizumai.png"
+      src={publicAssetUrl('kizumai.png')}
       alt="Kizumai — Accélérateur de Business"
       className={`w-auto object-contain ${SIZE_CLASS[size] || SIZE_CLASS.md} ${asLink ? '' : className}`}
       decoding="async"

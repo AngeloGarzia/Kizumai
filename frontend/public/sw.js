@@ -1,5 +1,22 @@
 // Service Worker Kizumai — notifications Web Push.
 
+/** Préfixe app (ex. /kizumai) dérivé du scope d'enregistrement du SW. */
+function scopeBasePath() {
+  try {
+    const path = new URL(self.registration.scope).pathname;
+    if (path === '/' || path === '') return '';
+    return path.endsWith('/') ? path.slice(0, -1) : path;
+  } catch {
+    return '';
+  }
+}
+
+function assetPath(relative) {
+  const rel = relative.startsWith('/') ? relative : `/${relative}`;
+  const base = scopeBasePath();
+  return base ? `${base}${rel}` : rel;
+}
+
 self.addEventListener('install', () => {
   self.skipWaiting();
 });
@@ -10,7 +27,7 @@ self.addEventListener('activate', (event) => {
 
 /** Uniquement chemins same-origin (anti open-redirect). */
 function safeNotificationUrl(raw) {
-  const fallback = '/';
+  const fallback = assetPath('/');
   if (!raw || typeof raw !== 'string') return fallback;
   try {
     const u = new URL(raw, self.location.origin);
@@ -32,9 +49,9 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'Kizumai';
   const options = {
     body: data.body || '',
-    icon: '/icon.svg',
-    badge: '/icon.svg',
-    data: { url: safeNotificationUrl(data.url || '/') },
+    icon: assetPath('/icon.svg'),
+    badge: assetPath('/icon.svg'),
+    data: { url: safeNotificationUrl(data.url || assetPath('/')) },
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
@@ -42,7 +59,7 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = safeNotificationUrl(event.notification.data?.url || '/');
+  const targetUrl = safeNotificationUrl(event.notification.data?.url || assetPath('/'));
 
   event.waitUntil(
     self.clients

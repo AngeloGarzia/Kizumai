@@ -32,6 +32,25 @@ export const LocationRepository = {
     return rows.map(mapLocation);
   },
 
+  async searchByLabel(query, { limit = 6 } = {}) {
+    const q = String(query || '').trim();
+    if (q.length < 2) return [];
+    const { rows } = await pool.query(
+      `SELECT * FROM locations
+       WHERE label ILIKE $1
+          OR city ILIKE $1
+          OR region ILIKE $1
+       ORDER BY
+         CASE WHEN lower(label) = lower($2) THEN 0
+              WHEN label ILIKE $3 THEN 1
+              ELSE 2 END,
+         label ASC
+       LIMIT $4`,
+      [`%${q}%`, q, `${q}%`, Number(limit)]
+    );
+    return rows.map(mapLocation);
+  },
+
   async findOrCreate({
     label,
     addressLine1 = null,

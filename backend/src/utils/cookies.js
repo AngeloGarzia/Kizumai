@@ -11,7 +11,7 @@ const baseOptions = () => ({
 export const setAuthCookies = (res, accessToken, refreshToken) => {
   res.cookie(config.cookies.accessName, accessToken, {
     ...baseOptions(),
-    path: '/',
+    path: config.cookies.accessPath,
     maxAge: config.cookies.accessMaxAge,
   });
 
@@ -28,7 +28,7 @@ export const setAuthCookies = (res, accessToken, refreshToken) => {
 export const clearAuthCookies = (res) => {
   const options = baseOptions();
 
-  res.clearCookie(config.cookies.accessName, { ...options, path: '/' });
+  res.clearCookie(config.cookies.accessName, { ...options, path: config.cookies.accessPath });
   res.clearCookie(config.cookies.refreshName, {
     ...options,
     path: config.cookies.refreshPath,

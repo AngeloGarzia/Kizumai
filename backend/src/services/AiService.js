@@ -2,6 +2,10 @@ import { config } from '../config/index.js';
 import { getProviderById } from '../config/aiProviders.js';
 import { AppError } from '../utils/AppError.js';
 import { withAiGuard, clipAiOutput } from '../utils/aiGuard.js';
+import {
+  geminiGenerateContentUrl,
+  geminiJsonHeaders,
+} from '../utils/geminiAuth.js';
 import { wrapUntrusted } from '../utils/aiPromptSafety.js';
 import {
   extractTokenUsage,
@@ -399,7 +403,8 @@ async function rawChatText({
     try {
       if (providerId === 'gemini') {
         const modelSeg = safeModelPathSegment(aiConfig.model);
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelSeg}:generateContent?key=${encodeURIComponent(apiKey)}`;
+        const url = geminiGenerateContentUrl(modelSeg, apiKey);
+        const geminiHeaders = geminiJsonHeaders(apiKey);
         const body = {
           contents: [{ role: 'user', parts: [{ text: safeUser }] }],
           generationConfig: {
@@ -422,7 +427,7 @@ async function rawChatText({
           url,
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: geminiHeaders,
             body: JSON.stringify(body),
           },
           requestTimeout
@@ -445,7 +450,7 @@ async function rawChatText({
                 url,
                 {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: geminiHeaders,
                   body: JSON.stringify(body),
                 },
                 requestTimeout
@@ -776,9 +781,16 @@ export function createAiService({ settingsService, currencyService }) {
 
   async function requestStepJson(
     userContent,
-    { systemExtra = '', maxOutputTokens, timeoutMs, thinkingBudget, responseSchema } = {}
+    { systemExtra = '', maxOutputTokens, timeoutMs, thinkingBudget, responseSchema, temperature } = {}
   ) {
-    const aiConfig = await settingsService.getAiConfig();
+    const baseConfig = await settingsService.getAiConfig();
+    const aiConfig =
+      temperature != null && Number.isFinite(Number(temperature))
+        ? {
+            ...baseConfig,
+            temperature: Math.min(1.3, Math.max(0.3, Math.round(Number(temperature) * 10) / 10)),
+          }
+        : baseConfig;
     const providerId = aiConfig.provider;
     const apiKey = providerApiKey(providerId);
     if (!apiKey) {
@@ -888,7 +900,8 @@ export function createAiService({ settingsService, currencyService }) {
   async function completeWithGemini(fields, limits, aiConfig) {
     const apiKey = providerApiKey('gemini');
     const modelSeg = safeModelPathSegment(aiConfig.model);
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelSeg}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const url = geminiGenerateContentUrl(modelSeg, apiKey);
+    const geminiHeaders = geminiJsonHeaders(apiKey);
 
     const { systemContent, userContent, temperature } = await buildAiPrompts(fields, limits);
     const trustedSystem = buildTrustedSystemText(aiConfig, systemContent);
@@ -908,7 +921,7 @@ export function createAiService({ settingsService, currencyService }) {
       try {
         const response = await fetchWithTimeout(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: geminiHeaders,
           body: JSON.stringify({
             systemInstruction: { parts: [{ text: trustedSystem.slice(0, 50_000) }] },
             contents: [{ role: 'user', parts: [{ text: safeUser }] }],
@@ -1168,6 +1181,7 @@ export function createAiService({ settingsService, currencyService }) {
       avoid = [],
       count = 3,
       memoryContext = '',
+      temperature = null,
     }) {
       const limits = await currencyService.getBudgetLimits(currency);
       const aiConfig = await settingsService.getAiConfig();
@@ -1186,7 +1200,7 @@ export function createAiService({ settingsService, currencyService }) {
         memoryContext,
         aiConfig
       );
-      const data = await requestStepJson(userContent);
+      const data = await requestStepJson(userContent, { temperature });
       return normalizeBusinesses(data.businesses).slice(0, count);
     },
 
@@ -1202,6 +1216,7 @@ export function createAiService({ settingsService, currencyService }) {
       avoid = [],
       count = 5,
       memoryContext = '',
+      temperature = null,
     }) {
       const aiConfig = await settingsService.getAiConfig();
       if (!aiConfig.lieuxPrompt) {
@@ -1220,7 +1235,7 @@ export function createAiService({ settingsService, currencyService }) {
           avoid: joinAvoid(avoid),
           count: Math.min(8, Math.max(1, Number(count) || 5)),
         }), memoryContext, aiConfig);
-      const data = await requestStepJson(userContent);
+      const data = await requestStepJson(userContent, { temperature });
       return normalizeLocations(data.locations).slice(0, count);
     },
 
@@ -1232,6 +1247,7 @@ export function createAiService({ settingsService, currencyService }) {
       budget,
       currency = 'EUR',
       memoryContext = '',
+      temperature = null,
     }) {
       return withAiUsageContext({ purpose: 'france_implantation' }, async () => {
         const aiConfig = await settingsService.getAiConfig();
@@ -1251,6 +1267,7 @@ export function createAiService({ settingsService, currencyService }) {
           timeoutMs: AI_FRANCE_TIMEOUT_MS,
           // Pas de responseSchema : avec gemini-3.x il gonfle la sortie jusqu'à MAX_TOKENS.
           thinkingBudget: 256,
+          temperature,
           systemExtra: resolveAiPrompt(
             aiConfig.franceSystemExtraPrompt,
             DEFAULT_FRANCE_SYSTEM_EXTRA
@@ -1270,6 +1287,7 @@ export function createAiService({ settingsService, currencyService }) {
       budget,
       currency = 'EUR',
       memoryContext = '',
+      temperature = null,
     }) {
       return withAiUsageContext({ purpose: 'city_implantation' }, async () => {
         const aiConfig = await settingsService.getAiConfig();
@@ -1290,7 +1308,7 @@ export function createAiService({ settingsService, currencyService }) {
             budget,
             currency: String(currency || 'EUR').slice(0, 8),
           }), memoryContext, aiConfig);
-        const data = await requestStepJson(userContent);
+        const data = await requestStepJson(userContent, { temperature });
         const scoreRaw = data?.score ?? data?.feasibility;
         const num = Math.round(Number(scoreRaw));
         const score = Number.isFinite(num) ? Math.min(100, Math.max(0, num)) : 50;
@@ -1315,6 +1333,7 @@ export function createAiService({ settingsService, currencyService }) {
       avoid = [],
       count = 3,
       memoryContext = '',
+      temperature = null,
     }) {
       const aiConfig = await settingsService.getAiConfig();
       if (!aiConfig.formationPrompt) {
@@ -1334,7 +1353,7 @@ export function createAiService({ settingsService, currencyService }) {
           avoid: joinAvoid(avoid),
           count: safeCount,
         }), memoryContext, aiConfig);
-      const data = await requestStepJson(userContent);
+      const data = await requestStepJson(userContent, { temperature });
       return normalizeTrainings(data.trainings).slice(0, safeCount);
     },
 
@@ -1345,6 +1364,7 @@ export function createAiService({ settingsService, currencyService }) {
       currency = 'EUR',
       refine = '',
       memoryContext = '',
+      temperature = null,
     }) {
       const limits = await currencyService.getBudgetLimits(currency);
       const aiConfig = await settingsService.getAiConfig();
@@ -1360,7 +1380,7 @@ export function createAiService({ settingsService, currencyService }) {
           budget_max: limits.max,
           refine: String(refine || '').trim().slice(0, 400) || 'aucune',
         }), memoryContext, aiConfig);
-      const data = await requestStepJson(userContent);
+      const data = await requestStepJson(userContent, { temperature });
       const proposals = await normalizeProposals(data.proposals, currency, budget);
       const assessment = normalizeBudgetAssessment(data.budget_assessment || data.budgetAssessment);
       assessment.adjustedProposed = proposals.some((p) => p.kind === 'budget_ajuste');

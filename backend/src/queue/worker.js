@@ -30,7 +30,7 @@ function buildReminderPayload(event) {
   return {
     title: `${prefix} : ${event.title}`,
     body: parts.join(' — '),
-    url: `${config.appUrl}/planner`,
+    url: `${config.publicAppUrl}/planner`,
   };
 }
 

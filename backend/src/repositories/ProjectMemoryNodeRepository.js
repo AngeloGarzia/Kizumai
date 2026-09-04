@@ -173,6 +173,16 @@ export const ProjectMemoryNodeRepository = {
     return rows.map(mapMemoryNode);
   },
 
+  async countActiveByProjectId(projectId) {
+    const { rows } = await pool.query(
+      `SELECT COUNT(*)::int AS count
+       FROM project_memory_nodes
+       WHERE project_id = $1 AND archived_at IS NULL`,
+      [Number(projectId)]
+    );
+    return rows[0]?.count ?? 0;
+  },
+
   async searchByText(projectId, query, { limit = 12 } = {}) {
     const q = String(query || '').trim();
     if (!q) return this.listActiveByImportance(projectId, { limit });

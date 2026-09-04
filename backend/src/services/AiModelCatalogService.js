@@ -1,5 +1,6 @@
 import { config } from '../config/index.js';
 import { AI_PROVIDERS, getProviderById, isRetiredGeminiModel } from '../config/aiProviders.js';
+import { geminiModelsListRequest } from '../utils/geminiAuth.js';
 
 const FETCH_TIMEOUT_MS = 12_000;
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -120,12 +121,9 @@ async function fetchGeminiModels(apiKey) {
   let pages = 0;
   do {
     pages += 1;
-    const url = new URL('https://generativelanguage.googleapis.com/v1beta/models');
-    url.searchParams.set('pageSize', '100');
-    url.searchParams.set('key', apiKey);
-    if (pageToken) url.searchParams.set('pageToken', pageToken);
+    const { url, headers } = geminiModelsListRequest(apiKey, { pageSize: '100', pageToken });
 
-    const json = await fetchJson(url.toString());
+    const json = await fetchJson(url, { headers });
     for (const m of json.models || []) {
       if (
         !Array.isArray(m.supportedGenerationMethods) ||

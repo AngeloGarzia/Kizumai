@@ -1,9 +1,12 @@
 node_modules/
 .env
 .env.development
+.env.development.*
 .env.production
+.env.production.*
 .env.local
 .env.*.local
+.env.lan
 docker-compose.override.yml
 dist/
 *.log
@@ -12,3 +15,5 @@ backend/uploads/
 *.key
 !.env.docker.example
 !**/.env.*.example
+!backend/.env.production.lan.example
+!.env.lan.example

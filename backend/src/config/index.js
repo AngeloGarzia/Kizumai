@@ -23,7 +23,28 @@ dotenv.config({ path: join(rootDir, '.env') });
 const allowInsecureCors = process.env.ALLOW_INSECURE_CORS === 'true';
 const allowInsecureRedis = process.env.ALLOW_INSECURE_REDIS === 'true';
 
+function normalizeBasePath(raw) {
+  const value = String(raw || '').trim();
+  if (!value || value === '/') return '';
+  const withSlash = value.startsWith('/') ? value : `/${value}`;
+  return withSlash.replace(/\/$/, '');
+}
+
+function joinUrlPath(base, segment) {
+  const normalized = `${base || ''}${segment}`.replace(/\/+/g, '/');
+  return normalized.startsWith('/') ? normalized : `/${normalized}`;
+}
+
 function buildDatabaseUrl() {
+  const user = process.env.POSTGRES_APP_USER?.trim();
+  const password = process.env.POSTGRES_APP_PASSWORD?.trim();
+  if (user && password) {
+    const host = process.env.POSTGRES_HOST?.trim() || 'postgres';
+    const port = process.env.POSTGRES_PORT?.trim() || '5432';
+    const name = process.env.POSTGRES_DB?.trim() || 'kizumai';
+    return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${name}`;
+  }
+
   if (process.env.DATABASE_URL) {
     return process.env.DATABASE_URL;
   }
@@ -35,10 +56,31 @@ function buildDatabaseUrl() {
   const host = process.env.DB_HOST || 'localhost';
   const port = process.env.DB_PORT || '5432';
   const name = process.env.DB_NAME || 'kizumai';
-  const user = process.env.DB_USER || 'kizumai';
-  const password = process.env.DB_PASSWORD || 'kizumai';
+  const devUser = process.env.DB_USER || 'kizumai';
+  const devPassword = process.env.DB_PASSWORD || 'kizumai';
 
-  return `postgresql://${user}:${password}@${host}:${port}/${name}`;
+  return `postgresql://${devUser}:${devPassword}@${host}:${port}/${name}`;
+}
+
+function buildRedisUrl() {
+  const password = process.env.REDIS_PASSWORD?.trim();
+  if (password) {
+    const host = process.env.REDIS_HOST?.trim() || 'redis';
+    const port = process.env.REDIS_PORT?.trim() || '6379';
+    return `redis://:${encodeURIComponent(password)}@${host}:${port}`;
+  }
+
+  return process.env.REDIS_URL?.trim() || '';
+}
+
+const databaseUrl = buildDatabaseUrl();
+if (databaseUrl) {
+  process.env.DATABASE_URL = databaseUrl;
+}
+
+const redisUrlRaw = buildRedisUrl();
+if (redisUrlRaw) {
+  process.env.REDIS_URL = redisUrlRaw;
 }
 
 validateProductionEnvironment(process.env);
@@ -54,7 +96,16 @@ const appUrl = validateAppUrl(process.env.APP_URL, {
   fallback: typeof corsOrigin === 'string' ? corsOrigin : corsOrigin[0],
 });
 
-const redisUrl = validateRedisUrl(process.env.REDIS_URL, {
+const appBasePath = normalizeBasePath(process.env.APP_BASE_PATH);
+const publicAppUrl = `${appUrl}${appBasePath}`;
+const cookieSecure =
+  process.env.COOKIE_SECURE === 'true'
+    ? true
+    : process.env.COOKIE_SECURE === 'false'
+      ? false
+      : isProd;
+
+const redisUrl = validateRedisUrl(redisUrlRaw, {
   isProd,
   allowInsecure: allowInsecureRedis,
 });
@@ -75,7 +126,7 @@ export const config = {
   isProd,
 
   database: {
-    url: buildDatabaseUrl(),
+    url: databaseUrl,
     ssl:
       process.env.DB_SSL === 'false'
         ? false
@@ -106,14 +157,16 @@ export const config = {
     refreshName: 'kizumai_refresh',
     csrfName: 'kizumai_csrf',
     httpOnly: true,
-    secure: isProd,
+    secure: cookieSecure,
     sameSite: isProd ? 'strict' : 'lax',
     domain: process.env.COOKIE_DOMAIN || undefined,
+    accessPath: appBasePath || '/',
+    csrfPath: appBasePath || '/',
     accessMaxAge:
       parseDurationMs(process.env.JWT_ACCESS_EXPIRES_IN || '15m') ?? 15 * 60 * 1000,
     refreshMaxAge:
       parseDurationMs(process.env.JWT_REFRESH_EXPIRES_IN || '7d') ?? 7 * 24 * 60 * 60 * 1000,
-    refreshPath: '/api/auth',
+    refreshPath: joinUrlPath(appBasePath, '/api/auth'),
   },
 
   bcrypt: {
@@ -138,6 +191,8 @@ export const config = {
   },
 
   appUrl,
+  appBasePath,
+  publicAppUrl,
 
   storage: {
     driver: process.env.STORAGE_DRIVER || 'local',
@@ -194,5 +249,6 @@ export const config = {
     recallMaxChars: Number(process.env.MEMORY_RECALL_MAX_CHARS) || 4000,
     graphDepth: Number(process.env.MEMORY_GRAPH_DEPTH) || 2,
     recallNodeLimit: Number(process.env.MEMORY_RECALL_NODE_LIMIT) || 12,
+    loginEvalMinIntervalHours: Number(process.env.MEMORY_LOGIN_EVAL_MIN_INTERVAL_HOURS) || 12,
   },
 };

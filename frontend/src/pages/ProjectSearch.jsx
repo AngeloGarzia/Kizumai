@@ -339,6 +339,7 @@ export default function ProjectSearch() {
         currency: seed.currency,
         refine: refineText,
         avoid,
+        temperature: seed.temperature,
       });
       setBusinesses(result);
     } catch (err) {
@@ -364,6 +365,7 @@ export default function ProjectSearch() {
         currency: seed.currency,
         refine: refineText,
         avoid,
+        temperature: seed.temperature,
       });
       setLocations(result);
     } catch (err) {
@@ -389,6 +391,7 @@ export default function ProjectSearch() {
         currency: seed?.currency,
         refine: refineText,
         avoid,
+        temperature: seed?.temperature,
       });
       setTrainings(result);
     } catch (err) {
@@ -426,6 +429,7 @@ export default function ProjectSearch() {
         budget: seed.budget,
         currency: seed.currency,
         refine: refineText,
+        temperature: seed.temperature,
       });
       setProposals(result.proposals || []);
       setBudgetAssessment(result.assessment || null);
@@ -473,6 +477,7 @@ export default function ProjectSearch() {
         businessRationale: business.rationale,
         budget: seed.budget,
         currency: seed.currency,
+        temperature: seed.temperature,
       });
       setMapSummary(result.summary || '');
       setMapRegions(result.regions || []);
@@ -802,6 +807,7 @@ export default function ProjectSearch() {
               region,
               budget: seed?.budget,
               currency: seed?.currency,
+              temperature: seed?.temperature,
             });
           }}
           onSkip={() => goToLocations(selectedBusiness, null)}

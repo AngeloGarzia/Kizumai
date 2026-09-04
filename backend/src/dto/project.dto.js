@@ -12,6 +12,13 @@ function normalizeBudgetCurrency(body = {}) {
   };
 }
 
+/** Température créativité recherche (0.3–1.3) — null si absent. */
+function optionalSearchTemperature(body = {}) {
+  const n = optionalNumber(body.temperature);
+  if (n == null) return null;
+  return Math.min(1.3, Math.max(0.3, Math.round(n * 10) / 10));
+}
+
 function optionalProjectId(body = {}) {
   const raw = body.projectId ?? body.project_id;
   if (raw == null || raw === '') return null;
@@ -36,6 +43,7 @@ export const SearchBusinessesRequestDto = {
       quoi: optionalString(body.quoi, { max: 500 }),
       ou: optionalString(body.ou, { max: 300 }),
       ...normalizeBudgetCurrency(body),
+      temperature: optionalSearchTemperature(body),
       refine: optionalString(body.refine, { max: 400 }) || '',
       avoid: Array.isArray(body.avoid) ? body.avoid : [],
       projectId: optionalProjectId(body),
@@ -62,6 +70,7 @@ export const SearchTrainingsRequestDto = {
       quoi: optionalString(body.quoi, { max: 300 }) || '',
       ou: optionalString(body.ou, { max: 200 }) || '',
       ...normalizeBudgetCurrency(body),
+      temperature: optionalSearchTemperature(body),
       refine: optionalString(body.refine, { max: 400 }) || '',
       avoid: Array.isArray(body.avoid) ? body.avoid : [],
       projectId: optionalProjectId(body),
@@ -78,6 +87,7 @@ export const SearchLocationsRequestDto = {
       businessRationale: optionalString(body.businessRationale, { max: 500 }) || '',
       ou: optionalString(body.ou, { max: 200 }) || '',
       ...normalizeBudgetCurrency(body),
+      temperature: optionalSearchTemperature(body),
       refine: optionalString(body.refine, { max: 400 }) || '',
       avoid: Array.isArray(body.avoid) ? body.avoid : [],
       projectId: optionalProjectId(body),
@@ -93,6 +103,7 @@ export const FranceImplantationRequestDto = {
       businessPitch: optionalString(body.businessPitch, { max: 500 }) || '',
       businessRationale: optionalString(body.businessRationale, { max: 500 }) || '',
       ...normalizeBudgetCurrency(body),
+      temperature: optionalSearchTemperature(body),
       projectId: optionalProjectId(body),
     };
   },
@@ -108,6 +119,7 @@ export const CityImplantationRequestDto = {
       city: optionalString(body.city, { max: 120 }),
       region: optionalString(body.region, { max: 120 }) || '',
       ...normalizeBudgetCurrency(body),
+      temperature: optionalSearchTemperature(body),
       projectId: optionalProjectId(body),
     };
   },
@@ -119,6 +131,7 @@ export const BuildProposalsRequestDto = {
       business: optionalString(body.business, { max: 200 }),
       location: optionalString(body.location, { max: 300 }),
       ...normalizeBudgetCurrency(body),
+      temperature: optionalSearchTemperature(body),
       refine: optionalString(body.refine, { max: 400 }) || '',
       projectId: optionalProjectId(body),
     };

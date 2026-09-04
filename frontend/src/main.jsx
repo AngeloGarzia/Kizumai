@@ -5,7 +5,8 @@ import './styles/index.css';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch((error) => {
+    const swUrl = `${import.meta.env.BASE_URL}sw.js`;
+    navigator.serviceWorker.register(swUrl).catch((error) => {
       console.warn('[sw] Enregistrement du service worker échoué', error);
     });
   });
