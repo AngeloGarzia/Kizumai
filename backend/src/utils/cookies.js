@@ -8,20 +8,44 @@ const baseOptions = () => ({
   domain: config.cookies.domain,
 });
 
-export const setAuthCookies = (res, accessToken, refreshToken) => {
+/**
+ * @param {import('express').Response} res
+ * @param {string} accessToken
+ * @param {string} refreshToken
+ * @param {{ rememberMe?: boolean, refreshMaxAge?: number|null }} [opts]
+ *   rememberMe=true  → cookie persistant long (30j)
+ *   rememberMe=false → cookie de session (fermeture navigateur)
+ *   omit            → comportement historique (JWT_REFRESH_EXPIRES_IN)
+ */
+export const setAuthCookies = (res, accessToken, refreshToken, opts = {}) => {
+  const { rememberMe, refreshMaxAge: overrideMaxAge } = opts;
+
+  let refreshMaxAge;
+  if (overrideMaxAge !== undefined) {
+    refreshMaxAge = overrideMaxAge;
+  } else if (rememberMe === true) {
+    refreshMaxAge = config.cookies.refreshMaxAgeRemember;
+  } else if (rememberMe === false) {
+    refreshMaxAge = null;
+  } else {
+    refreshMaxAge = config.cookies.refreshMaxAge;
+  }
+
   res.cookie(config.cookies.accessName, accessToken, {
     ...baseOptions(),
     path: config.cookies.accessPath,
     maxAge: config.cookies.accessMaxAge,
   });
 
-  res.cookie(config.cookies.refreshName, refreshToken, {
+  const refreshOpts = {
     ...baseOptions(),
     path: config.cookies.refreshPath,
-    maxAge: config.cookies.refreshMaxAge,
-  });
+  };
+  if (refreshMaxAge != null && refreshMaxAge > 0) {
+    refreshOpts.maxAge = refreshMaxAge;
+  }
+  res.cookie(config.cookies.refreshName, refreshToken, refreshOpts);
 
-  // CSRF double-submit (non-HttpOnly) — renouvelé à chaque émission de session
   issueCsrfToken(res);
 };
 
@@ -38,3 +62,10 @@ export const clearAuthCookies = (res) => {
 
 export const getAccessToken = (req) => req.cookies?.[config.cookies.accessName];
 export const getRefreshToken = (req) => req.cookies?.[config.cookies.refreshName];
+
+/** TTL initiale ≤ 36h → login sans « Se souvenir de moi ». */
+export function isSessionRefreshToken(stored) {
+  if (!stored?.expiresAt || !stored?.createdAt) return false;
+  const ttlMs = new Date(stored.expiresAt).getTime() - new Date(stored.createdAt).getTime();
+  return ttlMs > 0 && ttlMs <= 36 * 60 * 60 * 1000;
+}

@@ -14,6 +14,34 @@ const TABS = [
   { id: 'notifications', label: 'Notifications' },
 ];
 
+/** Clé jour YYYY-MM-DD en fuseau Europe/Paris. */
+function parisDayKey(value) {
+  if (!value) return '';
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+    return value.slice(0, 10);
+  }
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Paris',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date(value));
+  } catch {
+    return '';
+  }
+}
+
+function formatUsageDayLabel(dayKey) {
+  if (!dayKey) return '—';
+  return new Date(`${dayKey}T12:00:00`).toLocaleDateString('fr-FR', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
 const SETUP_SECTIONS = [
   {
     id: 'memory',
@@ -233,6 +261,7 @@ export default function Admin() {
   const [deletingUser, setDeletingUser] = useState(false);
   const [connections, setConnections] = useState([]);
   const [aiUsage, setAiUsage] = useState(null);
+  const [expandedUsageDays, setExpandedUsageDays] = useState(() => new Set());
   const [broadcast, setBroadcast] = useState({ title: '', body: '', url: '' });
   const [broadcasting, setBroadcasting] = useState(false);
 
@@ -264,6 +293,26 @@ export default function Admin() {
         String(u.plan || '').toLowerCase().includes(q)
     );
   }, [usersOverview, userSearch]);
+
+  const recentByDay = useMemo(() => {
+    const map = new Map();
+    for (const row of aiUsage?.recent || []) {
+      const key = parisDayKey(row.createdAt);
+      if (!key) continue;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(row);
+    }
+    return map;
+  }, [aiUsage?.recent]);
+
+  const toggleUsageDay = (dayKey) => {
+    setExpandedUsageDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(dayKey)) next.delete(dayKey);
+      else next.add(dayKey);
+      return next;
+    });
+  };
 
   const loadSetup = async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
@@ -910,110 +959,158 @@ export default function Admin() {
                   <div>
                     <h2 className="text-lg font-bold text-prune-900">Consommation par jour</h2>
                     <p className="text-sm text-prune-500 mt-1">
-                      Tokens prompt / complétion / total pour chaque jour (fuseau Europe/Paris).
+                      Une tuile par jour (fermée par défaut) — tokens et dernières requêtes (fuseau
+                      Europe/Paris).
                     </p>
                   </div>
-                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="space-y-3">
                     {(aiUsage.byDay || []).map((day) => {
-                      const label = day.day
-                        ? new Date(`${String(day.day).slice(0, 10)}T12:00:00`).toLocaleDateString('fr-FR', {
-                            weekday: 'short',
-                            day: 'numeric',
-                            month: 'short',
-                          })
-                        : '—';
+                      const dayKey = parisDayKey(day.day);
+                      const open = expandedUsageDays.has(dayKey);
+                      const dayRows = recentByDay.get(dayKey) || [];
                       return (
                         <div
-                          key={String(day.day)}
-                          className="rounded-2xl bg-white/80 border border-prune-100 p-4 space-y-3"
+                          key={dayKey || String(day.day)}
+                          className="rounded-2xl bg-white/80 border border-prune-100 overflow-hidden"
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="font-semibold text-prune-900 capitalize">{label}</p>
-                            <p className="text-xs text-prune-400">{day.requests} req.</p>
-                          </div>
-                          <div className="grid grid-cols-3 gap-2">
-                            {[
-                              ['Envoi', day.tokensPrompt],
-                              ['Réception', day.tokensCompletion],
-                              ['Total', day.tokensTotal],
-                            ].map(([sub, val]) => (
-                              <div key={sub} className="rounded-xl bg-prune-50 px-2 py-2 text-center">
-                                <p className="text-[10px] uppercase tracking-wide text-prune-500">{sub}</p>
-                                <p className="text-sm font-bold text-prune-900 mt-0.5">
-                                  {Number(val || 0).toLocaleString('fr-FR')}
-                                </p>
+                          <button
+                            type="button"
+                            onClick={() => toggleUsageDay(dayKey)}
+                            aria-expanded={open}
+                            className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left hover:bg-prune-50/80 transition-colors"
+                          >
+                            <div className="min-w-0">
+                              <p className="font-semibold text-prune-900 capitalize">
+                                {formatUsageDayLabel(dayKey)}
+                              </p>
+                              <p className="text-xs text-prune-500 mt-0.5">
+                                {day.requests} req. ·{' '}
+                                {Number(day.tokensTotal || 0).toLocaleString('fr-FR')} tokens
+                                {day.errors > 0 ? ` · ${day.errors} erreur(s)` : ''}
+                              </p>
+                            </div>
+                            <svg
+                              className={`w-5 h-5 text-prune-400 shrink-0 transition-transform ${
+                                open ? 'rotate-180' : ''
+                              }`}
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              aria-hidden="true"
+                            >
+                              <path strokeLinecap="round" d="M6 9l6 6 6-6" />
+                            </svg>
+                          </button>
+
+                          {open && (
+                            <div className="border-t border-prune-100 px-4 py-4 space-y-4">
+                              <div className="grid grid-cols-3 gap-2">
+                                {[
+                                  ['Envoi', day.tokensPrompt],
+                                  ['Réception', day.tokensCompletion],
+                                  ['Total', day.tokensTotal],
+                                ].map(([sub, val]) => (
+                                  <div
+                                    key={sub}
+                                    className="rounded-xl bg-prune-50 px-2 py-2 text-center"
+                                  >
+                                    <p className="text-[10px] uppercase tracking-wide text-prune-500">
+                                      {sub}
+                                    </p>
+                                    <p className="text-sm font-bold text-prune-900 mt-0.5">
+                                      {Number(val || 0).toLocaleString('fr-FR')}
+                                    </p>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
-                          {day.errors > 0 && (
-                            <p className="text-xs text-amber-700">{day.errors} erreur(s)</p>
+
+                              <div>
+                                <h3 className="text-sm font-semibold text-prune-800 mb-2">
+                                  Dernières requêtes
+                                </h3>
+                                {dayRows.length ? (
+                                  <div className="overflow-x-auto rounded-xl border border-prune-100">
+                                    <table className="w-full text-sm">
+                                      <thead className="bg-prune-50 text-left">
+                                        <tr>
+                                          <th className="px-3 py-2 font-semibold text-prune-700">
+                                            Heure
+                                          </th>
+                                          <th className="px-3 py-2 font-semibold text-prune-700">
+                                            User
+                                          </th>
+                                          <th className="px-3 py-2 font-semibold text-prune-700">
+                                            Usage
+                                          </th>
+                                          <th className="px-3 py-2 font-semibold text-prune-700">
+                                            Modèle
+                                          </th>
+                                          <th className="px-3 py-2 font-semibold text-prune-700">
+                                            Tokens
+                                          </th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {dayRows.map((row) => (
+                                          <tr key={row.id} className="border-t border-prune-100">
+                                            <td className="px-3 py-2 whitespace-nowrap">
+                                              {row.createdAt
+                                                ? new Date(row.createdAt).toLocaleTimeString(
+                                                    'fr-FR',
+                                                    { hour: '2-digit', minute: '2-digit' }
+                                                  )
+                                                : '—'}
+                                            </td>
+                                            <td className="px-3 py-2">
+                                              {row.userEmail ||
+                                                row.userName ||
+                                                (row.userId ? `#${row.userId}` : '—')}
+                                            </td>
+                                            <td className="px-3 py-2">
+                                              <span className="px-2 py-0.5 rounded-lg bg-prune-100 text-prune-700 text-xs font-medium">
+                                                {row.purpose || '—'}
+                                              </span>
+                                              {row.status === 'error' && (
+                                                <span className="ml-2 text-xs text-red-600">
+                                                  erreur
+                                                </span>
+                                              )}
+                                            </td>
+                                            <td className="px-3 py-2 text-prune-500">
+                                              {[row.provider, row.model].filter(Boolean).join(' / ') ||
+                                                '—'}
+                                            </td>
+                                            <td className="px-3 py-2 whitespace-nowrap">
+                                              {row.tokensPrompt ?? '—'} →{' '}
+                                              {row.tokensCompletion ?? '—'}
+                                              <span className="text-prune-400">
+                                                {' '}
+                                                ({row.tokensTotal ?? '—'})
+                                              </span>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                ) : (
+                                  <p className="text-sm text-prune-500">
+                                    Aucune requête récente listée pour ce jour (hors des 40
+                                    dernières).
+                                  </p>
+                                )}
+                              </div>
+                            </div>
                           )}
                         </div>
                       );
                     })}
                     {!aiUsage.byDay?.length && (
-                      <p className="text-sm text-prune-500 col-span-full">
+                      <p className="text-sm text-prune-500">
                         Aucune consommation enregistrée pour le moment.
                       </p>
                     )}
-                  </div>
-                </section>
-
-                <section className="rounded-2xl bg-white/80 border border-prune-100 overflow-hidden">
-                  <div className="px-4 py-3 border-b border-prune-100">
-                    <h2 className="font-bold text-prune-900">Dernières requêtes</h2>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-prune-50 text-left">
-                        <tr>
-                          <th className="px-4 py-3 font-semibold text-prune-700">Date</th>
-                          <th className="px-4 py-3 font-semibold text-prune-700">User</th>
-                          <th className="px-4 py-3 font-semibold text-prune-700">Usage</th>
-                          <th className="px-4 py-3 font-semibold text-prune-700">Modèle</th>
-                          <th className="px-4 py-3 font-semibold text-prune-700">Tokens</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(aiUsage.recent || []).map((row) => (
-                          <tr key={row.id} className="border-t border-prune-100">
-                            <td className="px-4 py-3 whitespace-nowrap">
-                              {row.createdAt
-                                ? new Date(row.createdAt).toLocaleString('fr-FR')
-                                : '—'}
-                            </td>
-                            <td className="px-4 py-3">
-                              {row.userEmail || row.userName || (row.userId ? `#${row.userId}` : '—')}
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className="px-2 py-1 rounded-lg bg-prune-100 text-prune-700 text-xs font-medium">
-                                {row.purpose || '—'}
-                              </span>
-                              {row.status === 'error' && (
-                                <span className="ml-2 text-xs text-red-600">erreur</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-prune-500">
-                              {[row.provider, row.model].filter(Boolean).join(' / ') || '—'}
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap">
-                              {row.tokensPrompt ?? '—'} → {row.tokensCompletion ?? '—'}
-                              <span className="text-prune-400">
-                                {' '}
-                                ({row.tokensTotal ?? '—'})
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                        {!aiUsage.recent?.length && (
-                          <tr>
-                            <td colSpan={5} className="px-4 py-6 text-prune-500">
-                              Aucune requête journalisée.
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
                   </div>
                 </section>
               </div>

@@ -26,15 +26,16 @@ export const RefreshTokenRepository = {
       expiresAt,
       userAgent = null,
       ip = null,
+      createdAt = null,
     },
     client = pool
   ) {
     const { rows } = await client.query(
       `INSERT INTO refresh_tokens (
-         user_id, token_hash, family_id, expires_at, user_agent, ip
-       ) VALUES ($1, $2, $3, $4, $5, $6::inet)
+         user_id, token_hash, family_id, expires_at, user_agent, ip, created_at
+       ) VALUES ($1, $2, $3, $4, $5, $6::inet, COALESCE($7::timestamptz, NOW()))
        RETURNING *`,
-      [userId, tokenHash, familyId, expiresAt, userAgent, ip]
+      [userId, tokenHash, familyId, expiresAt, userAgent, ip, createdAt]
     );
     return mapRow(rows[0]);
   },

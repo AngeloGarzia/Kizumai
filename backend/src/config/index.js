@@ -146,6 +146,10 @@ export const config = {
     refreshSecret: process.env.JWT_REFRESH_SECRET || (isDev ? devSecrets.refresh : ''),
     accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+    /** Login « Se souvenir de moi » */
+    refreshExpiresInRemember: process.env.JWT_REFRESH_EXPIRES_IN_REMEMBER || '30d',
+    /** Login sans souvenir (cookie de session navigateur) */
+    refreshExpiresInSession: process.env.JWT_REFRESH_EXPIRES_IN_SESSION || '1d',
     issuer: process.env.JWT_ISSUER || 'kizumai-api',
     audience: process.env.JWT_AUDIENCE || 'kizumai-web',
     algorithm: 'HS256',
@@ -166,6 +170,9 @@ export const config = {
       parseDurationMs(process.env.JWT_ACCESS_EXPIRES_IN || '15m') ?? 15 * 60 * 1000,
     refreshMaxAge:
       parseDurationMs(process.env.JWT_REFRESH_EXPIRES_IN || '7d') ?? 7 * 24 * 60 * 60 * 1000,
+    refreshMaxAgeRemember:
+      parseDurationMs(process.env.JWT_REFRESH_EXPIRES_IN_REMEMBER || '30d') ??
+      30 * 24 * 60 * 60 * 1000,
     refreshPath: joinUrlPath(appBasePath, '/api/auth'),
   },
 

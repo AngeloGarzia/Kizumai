@@ -5,6 +5,7 @@ import {
   clearAuthCookies,
   getRefreshToken,
   getAccessToken,
+  isSessionRefreshToken,
 } from '../utils/cookies.js';
 import { issueCsrfToken } from '../middleware/csrf.js';
 import { successResponse } from '../utils/response.js';
@@ -14,6 +15,19 @@ function requestMeta(req) {
     userAgent: req.get('user-agent') || null,
     ip: req.ip || null,
   };
+}
+
+function cookieOptsFromTokens(tokens, sessionMeta = null) {
+  if (tokens?.sessionOnly) return { rememberMe: false };
+  if (tokens?.rememberMe) return { rememberMe: true };
+  if (sessionMeta && isSessionRefreshToken(sessionMeta)) {
+    return { rememberMe: false };
+  }
+  if (sessionMeta?.expiresAt) {
+    const remaining = new Date(sessionMeta.expiresAt).getTime() - Date.now();
+    if (remaining > 0) return { refreshMaxAge: remaining };
+  }
+  return {};
 }
 
 export function createAuthController({
@@ -38,17 +52,29 @@ export function createAuthController({
     login: asyncHandler(async (req, res) => {
       const dto = LoginRequestDto.from(req.body);
       const { user, tokens } = await authService.login(dto, requestMeta(req));
-      setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
+      setAuthCookies(
+        res,
+        tokens.accessToken,
+        tokens.refreshToken,
+        cookieOptsFromTokens(tokens)
+      );
       await connectionService.log(req, { userId: user.id, email: user.email, action: 'login' });
-      // Éval silencieuse du contexte projet (login strict uniquement — pas refresh/me).
       projectMemoryLoginEvalService?.scheduleAfterLogin(user);
       successResponse(res, AuthResponseDto.fromUser(user));
     }),
 
     refresh: asyncHandler(async (req, res) => {
       const refreshToken = getRefreshToken(req);
-      const { user, tokens } = await authService.refresh(refreshToken, requestMeta(req));
-      setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
+      const { user, tokens, sessionMeta } = await authService.refresh(
+        refreshToken,
+        requestMeta(req)
+      );
+      setAuthCookies(
+        res,
+        tokens.accessToken,
+        tokens.refreshToken,
+        cookieOptsFromTokens(tokens, sessionMeta)
+      );
       await connectionService.log(req, { userId: user.id, email: user.email, action: 'refresh' });
       successResponse(res, AuthResponseDto.fromUser(user));
     }),

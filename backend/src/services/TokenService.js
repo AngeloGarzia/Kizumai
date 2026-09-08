@@ -132,8 +132,23 @@ export const TokenService = {
     return hashOpaqueToken(rawToken);
   },
 
-  refreshExpiresAt() {
-    const ms = parseDurationMs(config.jwt.refreshExpiresIn) ?? 7 * 24 * 60 * 60 * 1000;
+  /**
+   * @param {'default'|'remember'|'session'} [mode]
+   */
+  refreshExpiresAt(mode = 'default') {
+    const key =
+      mode === 'remember'
+        ? config.jwt.refreshExpiresInRemember
+        : mode === 'session'
+          ? config.jwt.refreshExpiresInSession
+          : config.jwt.refreshExpiresIn;
+    const fallback =
+      mode === 'remember'
+        ? 30 * 24 * 60 * 60 * 1000
+        : mode === 'session'
+          ? 24 * 60 * 60 * 1000
+          : 7 * 24 * 60 * 60 * 1000;
+    const ms = parseDurationMs(key) ?? fallback;
     return new Date(Date.now() + ms);
   },
 };

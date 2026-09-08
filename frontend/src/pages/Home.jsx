@@ -19,7 +19,10 @@ export default function Home() {
 
   const goToCreateFuture = () => navigate('/creer-son-avenir');
 
-  const showProgressOverlay = !loading && (!isAuthenticated || !isPaid || (isPaid && !hasProject));
+  // Invité : toujours le CTA « Créer son avenir » (même pendant le chargement auth).
+  // Connecté free / paid sans projet : CTA après fin du loading.
+  const showProgressOverlay =
+    !isAuthenticated || (!loading && (!isPaid || !hasProject));
 
   useEffect(() => {
     if (!isAuthenticated || !isPaid) {
@@ -121,9 +124,11 @@ export default function Home() {
 
           <ProgressCard
             showOverlay={showProgressOverlay}
-            onCreateFuture={hasProject ? openNextStage : goToCreateFuture}
-            project={project}
-            onOpenNext={hasProject ? openNextStage : undefined}
+            onCreateFuture={
+              !isAuthenticated || !hasProject ? goToCreateFuture : openNextStage
+            }
+            project={isAuthenticated ? project : null}
+            onOpenNext={isAuthenticated && hasProject ? openNextStage : undefined}
           />
 
           <ModulesSection

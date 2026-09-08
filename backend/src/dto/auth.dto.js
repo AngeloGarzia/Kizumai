@@ -23,6 +23,7 @@ export const LoginRequestDto = {
     return {
       email: requireString(body.email, 'email', { min: 3, max: 255 }).toLowerCase(),
       password: requireString(body.password, 'password', { min: 1, max: PASSWORD_POLICY.max }),
+      rememberMe: body.rememberMe === true || body.remember_me === true || body.rememberMe === 'true',
     };
   },
 };

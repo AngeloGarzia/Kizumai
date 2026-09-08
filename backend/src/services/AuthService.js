@@ -18,17 +18,23 @@ export function createAuthService({
   tokenService,
   settingsService = null,
 }) {
-  async function issueTokenPair(user, { familyId = null, userAgent = null, ip = null } = {}) {
+  async function issueTokenPair(
+    user,
+    { familyId = null, userAgent = null, ip = null, rememberMe = null } = {}
+  ) {
     const accessToken = tokenService.generateAccessToken(user);
     const opaque = familyId
       ? tokenService.rotateOpaqueRefreshToken(familyId)
       : tokenService.createOpaqueRefreshToken();
 
+    const mode =
+      rememberMe === true ? 'remember' : rememberMe === false ? 'session' : 'default';
+
     await refreshTokenRepository.create({
       userId: user.id,
       tokenHash: opaque.tokenHash,
       familyId: opaque.familyId,
-      expiresAt: tokenService.refreshExpiresAt(),
+      expiresAt: tokenService.refreshExpiresAt(mode),
       userAgent,
       ip,
     });
@@ -36,6 +42,8 @@ export function createAuthService({
     return {
       accessToken,
       refreshToken: opaque.token,
+      rememberMe: rememberMe === true,
+      sessionOnly: rememberMe === false,
     };
   }
 
@@ -89,7 +97,7 @@ export function createAuthService({
       };
     },
 
-    async login({ email, password }, meta = {}) {
+    async login({ email, password, rememberMe = false }, meta = {}) {
       if (!email || !password) {
         throw new AppError('L\'email et le mot de passe sont requis', 400);
       }
@@ -104,7 +112,7 @@ export function createAuthService({
         throw new AppError('Identifiants invalides', 401);
       }
 
-      const tokens = await issueTokenPair(user, meta);
+      const tokens = await issueTokenPair(user, { ...meta, rememberMe: Boolean(rememberMe) });
       return { user: sanitizeUser(user), tokens };
     },
 
@@ -163,7 +171,9 @@ export function createAuthService({
             userId: user.id,
             tokenHash: opaque.tokenHash,
             familyId: opaque.familyId,
-            expiresAt: tokenService.refreshExpiresAt(),
+            // Conserve l’échéance et le début de session (détection « Se souvenir de moi »).
+            expiresAt: stored.expiresAt,
+            createdAt: stored.createdAt,
             userAgent: meta.userAgent ?? null,
             ip: meta.ip ?? null,
           },
@@ -179,6 +189,10 @@ export function createAuthService({
           tokens: {
             accessToken: tokenService.generateAccessToken(user),
             refreshToken: opaque.token,
+          },
+          sessionMeta: {
+            expiresAt: stored.expiresAt,
+            createdAt: stored.createdAt,
           },
         };
       } catch (error) {

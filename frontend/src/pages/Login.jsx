@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import AuthLayout from '../components/AuthLayout.jsx';
@@ -7,14 +7,29 @@ import Input from '../components/Input.jsx';
 
 import { getProjectDraft } from '../services/projectService.js';
 
+const REMEMBER_EMAIL_KEY = 'kizumai_remember_email';
+
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(REMEMBER_EMAIL_KEY);
+      if (saved) {
+        setEmail(saved);
+        setRememberMe(true);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -22,7 +37,14 @@ export default function Login() {
     setSubmitting(true);
 
     try {
-      const loggedUser = await login(email, password);
+      const loggedUser = await login(email, password, { rememberMe });
+      try {
+        if (rememberMe) localStorage.setItem(REMEMBER_EMAIL_KEY, email.trim());
+        else localStorage.removeItem(REMEMBER_EMAIL_KEY);
+      } catch {
+        // ignore
+      }
+
       const draft = getProjectDraft();
       const from = location.state?.from?.pathname;
       const safeFrom =
@@ -72,6 +94,17 @@ export default function Login() {
           required
           autoComplete="current-password"
         />
+
+        <label className="flex items-center gap-2.5 text-sm text-prune-700 cursor-pointer select-none">
+          <input
+            id="rememberMe"
+            type="checkbox"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+            className="h-4 w-4 rounded border-prune-300 text-wasabi-600 focus:ring-wasabi-400"
+          />
+          Se souvenir de moi
+        </label>
 
         {error && <p className="alert-error">{error}</p>}
 

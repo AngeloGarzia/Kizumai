@@ -2,7 +2,7 @@
 FROM node:22.14.0-bookworm-slim AS build
 WORKDIR /app
 
-ARG VITE_API_URL=http://192.168.1.11/kizumai/api
+ARG VITE_API_URL=/kizumai/api
 ARG VITE_BASE_PATH=/kizumai/
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_BASE_PATH=$VITE_BASE_PATH

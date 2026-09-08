@@ -93,7 +93,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.lan
       args:
-        VITE_API_URL: ${LAN_PUBLIC_URL:-http://192.168.1.11}/kizumai/api
+        # Chemin relatif = même origine que la page (LAN ou IP publique) → pas de blocage PNA/CORS
+        VITE_API_URL: /kizumai/api
         VITE_BASE_PATH: /kizumai/
     image: kizumai-web:lan
     container_name: kizumai-web
