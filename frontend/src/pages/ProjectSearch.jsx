@@ -250,7 +250,7 @@ function TrainingModal({
 
 export default function ProjectSearch() {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const seedRef = useRef(null);
   const bootstrappedRef = useRef(false);
   const persistReadyRef = useRef(false);
