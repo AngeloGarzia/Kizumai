@@ -1,7 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { authService } from '../services/authService.js';
 import { ApiError, ensureCsrfToken } from '../services/api.js';
-import { clearProjectDraft, clearSearchSeed } from '../services/projectService.js';
+import {
+  clearProjectDraft,
+  clearSearchProgress,
+  clearSearchSeed,
+} from '../services/projectService.js';
 
 const AuthContext = createContext(null);
 
@@ -51,6 +55,7 @@ export function AuthProvider({ children }) {
     await authService.logout();
     clearProjectDraft();
     clearSearchSeed();
+    clearSearchProgress();
     setUser(null);
   };
 

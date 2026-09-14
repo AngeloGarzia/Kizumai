@@ -387,6 +387,28 @@ export function clearSearchSeed() {
   sessionStorage.removeItem(SEARCH_SEED_KEY);
 }
 
+/** Progression wizard recherche (étapes + listes IA) — sessionStorage. */
+export const SEARCH_PROGRESS_KEY = 'kizumai_search_progress';
+
+export function saveSearchProgress(progress) {
+  sessionStorage.setItem(SEARCH_PROGRESS_KEY, JSON.stringify(progress));
+}
+
+export function getSearchProgress() {
+  const raw = sessionStorage.getItem(SEARCH_PROGRESS_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    sessionStorage.removeItem(SEARCH_PROGRESS_KEY);
+    return null;
+  }
+}
+
+export function clearSearchProgress() {
+  sessionStorage.removeItem(SEARCH_PROGRESS_KEY);
+}
+
 export const PROJECT_DRAFT_KEY = 'kizumai_project_draft';
 
 export function saveProjectDraft(draft) {

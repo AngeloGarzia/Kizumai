@@ -7,7 +7,10 @@ import FeasibilityGauge from '../components/FeasibilityGauge.jsx';
 import ProjectReport from '../components/ProjectReport.jsx';
 import {
   clearProjectDraft,
+  clearSearchProgress,
+  clearSearchSeed,
   getProjectDraft,
+  getSearchProgress,
   projectService,
 } from '../services/projectService.js';
 import { authService } from '../services/authService.js';
@@ -25,7 +28,12 @@ export default function ProjectPreview() {
   useEffect(() => {
     const draft = getProjectDraft();
     if (!draft) {
-      navigate('/creer-son-avenir', { replace: true });
+      const progress = getSearchProgress();
+      if (progress?.businesses?.length) {
+        navigate(`/projet/recherche?step=${progress.step || 'proposals'}`, { replace: true });
+      } else {
+        navigate('/creer-son-avenir', { replace: true });
+      }
       return;
     }
     setPreview(draft);
@@ -39,6 +47,8 @@ export default function ProjectPreview() {
     try {
       await projectService.createProject(preview);
       clearProjectDraft();
+      clearSearchSeed();
+      clearSearchProgress();
       navigate('/');
     } catch (err) {
       setError(err.message || "Impossible d'enregistrer le projet");
@@ -57,6 +67,8 @@ export default function ProjectPreview() {
       await loadUser();
       await projectService.createProject(preview);
       clearProjectDraft();
+      clearSearchSeed();
+      clearSearchProgress();
       setConfirmUpgradeOpen(false);
       navigate('/');
     } catch (err) {
@@ -86,15 +98,16 @@ export default function ProjectPreview() {
     <div className="min-h-screen min-h-dvh page-bg flex flex-col">
       <header className="sticky top-0 z-10 header-glass">
         <div className="page-container py-4 flex items-center justify-between gap-3">
-          <Link
-            to="/creer-son-avenir"
+          <button
+            type="button"
+            onClick={() => navigate('/projet/recherche?step=proposals')}
             className="flex items-center justify-center w-10 h-10 rounded-xl bg-prune-100 text-prune-700 hover:bg-prune-200 transition-colors"
-            aria-label="Retour"
+            aria-label="Retour à la recherche"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
-          </Link>
+          </button>
           <BrandLogo size="sm" />
           <div className="w-10" aria-hidden="true" />
         </div>

@@ -8,7 +8,13 @@ import TemperatureGauge, {
   TEMP_DEFAULT,
   clampSearchTemperature,
 } from '../components/TemperatureGauge.jsx';
-import { projectService, saveSearchSeed } from '../services/projectService.js';
+import {
+  clearSearchProgress,
+  getSearchProgress,
+  getSearchSeed,
+  projectService,
+  saveSearchSeed,
+} from '../services/projectService.js';
 import { IconChevronRight } from '../components/icons.jsx';
 
 export default function CreateFuture() {
@@ -25,11 +31,25 @@ export default function CreateFuture() {
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState('');
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
+  const [canResume, setCanResume] = useState(false);
   const locationRequestRef = useRef(0);
 
   const hasQuoi = Boolean(quoi.trim());
   const hasOu = Boolean(ou.trim());
   const canLaunch = hasQuoi || hasOu;
+
+  useEffect(() => {
+    const seed = getSearchSeed();
+    const progress = getSearchProgress();
+    if (seed) {
+      setQuoi(seed.quoi || '');
+      setOu(seed.ou || '');
+      setBudget(seed.budget != null ? seed.budget : null);
+      setCurrency(seed.currency || 'EUR');
+      if (seed.temperature != null) setTemperature(clampSearchTemperature(seed.temperature));
+    }
+    setCanResume(Boolean(progress?.businesses?.length || progress?.step));
+  }, []);
 
   useEffect(() => {
     const query = ou.trim();
@@ -77,7 +97,8 @@ export default function CreateFuture() {
 
     setSubmitting(true);
 
-    // Idée et lieu optionnels séparément. Budget jamais à 0 : minimum 500 € (EUR).
+    // Nouvelle recherche : on repart proprement (garder le seed à jour).
+    clearSearchProgress();
     saveSearchSeed({
       quoi: quoi.trim() || null,
       ou: ou.trim() || null,
@@ -86,7 +107,7 @@ export default function CreateFuture() {
       temperature: clampSearchTemperature(temperature),
     });
 
-    navigate('/projet/recherche');
+    navigate('/projet/recherche?step=businesses');
   };
 
   return (
@@ -190,6 +211,20 @@ export default function CreateFuture() {
             <Button type="submit" disabled={submitting || !canLaunch}>
               {submitting ? 'Recherche en cours...' : 'Lancer la recherche'}
             </Button>
+
+            {canResume && (
+              <button
+                type="button"
+                onClick={() => {
+                  const progress = getSearchProgress();
+                  const step = progress?.step || 'businesses';
+                  navigate(`/projet/recherche?step=${step}`);
+                }}
+                className="w-full text-sm font-medium text-prune-700 hover:text-prune-900 underline underline-offset-2"
+              >
+                Reprendre la recherche en cours
+              </button>
+            )}
           </form>
         </div>
 

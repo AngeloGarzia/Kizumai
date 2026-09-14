@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import BrandLogo from '../components/BrandLogo.jsx';
 import FeasibilityGauge, {
   averageFeasibility,
@@ -10,7 +10,9 @@ import FeasibilityGauge, {
 import {
   projectService,
   getSearchSeed,
-  clearSearchSeed,
+  getSearchProgress,
+  saveSearchSeed,
+  saveSearchProgress,
   saveProjectDraft,
 } from '../services/projectService.js';
 import { IconChevronRight } from '../components/icons.jsx';
@@ -23,6 +25,12 @@ const STEPS = [
   { key: 'locations', label: 'Lieu' },
   { key: 'proposals', label: 'Projet' },
 ];
+
+const VALID_STEPS = new Set(STEPS.map((s) => s.key));
+
+function normalizeStep(value) {
+  return VALID_STEPS.has(value) ? value : 'businesses';
+}
 
 function formatBudget(amount, currency) {
   if (amount == null) return '—';
@@ -242,9 +250,12 @@ function TrainingModal({
 
 export default function ProjectSearch() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const seedRef = useRef(null);
+  const bootstrappedRef = useRef(false);
+  const persistReadyRef = useRef(false);
 
-  const [step, setStep] = useState('businesses');
+  const [step, setStep] = useState(() => normalizeStep(searchParams.get('step')));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [refine, setRefine] = useState('');
@@ -272,6 +283,15 @@ export default function ProjectSearch() {
   const [mapSummary, setMapSummary] = useState('');
   const [mapRegions, setMapRegions] = useState([]);
   const [mapSelectedCode, setMapSelectedCode] = useState(null);
+
+  const goToStep = useCallback(
+    (nextStep, { replace = false } = {}) => {
+      const normalized = normalizeStep(nextStep);
+      setStep(normalized);
+      setSearchParams({ step: normalized }, { replace });
+    },
+    [setSearchParams]
+  );
 
   const proposalKindLabel = (kind) => {
     if (kind === 'budget_ideal') return assistantPhrases.idealBudget;
@@ -441,23 +461,109 @@ export default function ProjectSearch() {
   }, []);
 
   useEffect(() => {
-    const seed = getSearchSeed();
+    if (bootstrappedRef.current) return;
+    bootstrappedRef.current = true;
+
+    let seed = getSearchSeed();
+    const progress = getSearchProgress();
+
+    if (!seed && progress?.seed) {
+      saveSearchSeed(progress.seed);
+      seed = progress.seed;
+    }
+
     if (!seed) {
       navigate('/creer-son-avenir', { replace: true });
       return;
     }
+
     seedRef.current = seed;
+
+    const urlStep = normalizeStep(
+      new URLSearchParams(window.location.search).get('step') || progress?.step
+    );
+    const canRestore =
+      progress &&
+      Array.isArray(progress.businesses) &&
+      progress.businesses.length > 0;
+
+    if (canRestore) {
+      setBusinesses(progress.businesses || []);
+      setSelectedBusiness(progress.selectedBusiness || null);
+      setLocations(progress.locations || []);
+      setSelectedLocation(progress.selectedLocation || null);
+      setProposals(progress.proposals || []);
+      setBudgetAssessment(progress.budgetAssessment || null);
+      setSavedTraining(progress.savedTraining || null);
+      goToStep(urlStep, { replace: true });
+      persistReadyRef.current = true;
+
+      if (
+        urlStep === 'locations' &&
+        !(progress.locations || []).length &&
+        progress.selectedBusiness
+      ) {
+        fetchLocations(progress.selectedBusiness, '', []);
+      } else if (
+        urlStep === 'proposals' &&
+        !(progress.proposals || []).length &&
+        progress.selectedBusiness &&
+        progress.selectedLocation
+      ) {
+        fetchProposals(progress.selectedBusiness, progress.selectedLocation, '');
+      } else {
+        setLoading(false);
+      }
+      return;
+    }
+
+    goToStep('businesses', { replace: true });
+    persistReadyRef.current = true;
     fetchBusinesses('', []);
-  }, [navigate, fetchBusinesses]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- bootstrap once on mount
+  }, [navigate, fetchBusinesses, goToStep, fetchLocations, fetchProposals]);
+
+  // Navigateur précédent / suivant : synchroniser l'étape depuis l'URL.
+  useEffect(() => {
+    if (!bootstrappedRef.current) return;
+    const urlStep = normalizeStep(searchParams.get('step'));
+    setStep((current) => (current === urlStep ? current : urlStep));
+  }, [searchParams]);
+
+  // Persister la progression à chaque changement utile.
+  useEffect(() => {
+    if (!persistReadyRef.current || !seedRef.current) return;
+    saveSearchProgress({
+      step,
+      seed: seedRef.current,
+      businesses,
+      selectedBusiness,
+      locations,
+      selectedLocation,
+      proposals,
+      budgetAssessment,
+      savedTraining,
+    });
+  }, [
+    step,
+    businesses,
+    selectedBusiness,
+    locations,
+    selectedLocation,
+    proposals,
+    budgetAssessment,
+    savedTraining,
+  ]);
 
   const goToLocations = (business, zone) => {
     if (zone && seedRef.current) {
       seedRef.current = { ...seedRef.current, ou: zone };
+      saveSearchSeed(seedRef.current);
     }
     setSelectedLocation(null);
     setLocations([]);
     setRefine('');
-    setStep('locations');
+    goToStep('locations');
     setMapOpen(false);
     fetchLocations(business, '', []);
   };
@@ -504,7 +610,7 @@ export default function ProjectSearch() {
     setProposals([]);
     setBudgetAssessment(null);
     setRefine('');
-    setStep('proposals');
+    goToStep('proposals');
     fetchProposals(selectedBusiness, location, '');
   };
 
@@ -541,7 +647,18 @@ export default function ProjectSearch() {
         budgetScore: proposal.feasibility ?? budgetAssessment?.feasibility,
       }),
     });
-    clearSearchSeed();
+    // Garde seed + progression pour pouvoir revenir modifier le parcours.
+    saveSearchProgress({
+      step: 'proposals',
+      seed: seedRef.current,
+      businesses,
+      selectedBusiness,
+      locations,
+      selectedLocation,
+      proposals,
+      budgetAssessment,
+      savedTraining,
+    });
     navigate('/projet/apercu');
   };
 
@@ -558,8 +675,9 @@ export default function ProjectSearch() {
   const goBack = () => {
     setError('');
     setRefine('');
-    if (step === 'locations') setStep('businesses');
-    else if (step === 'proposals') setStep('locations');
+    if (step === 'locations') goToStep('businesses');
+    else if (step === 'proposals') goToStep('locations');
+    else navigate('/creer-son-avenir');
   };
 
   const seed = seedRef.current;
@@ -568,15 +686,16 @@ export default function ProjectSearch() {
     <div className="min-h-screen min-h-dvh page-bg flex flex-col">
       <header className="sticky top-0 z-10 header-glass">
         <div className="page-container py-4 flex items-center justify-between gap-3">
-          <Link
-            to="/creer-son-avenir"
+          <button
+            type="button"
+            onClick={goBack}
             className="flex items-center justify-center w-10 h-10 rounded-xl bg-prune-100 text-prune-700 hover:bg-prune-200 transition-colors"
             aria-label="Retour"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
-          </Link>
+          </button>
           <BrandLogo size="sm" />
           <div className="w-10" aria-hidden="true" />
         </div>
