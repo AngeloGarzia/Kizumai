@@ -17,6 +17,7 @@ RUN groupadd --gid 1001 kizumai \
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json package-lock.json ./
 COPY src ./src
+COPY scripts ./scripts
 
 RUN mkdir -p /app/uploads && chown -R kizumai:kizumai /app
 

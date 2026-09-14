@@ -1,4 +1,6 @@
 import { sanitizeDisplayText } from '../utils/safeDisplay.js';
+import { ASSISTANT_NAME, assistantPhrases } from '../constants/assistant.js';
+import FabulousThinking from './FabulousThinking.jsx';
 
 function formatBudget(amount, currency) {
   if (amount == null) return '—';
@@ -78,7 +80,93 @@ function renderSectionContent(content) {
   ));
 }
 
-export default function ProjectReport({ project }) {
+function FabulousAnalysisBlock({ analysis, loading, error }) {
+  if (loading) {
+    return (
+      <section className="px-5 sm:px-8 py-5 sm:py-6 border-b border-prune-100 bg-white/60">
+        <p className="text-xs font-semibold tracking-widest text-prune-500 uppercase mb-3">
+          Analyse {ASSISTANT_NAME}
+        </p>
+        <FabulousThinking message={assistantPhrases.thinking} />
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="px-5 sm:px-8 py-5 sm:py-6 border-b border-prune-100">
+        <p className="text-xs font-semibold tracking-widest text-prune-500 uppercase mb-2">
+          Analyse {ASSISTANT_NAME}
+        </p>
+        <p className="text-sm text-amber-800">{error}</p>
+      </section>
+    );
+  }
+
+  if (!analysis?.summary && !analysis?.outlook) return null;
+
+  return (
+    <section className="px-5 sm:px-8 py-5 sm:py-6 border-b border-prune-100 bg-gradient-to-br from-prune-50/80 to-white">
+      <p className="text-xs font-semibold tracking-widest text-prune-500 uppercase">
+        Analyse {ASSISTANT_NAME}
+      </p>
+      <p className="mt-1 text-xs text-prune-400">
+        Lecture neutre et objective — sans promesse de réussite.
+      </p>
+
+      {analysis.summary && (
+        <p className="mt-4 text-sm sm:text-base text-prune-800 leading-relaxed">
+          {asText(analysis.summary)}
+        </p>
+      )}
+
+      <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {Array.isArray(analysis.strengths) && analysis.strengths.length > 0 && (
+          <div className="rounded-xl border border-wasabi-100 bg-wasabi-50/50 p-4">
+            <h4 className="text-sm font-semibold text-prune-900 mb-2">Points favorables</h4>
+            <ul className="space-y-2">
+              {analysis.strengths.map((item, index) => (
+                <li key={index} className="flex gap-2 text-sm text-prune-800 leading-relaxed">
+                  <span className="text-wasabi-600 font-bold shrink-0">+</span>
+                  <span>{asText(item)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {Array.isArray(analysis.risks) && analysis.risks.length > 0 && (
+          <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-4">
+            <h4 className="text-sm font-semibold text-prune-900 mb-2">Points de vigilance</h4>
+            <ul className="space-y-2">
+              {analysis.risks.map((item, index) => (
+                <li key={index} className="flex gap-2 text-sm text-prune-800 leading-relaxed">
+                  <span className="text-amber-700 font-bold shrink-0">!</span>
+                  <span>{asText(item)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {analysis.outlook && (
+        <div className="mt-4">
+          <h4 className="text-sm font-semibold text-prune-900 mb-2">Perspectives</h4>
+          <p className="text-sm sm:text-base text-prune-800 leading-relaxed">
+            {asText(analysis.outlook)}
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+export default function ProjectReport({
+  project,
+  fabulousAnalysis = null,
+  analysisLoading = false,
+  analysisError = '',
+}) {
   if (!project) return null;
 
   const sections = getReportSections(project);
@@ -89,6 +177,7 @@ export default function ProjectReport({ project }) {
   const locationLabel = project.ou || project.location?.label || '—';
   const activityLabel = project.quoi || project.activity?.label || project.title || '—';
   const training = project.training || project.metadata?.training;
+  const analysis = fabulousAnalysis || project.fabulousAnalysis || null;
 
   return (
     <article className="rounded-2xl border border-prune-100 bg-gradient-to-b from-white to-prune-50/40 overflow-hidden">
@@ -105,6 +194,12 @@ export default function ProjectReport({ project }) {
           </p>
         )}
       </header>
+
+      <FabulousAnalysisBlock
+        analysis={analysis}
+        loading={analysisLoading}
+        error={analysisError}
+      />
 
       {sections.length > 0 ? (
         <div className="divide-y divide-prune-100">
@@ -151,7 +246,7 @@ export default function ProjectReport({ project }) {
               </dd>
             </div>
           </dl>
-          {!project.description && (
+          {!project.description && !analysis && !analysisLoading && (
             <p className="text-sm text-prune-500 italic">
               Aucun détail de recherche n&apos;est disponible pour ce projet.
             </p>

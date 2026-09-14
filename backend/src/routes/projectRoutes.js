@@ -79,6 +79,7 @@ export function createProjectRoutes({
   router.post('/search/france-map', ...publicAi, projectController.evaluateFranceImplantation);
   router.post('/search/city-eval', ...publicAi, projectController.evaluateCityImplantation);
   router.post('/search/proposals', ...publicAi, projectController.buildProposals);
+  router.post('/search/preview-analysis', ...publicAi, projectController.analyzeProjectPreview);
 
   const paidAi = [
     authenticate,

@@ -171,6 +171,11 @@ export const projectService = {
     };
   },
 
+  async analyzeProjectPreview(payload) {
+    const { data } = await api.post('/projects/search/preview-analysis', payload);
+    return data.analysis || null;
+  },
+
   async getMine() {
     const { data } = await api.get('/projects/mine');
     return data;

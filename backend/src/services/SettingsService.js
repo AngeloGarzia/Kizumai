@@ -37,6 +37,9 @@ export function createSettingsService({ settingsRepository, aiPromptRepository }
       const jsonRetryPrompt = await aiPromptRepository.findByKey('ai_json_retry');
       const franceSystemExtraPrompt = await aiPromptRepository.findByKey('ai_france_system_extra');
       const memoryContextPrefixPrompt = await aiPromptRepository.findByKey('ai_memory_context_prefix');
+      const projectPreviewAnalysisPrompt = await aiPromptRepository.findByKey(
+        'project_preview_analysis'
+      );
 
       const provider = settings.ai_provider || config.ai.defaultProvider;
       const providerDef = getProviderById(provider);
@@ -63,6 +66,7 @@ export function createSettingsService({ settingsRepository, aiPromptRepository }
         jsonRetryPrompt: jsonRetryPrompt?.content || null,
         franceSystemExtraPrompt: franceSystemExtraPrompt?.content || null,
         memoryContextPrefixPrompt: memoryContextPrefixPrompt?.content || null,
+        projectPreviewAnalysisPrompt: projectPreviewAnalysisPrompt?.content || null,
       };
     },
 

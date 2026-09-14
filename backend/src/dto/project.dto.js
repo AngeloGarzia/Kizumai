@@ -138,6 +138,23 @@ export const BuildProposalsRequestDto = {
   },
 };
 
+export const ProjectPreviewAnalysisRequestDto = {
+  from(body = {}) {
+    return {
+      title: optionalString(body.title, { max: 200 }) || '',
+      business: optionalString(body.business ?? body.quoi, { max: 200 }),
+      location: optionalString(body.location ?? body.ou, { max: 300 }),
+      ...normalizeBudgetCurrency(body),
+      temperature: optionalSearchTemperature(body),
+      report: optionalString(body.report, { max: 50_000 }) || '',
+      sections: Array.isArray(body.sections) ? body.sections : [],
+      training: body.training && typeof body.training === 'object' ? body.training : null,
+      feasibility: optionalNumber(body.feasibility),
+      projectId: optionalProjectId(body),
+    };
+  },
+};
+
 export const CreateProjectRequestDto = {
   from(body = {}) {
     return {

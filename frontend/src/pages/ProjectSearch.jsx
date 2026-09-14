@@ -644,6 +644,14 @@ export default function ProjectSearch() {
     goToLocations(business, null);
   };
 
+  const openFranceMap = () => {
+    if (!selectedBusiness) return;
+    setMapOpen(true);
+    setMapError('');
+    // Recharger la carte pour permettre un nouveau choix de région.
+    fetchFranceMap(selectedBusiness);
+  };
+
   const handleSelectLocation = (location) => {
     setSelectedLocation(location);
     setProposals([]);
@@ -724,19 +732,8 @@ export default function ProjectSearch() {
   return (
     <div className="min-h-screen min-h-dvh page-bg flex flex-col">
       <header className="sticky top-0 z-10 header-glass">
-        <div className="page-container py-4 flex items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={goBack}
-            className="flex items-center justify-center w-10 h-10 rounded-xl bg-prune-100 text-prune-700 hover:bg-prune-200 transition-colors"
-            aria-label="Retour"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
+        <div className="page-container py-4 flex items-center justify-center gap-3">
           <BrandLogo size="sm" />
-          <div className="w-10" aria-hidden="true" />
         </div>
       </header>
 
@@ -856,6 +853,22 @@ export default function ProjectSearch() {
 
               {step === 'locations' && (
                 <div className="grid gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-prune-100 bg-white p-4">
+                    <p className="text-sm text-prune-600">
+                      Zone actuelle :{' '}
+                      <span className="font-medium text-prune-900">
+                        {seed?.ou || 'France entière'}
+                      </span>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={openFranceMap}
+                      disabled={loading || mapLoading}
+                      className="btn-secondary w-full sm:w-auto whitespace-nowrap disabled:opacity-50"
+                    >
+                      Changer de région (carte)
+                    </button>
+                  </div>
                   {locations.map((location, index) => (
                     <SelectableCard key={index} onSelect={() => handleSelectLocation(location)}>
                       <div className="flex items-start justify-between gap-3">

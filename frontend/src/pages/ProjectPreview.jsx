@@ -11,7 +11,9 @@ import {
   clearSearchSeed,
   getProjectDraft,
   getSearchProgress,
+  getSearchSeed,
   projectService,
+  saveProjectDraft,
 } from '../services/projectService.js';
 import { authService } from '../services/authService.js';
 import { IconChevronRight } from '../components/icons.jsx';
@@ -24,6 +26,8 @@ export default function ProjectPreview() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [confirmUpgradeOpen, setConfirmUpgradeOpen] = useState(false);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisError, setAnalysisError] = useState('');
 
   useEffect(() => {
     const draft = getProjectDraft();
@@ -38,6 +42,51 @@ export default function ProjectPreview() {
     }
     setPreview(draft);
   }, [navigate]);
+
+  useEffect(() => {
+    if (!preview) return undefined;
+    if (preview.fabulousAnalysis?.summary || preview.fabulousAnalysis?.outlook) {
+      return undefined;
+    }
+
+    let active = true;
+    setAnalysisLoading(true);
+    setAnalysisError('');
+
+    const seed = getSearchSeed();
+    projectService
+      .analyzeProjectPreview({
+        title: preview.title,
+        business: preview.quoi,
+        location: preview.ou,
+        budget: preview.budget,
+        currency: preview.currency,
+        report: preview.report,
+        sections: preview.sections,
+        training: preview.training,
+        feasibility: preview.feasibility,
+        temperature: seed?.temperature,
+      })
+      .then((analysis) => {
+        if (!active || !analysis) return;
+        const next = { ...preview, fabulousAnalysis: analysis };
+        setPreview(next);
+        saveProjectDraft(next);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setAnalysisError(err.message || `Impossible de générer l’analyse ${ASSISTANT_NAME}`);
+      })
+      .finally(() => {
+        if (active) setAnalysisLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+    // Une seule génération par brouillon (clé budget+titre) ; preview.id n'existe pas encore.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional once per draft identity
+  }, [preview?.title, preview?.budget, preview?.quoi, preview?.ou]);
 
   const handleContinuePaid = async () => {
     if (!preview) return;
@@ -97,23 +146,21 @@ export default function ProjectPreview() {
   return (
     <div className="min-h-screen min-h-dvh page-bg flex flex-col">
       <header className="sticky top-0 z-10 header-glass">
-        <div className="page-container py-4 flex items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={() => navigate('/projet/recherche?step=proposals')}
-            className="flex items-center justify-center w-10 h-10 rounded-xl bg-prune-100 text-prune-700 hover:bg-prune-200 transition-colors"
-            aria-label="Retour à la recherche"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
+        <div className="page-container py-4 flex items-center justify-center gap-3">
           <BrandLogo size="sm" />
-          <div className="w-10" aria-hidden="true" />
         </div>
       </header>
 
       <main className="page-container flex-1 py-6 sm:py-10 max-w-[67.2rem]">
+        <button
+          type="button"
+          onClick={() => navigate('/projet/recherche?step=proposals')}
+          className="mb-4 inline-flex items-center gap-1 text-sm text-prune-500 hover:text-prune-700"
+        >
+          <IconChevronRight className="w-4 h-4 rotate-180" />
+          Étape précédente
+        </button>
+
         <section className="text-center sm:text-left mb-6 sm:mb-8">
           <p className="text-xs sm:text-sm font-semibold tracking-widest text-prune-600 uppercase">
             Résultat de la recherche
@@ -130,7 +177,12 @@ export default function ProjectPreview() {
           {preview.feasibility != null && (
             <FeasibilityGauge score={preview.feasibility} />
           )}
-          <ProjectReport project={preview} />
+          <ProjectReport
+            project={preview}
+            fabulousAnalysis={preview.fabulousAnalysis}
+            analysisLoading={analysisLoading}
+            analysisError={analysisError}
+          />
 
           <div className="card p-5 sm:p-6 space-y-4">
             {error && <p className="alert-error">{error}</p>}

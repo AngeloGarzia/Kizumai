@@ -1,47 +1,23 @@
 import { config } from '../config/index.js';
-import { EmailService } from './EmailService.js';
-
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+import { TransactionalMail } from './TransactionalMail.js';
 
 function sanitizeHttpUrl(url) {
-  if (!url) return config.appUrl;
+  if (!url) return config.publicAppUrl || config.appUrl;
   try {
-    const parsed = new URL(url, config.appUrl);
+    const base = config.publicAppUrl || config.appUrl;
+    const parsed = new URL(url, base);
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      return config.appUrl;
+      return base;
     }
-    const app = new URL(config.appUrl);
+    const app = new URL(base);
     if (parsed.origin !== app.origin) {
       // Uniquement chemins same-origin (anti open-redirect).
-      return config.appUrl;
+      return base;
     }
     return parsed.toString();
   } catch {
-    return config.appUrl;
+    return config.publicAppUrl || config.appUrl;
   }
-}
-
-function buildEmailFromPayload({ title, body, url }) {
-  const link = sanitizeHttpUrl(url);
-  const safeTitle = escapeHtml(title);
-  const safeBody = escapeHtml(body);
-  const safeLink = escapeHtml(link);
-  const text = `${body}\n\n${link}`;
-  const html = `
-    <div style="font-family:system-ui,Arial,sans-serif;line-height:1.5">
-      <h2 style="margin:0 0 12px">${safeTitle}</h2>
-      <p style="margin:0 0 16px">${safeBody}</p>
-      <p><a href="${safeLink}" style="color:#7c3aed">Ouvrir Kizumai</a></p>
-    </div>
-  `;
-  return { subject: String(title || 'Kizumai'), text, html };
 }
 
 export function createNotificationService({
@@ -74,18 +50,32 @@ export function createNotificationService({
       }
 
       const user = await userRepository.findById(userId);
-      if (user?.email) {
-        const { subject, text, html } = buildEmailFromPayload(safePayload);
-        const { skipped } = await EmailService.send({
+      if (!user?.email) return result;
+
+      let sendResult;
+      if (payload.emailTemplate === 'planner-reminder' && payload.emailVars) {
+        sendResult = await TransactionalMail.sendPlannerReminderEmail({
           to: user.email,
-          subject,
-          text,
-          html,
+          ...payload.emailVars,
+          url: safePayload.url,
         });
-        result.emailSent = !skipped;
-        result.channel = 'email';
+      } else if (payload.emailTemplate === 'project-progress' && payload.emailVars) {
+        sendResult = await TransactionalMail.sendProjectProgressEmail({
+          to: user.email,
+          ...payload.emailVars,
+          url: safePayload.url,
+        });
+      } else {
+        sendResult = await TransactionalMail.sendGenericNotificationEmail({
+          to: user.email,
+          title: safePayload.title,
+          body: safePayload.body,
+          url: safePayload.url,
+        });
       }
 
+      result.emailSent = Boolean(sendResult?.ok && !sendResult?.skipped);
+      result.channel = sendResult?.ok ? 'email' : result.channel;
       return result;
     },
 

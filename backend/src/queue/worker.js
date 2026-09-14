@@ -24,13 +24,21 @@ function buildReminderPayload(event) {
   });
 
   const parts = [when];
-  if (event.location) parts.push(`📍 ${event.location}`);
+  if (event.location) parts.push(event.location);
   if (event.description) parts.push(event.description);
 
   return {
     title: `${prefix} : ${event.title}`,
     body: parts.join(' — '),
     url: `${config.publicAppUrl}/planner`,
+    emailTemplate: 'planner-reminder',
+    emailVars: {
+      kindLabel: prefix,
+      eventTitle: event.title,
+      when,
+      location: event.location || '',
+      description: event.description || '',
+    },
   };
 }
 

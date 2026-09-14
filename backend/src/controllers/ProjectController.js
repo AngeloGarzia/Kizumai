@@ -5,6 +5,7 @@ import {
   CityImplantationRequestDto,
   LocationSuggestQueryDto,
   ProjectIdParamDto,
+  ProjectPreviewAnalysisRequestDto,
   ProjectPreviewRequestDto,
   ProjectResponseDto,
   SearchBusinessesRequestDto,
@@ -74,6 +75,14 @@ export function createProjectController({ projectService }) {
         withUserContext(dto, req)
       );
       successResponse(res, { proposals, assessment });
+    }),
+
+    analyzeProjectPreview: asyncHandler(async (req, res) => {
+      const dto = ProjectPreviewAnalysisRequestDto.from(req.body);
+      const analysis = await projectService.analyzeProjectPreview(
+        withUserContext(dto, req)
+      );
+      successResponse(res, { analysis });
     }),
 
     create: asyncHandler(async (req, res) => {

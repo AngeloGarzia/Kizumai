@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import BrandLogo from '../components/BrandLogo.jsx';
 import Button from '../components/Button.jsx';
 import Input from '../components/Input.jsx';
@@ -164,18 +164,8 @@ export default function CreateFuture() {
   return (
     <div className="min-h-screen min-h-dvh page-bg flex flex-col">
       <header className="sticky top-0 z-10 header-glass">
-        <div className="page-container py-4 flex items-center justify-between gap-3">
-          <Link
-            to="/"
-            className="flex items-center justify-center w-10 h-10 rounded-xl bg-prune-100 text-prune-700 hover:bg-prune-200 transition-colors"
-            aria-label="Retour à l'accueil"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-          </Link>
+        <div className="page-container py-4 flex items-center justify-center gap-3">
           <BrandLogo size="sm" />
-          <div className="w-10" aria-hidden="true" />
         </div>
       </header>
 

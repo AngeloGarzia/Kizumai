@@ -1388,6 +1388,91 @@ export function createAiService({ settingsService, currencyService }) {
     },
 
     /**
+     * Analyse neutre Fabulous pour l’aperçu projet (après choix budget).
+     * Prompt : ai_prompts.project_preview_analysis
+     */
+    async analyzeProjectPreview({
+      title = '',
+      business,
+      location,
+      budget,
+      currency = 'EUR',
+      report = '',
+      sections = [],
+      training = null,
+      feasibility = null,
+      memoryContext = '',
+      temperature = null,
+    }) {
+      const aiConfig = await settingsService.getAiConfig();
+      if (!aiConfig.projectPreviewAnalysisPrompt) {
+        throw new AppError(
+          'Le prompt « project_preview_analysis » est introuvable en base.',
+          500
+        );
+      }
+
+      const sectionsText = Array.isArray(sections)
+        ? sections
+            .slice(0, 20)
+            .map((s) => {
+              const t = String(s?.title || '').trim();
+              const c = String(s?.content || '').trim();
+              return t && c ? `## ${t}\n${c}` : '';
+            })
+            .filter(Boolean)
+            .join('\n\n')
+            .slice(0, 12_000)
+        : '';
+
+      const trainingText = training?.title
+        ? [
+            training.title,
+            training.level,
+            training.duration,
+            training.format,
+            training.rationale,
+          ]
+            .filter(Boolean)
+            .join(' · ')
+        : 'aucune';
+
+      const userContent = memCtx(
+        interpolate(aiConfig.projectPreviewAnalysisPrompt, {
+          title: String(title || business || '').trim().slice(0, 200),
+          business: String(business || '').trim().slice(0, 200),
+          location: String(location || '').trim().slice(0, 300),
+          budget,
+          currency: String(currency || 'EUR').slice(0, 8),
+          report: String(report || '').trim().slice(0, 12_000) || 'aucun',
+          sections: sectionsText || 'aucune',
+          training: trainingText,
+          feasibility:
+            feasibility != null && Number.isFinite(Number(feasibility))
+              ? String(Math.round(Number(feasibility)))
+              : 'non fournie',
+        }),
+        memoryContext,
+        aiConfig
+      );
+
+      const data = await requestStepJson(userContent, { temperature });
+      const strengths = Array.isArray(data.strengths)
+        ? data.strengths.map((s) => clipAiOutput(String(s || '').trim(), 400)).filter(Boolean).slice(0, 6)
+        : [];
+      const risks = Array.isArray(data.risks)
+        ? data.risks.map((s) => clipAiOutput(String(s || '').trim(), 400)).filter(Boolean).slice(0, 6)
+        : [];
+
+      return {
+        summary: clipAiOutput(String(data.summary || '').trim(), 2000),
+        strengths,
+        risks,
+        outlook: clipAiOutput(String(data.outlook || '').trim(), 2000),
+      };
+    },
+
+    /**
      * Extraction contacts / dates / adresses depuis un texte de document.
      * Le prompt vient exclusivement de ai_prompts.document_scan.
      */

@@ -473,6 +473,48 @@ export function createProjectService({
       return { proposals, assessment };
     },
 
+    async analyzeProjectPreview({
+      title = '',
+      business,
+      location,
+      budget,
+      currency = 'EUR',
+      report = '',
+      sections = [],
+      training = null,
+      feasibility = null,
+      userId = null,
+      projectId = null,
+      temperature = null,
+    }) {
+      if (!business?.trim() || !location?.trim()) {
+        throw new AppError('Business et lieu sont requis pour l’analyse.', 400);
+      }
+      await currencyService.getCurrencyData();
+      const memoryContext = await resolveMemoryContext({
+        userId,
+        projectId,
+        intent: `Analyse aperçu : ${business} à ${location}`,
+      });
+      return withAiUsageContext(
+        { userId, projectId, purpose: 'project_preview_analysis' },
+        async () =>
+          aiService.analyzeProjectPreview({
+            title,
+            business: business.trim(),
+            location: location.trim(),
+            budget: await currencyService.clampBudget(budget, currency),
+            currency,
+            report,
+            sections,
+            training,
+            feasibility,
+            memoryContext,
+            temperature,
+          })
+      );
+    },
+
     async startProject({ user, quoi, ou, budget, currency = 'EUR', title, report, sections }) {
       if (!user?.id) {
         throw new AppError('Authentification requise pour enregistrer le projet', 401);

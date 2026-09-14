@@ -180,6 +180,7 @@ Puis rebuild du service concerné sur le Debian.
 |----------|----------------|--------|
 | `502 Bad Gateway` | API down / redémarre | `sudo docker logs kizumai-api --tail 40` |
 | CORS / *more-private address space* | Page ouverte via IP publique mais API en `192.168.x.x` | Rebuild **web** avec `VITE_API_URL=/kizumai/api` (même origine) ; ouvrir l’app via la même URL que l’API |
+| Emails non envoyés | `SMTP_HOST` vide | Renseigner SMTP dans `backend/.env.production.lan` (`SMTP_PASSWORD`, `EMAIL_FROM`) puis `--force-recreate api` ; test : `npm run test:mail -- vous@…` en local |
 | `permission denied` sur init Postgres | Dossier `docker/postgres/init` en `700` | `chmod 755 docker/postgres/init` puis recréer le volume si 1ère install |
 | `REDIS_URL invalide` | `/` ou `@` dans `REDIS_PASSWORD` | Mot de passe hex dans `.env`, ou pull récent (encode auto) + rebuild `api` |
 | `SSL connections` | Postgres Docker sans TLS | `DB_SSL=false` dans `.env.production.lan` |
