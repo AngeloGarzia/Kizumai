@@ -13,9 +13,31 @@ import {
   getSearchProgress,
   getSearchSeed,
   projectService,
+  saveSearchProgress,
   saveSearchSeed,
 } from '../services/projectService.js';
 import { IconChevronRight } from '../components/icons.jsx';
+
+function buildSeed({ quoi, ou, budget, currency, temperature }) {
+  return {
+    quoi: quoi.trim() || null,
+    ou: ou.trim() || null,
+    budget: budget != null && Number(budget) > 0 ? Number(budget) : 500,
+    currency,
+    temperature: clampSearchTemperature(temperature),
+  };
+}
+
+function seedChanged(prev, next) {
+  if (!prev) return true;
+  return (
+    String(prev.quoi || '') !== String(next.quoi || '') ||
+    String(prev.ou || '') !== String(next.ou || '') ||
+    Number(prev.budget) !== Number(next.budget) ||
+    String(prev.currency || '') !== String(next.currency || '') ||
+    Number(prev.temperature) !== Number(next.temperature)
+  );
+}
 
 export default function CreateFuture() {
   const navigate = useNavigate();
@@ -31,12 +53,13 @@ export default function CreateFuture() {
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState('');
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
-  const [canResume, setCanResume] = useState(false);
+  const [resumeStep, setResumeStep] = useState(null);
   const locationRequestRef = useRef(0);
 
   const hasQuoi = Boolean(quoi.trim());
   const hasOu = Boolean(ou.trim());
   const canLaunch = hasQuoi || hasOu;
+  const canResume = Boolean(resumeStep);
 
   useEffect(() => {
     const seed = getSearchSeed();
@@ -48,7 +71,11 @@ export default function CreateFuture() {
       setCurrency(seed.currency || 'EUR');
       if (seed.temperature != null) setTemperature(clampSearchTemperature(seed.temperature));
     }
-    setCanResume(Boolean(progress?.businesses?.length || progress?.step));
+    if (progress?.businesses?.length) {
+      setResumeStep(progress.step || 'businesses');
+    } else {
+      setResumeStep(null);
+    }
   }, []);
 
   useEffect(() => {
@@ -86,28 +113,52 @@ export default function CreateFuture() {
     return () => clearTimeout(timer);
   }, [ou]);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setError('');
+  const resumeSearch = () => {
+    const progress = getSearchProgress();
+    const nextSeed = buildSeed({ quoi, ou, budget, currency, temperature });
+    const prevSeed = progress?.seed || getSearchSeed();
+    saveSearchSeed(nextSeed);
 
+    // Critères modifiés → on garde la session mais on repart sur l'étape Business.
+    if (seedChanged(prevSeed, nextSeed)) {
+      saveSearchProgress({
+        ...(progress || {}),
+        seed: nextSeed,
+        step: 'businesses',
+        businesses: [],
+        selectedBusiness: null,
+        locations: [],
+        selectedLocation: null,
+        proposals: [],
+        budgetAssessment: null,
+      });
+      navigate('/projet/recherche?step=businesses');
+      return;
+    }
+
+    const step = progress?.step || resumeStep || 'businesses';
+    if (progress) {
+      saveSearchProgress({ ...progress, seed: nextSeed });
+    }
+    navigate(`/projet/recherche?step=${step}`);
+  };
+
+  const startFreshSearch = () => {
+    setError('');
     if (!canLaunch) {
       setError('Indiquez au moins une idée ou un lieu pour lancer la recherche.');
       return;
     }
-
     setSubmitting(true);
-
-    // Nouvelle recherche : on repart proprement (garder le seed à jour).
     clearSearchProgress();
-    saveSearchSeed({
-      quoi: quoi.trim() || null,
-      ou: ou.trim() || null,
-      budget: budget != null && Number(budget) > 0 ? Number(budget) : 500,
-      currency,
-      temperature: clampSearchTemperature(temperature),
-    });
-
+    saveSearchSeed(buildSeed({ quoi, ou, budget, currency, temperature }));
     navigate('/projet/recherche?step=businesses');
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (canResume) resumeSearch();
+    else startFreshSearch();
   };
 
   return (
@@ -136,6 +187,12 @@ export default function CreateFuture() {
             </h1>
           </div>
         </section>
+
+        {canResume && (
+          <div className="mb-4 rounded-2xl border border-wasabi-200 bg-wasabi-50 px-4 py-3 text-sm text-prune-800">
+            Une recherche est en cours. Tu peux la reprendre ou modifier les critères puis continuer.
+          </div>
+        )}
 
         <div className="card p-5 sm:p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -209,20 +266,21 @@ export default function CreateFuture() {
             {error && <p className="alert-error">{error}</p>}
 
             <Button type="submit" disabled={submitting || !canLaunch}>
-              {submitting ? 'Recherche en cours...' : 'Lancer la recherche'}
+              {submitting
+                ? 'Recherche en cours...'
+                : canResume
+                  ? 'Continuer la recherche'
+                  : 'Lancer la recherche'}
             </Button>
 
             {canResume && (
               <button
                 type="button"
-                onClick={() => {
-                  const progress = getSearchProgress();
-                  const step = progress?.step || 'businesses';
-                  navigate(`/projet/recherche?step=${step}`);
-                }}
-                className="w-full text-sm font-medium text-prune-700 hover:text-prune-900 underline underline-offset-2"
+                onClick={startFreshSearch}
+                disabled={submitting || !canLaunch}
+                className="w-full text-sm font-medium text-prune-600 hover:text-prune-900 underline underline-offset-2 disabled:opacity-50"
               >
-                Reprendre la recherche en cours
+                Relancer une nouvelle recherche
               </button>
             )}
           </form>

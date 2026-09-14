@@ -288,9 +288,9 @@ export default function ProjectSearch() {
     (nextStep, { replace = false } = {}) => {
       const normalized = normalizeStep(nextStep);
       setStep(normalized);
-      setSearchParams({ step: normalized }, { replace });
+      navigate(`/projet/recherche?step=${normalized}`, { replace });
     },
-    [setSearchParams]
+    [navigate]
   );
 
   const proposalKindLabel = (kind) => {
@@ -362,6 +362,19 @@ export default function ProjectSearch() {
         temperature: seed.temperature,
       });
       setBusinesses(result);
+      const prev = getSearchProgress() || {};
+      saveSearchProgress({
+        ...prev,
+        step: 'businesses',
+        seed,
+        businesses: result,
+        selectedBusiness: prev.selectedBusiness || null,
+        locations: prev.locations || [],
+        selectedLocation: prev.selectedLocation || null,
+        proposals: prev.proposals || [],
+        budgetAssessment: prev.budgetAssessment || null,
+        savedTraining: prev.savedTraining || null,
+      });
     } catch (err) {
       setError(err.message || 'La recherche a échoué.');
     } finally {
@@ -388,6 +401,19 @@ export default function ProjectSearch() {
         temperature: seed.temperature,
       });
       setLocations(result);
+      const prev = getSearchProgress() || {};
+      saveSearchProgress({
+        ...prev,
+        step: 'locations',
+        seed,
+        businesses: prev.businesses || [],
+        selectedBusiness: business,
+        locations: result,
+        selectedLocation: null,
+        proposals: [],
+        budgetAssessment: null,
+        savedTraining: prev.savedTraining || null,
+      });
     } catch (err) {
       setError(err.message || 'La recherche a échoué.');
     } finally {
@@ -453,6 +479,19 @@ export default function ProjectSearch() {
       });
       setProposals(result.proposals || []);
       setBudgetAssessment(result.assessment || null);
+      const prev = getSearchProgress() || {};
+      saveSearchProgress({
+        ...prev,
+        step: 'proposals',
+        seed,
+        businesses: prev.businesses || [],
+        selectedBusiness: business,
+        locations: prev.locations || [],
+        selectedLocation: location,
+        proposals: result.proposals || [],
+        budgetAssessment: result.assessment || null,
+        savedTraining: prev.savedTraining || null,
+      });
     } catch (err) {
       setError(err.message || 'La recherche a échoué.');
     } finally {
