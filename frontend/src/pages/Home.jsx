@@ -1,28 +1,45 @@
-import { useNavigate } from 'react-router-dom';
-import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useProject } from '../context/ProjectContext.jsx';
 import BrandLogo from '../components/BrandLogo.jsx';
 import BottomNav from '../components/BottomNav.jsx';
 import ProgressCard from '../components/ProgressCard.jsx';
 import ModulesSection from '../components/ModulesSection.jsx';
+import NextStepGuide from '../components/NextStepGuide.jsx';
 import { IconRocket, IconBulb, IconPin, IconUser } from '../components/icons.jsx';
 import { stageHref } from '../constants/projectStages.js';
 import { competencesPercent, learningService } from '../services/learningService.js';
+import { projectService } from '../services/projectService.js';
 import { geoPercent } from '../utils/moduleProgress.js';
+import {
+  guideFromAdvancementCoach,
+  isNextStepGuideSeen,
+  markNextStepGuideSeen,
+  railStageId,
+  readAdvancementCache,
+  resolveNextStepGuide,
+  writeAdvancementCache,
+} from '../utils/nextStepGuide.js';
 
 export default function Home() {
   const navigate = useNavigate();
-  const { isAuthenticated, isPaid, loading } = useAuth();
+  const location = useLocation();
+  const { user, isAuthenticated, isPaid, loading } = useAuth();
   const { currentProject: project, hasProject } = useProject();
   const [learningRecords, setLearningRecords] = useState([]);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [activeGuide, setActiveGuide] = useState(null);
+  const welcomeLockRef = useRef(false);
 
   const goToCreateFuture = () => navigate('/creer-son-avenir');
 
-  // Invité : toujours le CTA « Créer son avenir » (même pendant le chargement auth).
-  // Connecté free / paid sans projet : CTA après fin du loading.
   const showProgressOverlay =
     !isAuthenticated || (!loading && (!isPaid || !hasProject));
+
+  const projectId = project?.id ?? null;
+  const stageId = project ? railStageId(project) : null;
+  const forceWelcome = Boolean(location.state?.showNextStepGuide);
 
   useEffect(() => {
     if (!isAuthenticated || !isPaid) {
@@ -36,8 +53,8 @@ export default function Home() {
         if (!active) return;
         const all = Array.isArray(records) ? records : [];
         setLearningRecords(
-          project?.id
-            ? all.filter((r) => r.projectId == null || r.projectId === project.id)
+          projectId
+            ? all.filter((r) => r.projectId == null || r.projectId === projectId)
             : all
         );
       })
@@ -47,7 +64,141 @@ export default function Home() {
     return () => {
       active = false;
     };
-  }, [isAuthenticated, isPaid, project?.id]);
+  }, [isAuthenticated, isPaid, projectId]);
+
+  // Coach d’avancement (IA + mémoire) — fallback texte statique.
+  useEffect(() => {
+    if (!isPaid || !projectId || !user?.id || !project) {
+      setGuideOpen(false);
+      setActiveGuide(null);
+      welcomeLockRef.current = false;
+      return undefined;
+    }
+
+    if (forceWelcome) {
+      welcomeLockRef.current = true;
+      const welcome = resolveNextStepGuide(project, { forceWelcome: true });
+      setActiveGuide(welcome);
+      setGuideOpen(Boolean(welcome));
+      navigate(location.pathname, { replace: true, state: {} });
+      return undefined;
+    }
+
+    if (welcomeLockRef.current) {
+      return undefined;
+    }
+
+    const tipKey = `stage:${stageId}`;
+    if (isNextStepGuideSeen(user.id, projectId, tipKey)) {
+      setGuideOpen(false);
+      setActiveGuide(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const showStatic = () => {
+      if (cancelled || welcomeLockRef.current) return;
+      const guide = resolveNextStepGuide(project);
+      if (!guide || isNextStepGuideSeen(user.id, projectId, guide.key)) {
+        setGuideOpen(false);
+        setActiveGuide(null);
+        return;
+      }
+      setActiveGuide(guide);
+      setGuideOpen(true);
+    };
+
+    const cached = readAdvancementCache(user.id, projectId, stageId);
+    if (cached) {
+      const guide = guideFromAdvancementCoach(project, cached);
+      if (guide && !isNextStepGuideSeen(user.id, projectId, tipKey)) {
+        setActiveGuide(guide);
+        setGuideOpen(true);
+        return undefined;
+      }
+    }
+
+    showStatic();
+
+    projectService
+      .getAdvancementCoach(projectId)
+      .then((coach) => {
+        if (cancelled || welcomeLockRef.current || !coach) return;
+        writeAdvancementCache(user.id, projectId, stageId, coach);
+        if (isNextStepGuideSeen(user.id, projectId, tipKey)) return;
+        const guide = guideFromAdvancementCoach(project, coach);
+        if (!guide) return;
+        setActiveGuide(guide);
+        setGuideOpen(true);
+      })
+      .catch(() => {
+        // Fallback déjà affiché.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isPaid,
+    project,
+    projectId,
+    stageId,
+    user?.id,
+    forceWelcome,
+    location.pathname,
+    navigate,
+  ]);
+
+  const dismissGuide = () => {
+    const wasWelcome = activeGuide?.key === 'welcome';
+    if (user?.id && projectId && activeGuide?.key) {
+      markNextStepGuideSeen(user.id, projectId, activeGuide.key);
+    }
+    welcomeLockRef.current = false;
+    setGuideOpen(false);
+
+    if (!wasWelcome || !project || !user?.id) return;
+
+    const nextStage = railStageId(project);
+    const tipKey = `stage:${nextStage}`;
+    if (isNextStepGuideSeen(user.id, projectId, tipKey)) return;
+
+    const cached = readAdvancementCache(user.id, projectId, nextStage);
+    if (cached) {
+      const guide = guideFromAdvancementCoach(project, cached);
+      if (guide) {
+        setActiveGuide(guide);
+        setGuideOpen(true);
+        return;
+      }
+    }
+
+    projectService
+      .getAdvancementCoach(projectId)
+      .then((coach) => {
+        if (!coach) return;
+        writeAdvancementCache(user.id, projectId, nextStage, coach);
+        const guide = guideFromAdvancementCoach(project, coach);
+        if (guide) {
+          setActiveGuide(guide);
+          setGuideOpen(true);
+        }
+      })
+      .catch(() => {
+        const guide = resolveNextStepGuide(project);
+        if (guide && !isNextStepGuideSeen(user.id, projectId, guide.key)) {
+          setActiveGuide(guide);
+          setGuideOpen(true);
+        }
+      });
+  };
+
+  const continueGuide = () => {
+    const href = activeGuide?.href;
+    dismissGuide();
+    if (href) navigate(href);
+  };
 
   const modules = useMemo(
     () => [
@@ -106,8 +257,8 @@ export default function Home() {
       goToCreateFuture();
       return;
     }
-    const stageId = project.progress?.nextStage || project.stage || 'idee';
-    navigate(stageHref(stageId, project.id));
+    const next = project.progress?.nextStage || project.stage || 'idee';
+    navigate(stageHref(next, project.id));
   };
 
   return (
@@ -139,13 +290,19 @@ export default function Home() {
               navigate(isPaid ? '/parcours' : isAuthenticated ? '/projet/apercu' : '/register')
             }
           />
-
         </main>
       </div>
 
       <div className="lg:hidden">
         <BottomNav />
       </div>
+
+      <NextStepGuide
+        open={guideOpen}
+        guide={activeGuide}
+        onDismiss={dismissGuide}
+        onContinue={continueGuide}
+      />
     </div>
   );
 }

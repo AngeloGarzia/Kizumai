@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useProject } from '../context/ProjectContext.jsx';
 import BrandLogo from '../components/BrandLogo.jsx';
 import Button from '../components/Button.jsx';
 import FeasibilityGauge from '../components/FeasibilityGauge.jsx';
@@ -22,12 +23,24 @@ import { ASSISTANT_NAME } from '../constants/assistant.js';
 export default function ProjectPreview() {
   const navigate = useNavigate();
   const { user, isAuthenticated, isPaid, loading, loadUser } = useAuth();
+  const { refreshProjects, setCurrentProjectId } = useProject();
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [confirmUpgradeOpen, setConfirmUpgradeOpen] = useState(false);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState('');
+
+  const finishCreateAndGoHome = async (created) => {
+    clearProjectDraft();
+    clearSearchSeed();
+    clearSearchProgress();
+    if (created?.id) {
+      setCurrentProjectId(created.id);
+    }
+    await refreshProjects();
+    navigate('/', { state: { showNextStepGuide: true } });
+  };
 
   useEffect(() => {
     const draft = getProjectDraft();
@@ -94,11 +107,8 @@ export default function ProjectPreview() {
     setSubmitting(true);
 
     try {
-      await projectService.createProject(preview);
-      clearProjectDraft();
-      clearSearchSeed();
-      clearSearchProgress();
-      navigate('/');
+      const created = await projectService.createProject(preview);
+      await finishCreateAndGoHome(created);
     } catch (err) {
       setError(err.message || "Impossible d'enregistrer le projet");
     } finally {
@@ -114,12 +124,9 @@ export default function ProjectPreview() {
     try {
       await authService.upgradeToPaid();
       await loadUser();
-      await projectService.createProject(preview);
-      clearProjectDraft();
-      clearSearchSeed();
-      clearSearchProgress();
+      const created = await projectService.createProject(preview);
       setConfirmUpgradeOpen(false);
-      navigate('/');
+      await finishCreateAndGoHome(created);
     } catch (err) {
       setError(err.message || "Impossible d'activer le compte payant");
       setConfirmUpgradeOpen(false);

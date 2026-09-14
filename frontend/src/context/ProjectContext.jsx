@@ -38,7 +38,7 @@ export function ProjectProvider({ children }) {
   }, []);
 
   const refreshProjects = useCallback(async () => {
-    if (!isAuthenticated || !isPaid) {
+    if (!isAuthenticated) {
       setProjects([]);
       setError('');
       return [];
@@ -67,7 +67,7 @@ export function ProjectProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, isPaid, setCurrentProjectId]);
+  }, [isAuthenticated, setCurrentProjectId]);
 
   useEffect(() => {
     if (!isAuthenticated || !isPaid) {

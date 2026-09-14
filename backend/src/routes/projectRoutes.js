@@ -92,6 +92,7 @@ export function createProjectRoutes({
   router.get('/mine', authenticate, requirePaid, projectController.getMine);
   router.post('/mine/memory/situation', ...paidAi, projectController.recallSituation);
   router.post('/mine/memory/scan', ...paidAi, projectController.scanMemory);
+  router.post('/mine/advancement', ...paidAi, projectController.advancementCoach);
   router.get('/mine/timeline', authenticate, requirePaid, projectController.getTimeline);
 
   router.get('/:id', authenticate, requirePaid, projectController.getOne);
@@ -99,6 +100,7 @@ export function createProjectRoutes({
   router.put('/:id/location', authenticate, requirePaid, projectController.updateLocation);
   router.post('/:id/memory/situation', ...paidAi, projectController.recallSituationForProject);
   router.post('/:id/memory/scan', ...paidAi, projectController.scanMemoryForProject);
+  router.post('/:id/advancement', ...paidAi, projectController.advancementCoachForProject);
   router.get('/:id/timeline', authenticate, requirePaid, projectController.getTimelineForProject);
 
   router.get('/:id/stages/:stage', authenticate, requirePaid, projectStageController.getOrCreate);

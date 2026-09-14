@@ -137,6 +137,17 @@ export function createProjectController({ projectService }) {
       successResponse(res, { situation });
     }),
 
+    advancementCoach: asyncHandler(async (req, res) => {
+      const coach = await projectService.getAdvancementCoach(req.user.id);
+      successResponse(res, { coach });
+    }),
+
+    advancementCoachForProject: asyncHandler(async (req, res) => {
+      const { id } = ProjectIdParamDto.from(req.params);
+      const coach = await projectService.getAdvancementCoach(req.user.id, { projectId: id });
+      successResponse(res, { coach });
+    }),
+
     scanMemory: asyncHandler(async (req, res) => {
       const result = await projectService.scanProjectMemory(req.user.id);
       successResponse(res, { scan: result });

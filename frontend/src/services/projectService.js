@@ -196,6 +196,15 @@ export const projectService = {
     return data.situation;
   },
 
+  async getAdvancementCoach(projectId = null) {
+    if (projectId) {
+      const { data } = await api.post(`/projects/${projectId}/advancement`, {});
+      return data.coach;
+    }
+    const { data } = await api.post('/projects/mine/advancement', {});
+    return data.coach;
+  },
+
   async scanProjectMemory() {
     const { data } = await api.post('/projects/mine/memory/scan', {});
     return data.scan;

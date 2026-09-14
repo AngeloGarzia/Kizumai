@@ -2,6 +2,7 @@ import { AppError } from '../utils/AppError.js';
 import { hasPaidAccess } from '../constants/plans.js';
 import { computeProjectProgress } from '../constants/projectStages.js';
 import { withAiUsageContext } from '../utils/aiUsage.js';
+import { createAdvancementCoachService } from './AdvancementCoachService.js';
 
 const LOCATION_SUGGEST_TIMEOUT_MS = 4500;
 
@@ -117,6 +118,10 @@ export function createProjectService({
   projectTimelineService = null,
   projectStageRepository = null,
 }) {
+  const advancementCoach = createAdvancementCoachService({
+    projectMemoryRecallService,
+  });
+
   async function withProgress(project) {
     if (!project) return project;
     let runs = [];
@@ -689,6 +694,31 @@ export function createProjectService({
         projectId: project.id,
         projectTitle: project.title || project.quoi || null,
         ...result,
+      };
+    },
+
+    /**
+     * Coach d’avancement (mémoire + IA), rail = étape parcours.
+     */
+    async getAdvancementCoach(userId, { projectId = null } = {}) {
+      let project;
+      if (projectId) {
+        project = await this.getUserProject(userId, projectId);
+      } else {
+        const projects = await this.getUserProjects(userId);
+        project = projects[0] || null;
+        if (!project) {
+          throw new AppError(
+            'Aucun projet pour l’instant. Crée ton avenir pour activer le coach d’avancement.',
+            404
+          );
+        }
+      }
+
+      const coach = await advancementCoach.buildForProject(project);
+      return {
+        ...coach,
+        projectTitle: project.title || project.quoi || null,
       };
     },
 
