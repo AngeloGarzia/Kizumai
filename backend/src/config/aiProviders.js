@@ -100,15 +100,18 @@ export function isModelValidForProvider(providerId, modelId) {
   return provider.models.some((m) => m.id === modelId);
 }
 
+/**
+ * Résout le modèle à utiliser.
+ * - vide → default du fournisseur
+ * - Gemini retiré (1.5 / 2.x) → remap 3.x
+ * - sinon → conserve l’id persisté (catalogue live peut aller au-delà de la liste statique)
+ *   La validation stricte se fait à l’enregistrement via assertModelAllowed.
+ */
 export function resolveModel(providerId, modelId) {
   const provider = getProviderById(providerId);
   if (!provider) return null;
   const trimmed = modelId != null ? String(modelId).trim() : '';
   if (!trimmed) return provider.defaultModel;
-  let resolved = trimmed;
-  if (providerId === 'gemini') resolved = remapRetiredGeminiModel(trimmed);
-  if (!isModelValidForProvider(providerId, resolved)) {
-    return provider.defaultModel;
-  }
-  return resolved;
+  if (providerId === 'gemini') return remapRetiredGeminiModel(trimmed);
+  return trimmed;
 }

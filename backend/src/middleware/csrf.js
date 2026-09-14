@@ -5,10 +5,9 @@ import { AppError } from '../utils/AppError.js';
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 function allowedOrigins() {
-  return String(config.cors.origin || '')
-    .split(',')
-    .map((o) => o.trim())
-    .filter(Boolean);
+  const raw = config.cors.origin;
+  const list = Array.isArray(raw) ? raw : String(raw || '').split(',');
+  return list.map((o) => String(o).trim()).filter(Boolean);
 }
 
 function originFromReferer(referer) {
