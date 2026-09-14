@@ -45,11 +45,23 @@ export function AuthProvider({ children }) {
     return loggedUser;
   };
 
-  const register = async (name, email, password) => {
-    const newUser = await authService.register({ name, email, password });
-    setUser(newUser);
-    return newUser;
-  };
+  const register = useCallback(async (name, email, password) => {
+    const result = await authService.register({ name, email, password });
+    if (result?.pendingVerification) {
+      return result;
+    }
+    if (result?.user) {
+      setUser(result.user);
+      return result;
+    }
+    return result;
+  }, []);
+
+  const confirmEmail = useCallback(async (token) => {
+    const user = await authService.confirmEmail(token);
+    setUser(user);
+    return user;
+  }, []);
 
   const logout = async () => {
     await authService.logout();
@@ -65,6 +77,7 @@ export function AuthProvider({ children }) {
       loading,
       login,
       register,
+      confirmEmail,
       logout,
       isAuthenticated: !!user,
       isAdmin: user?.role === 'admin',

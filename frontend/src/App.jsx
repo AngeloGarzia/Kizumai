@@ -15,6 +15,7 @@ import Parcours from './pages/Parcours.jsx';
 import CreateFuture from './pages/CreateFuture.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
+import ConfirmEmail from './pages/ConfirmEmail.jsx';
 import Admin from './pages/Admin.jsx';
 import Competences from './pages/Competences.jsx';
 import Geographie from './pages/Geographie.jsx';
@@ -41,6 +42,7 @@ export default function App() {
             <Route path="/projet/apercu" element={<ProjectPreview />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/confirm-email" element={<ConfirmEmail />} />
             <Route element={<AuthRoute />}>
               <Route path="/setup" element={<Setup />} />
             </Route>

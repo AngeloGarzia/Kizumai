@@ -22,6 +22,16 @@ export function createAuthRoutes({
   router.get('/csrf', authController.csrf);
   router.get('/billing-config', authController.billingConfig);
   router.post('/register', stackRedis(registerRedisQuota, registerRateLimiter), authController.register);
+  router.post(
+    '/confirm-email',
+    stackRedis(registerRedisQuota, registerRateLimiter),
+    authController.confirmEmail
+  );
+  router.post(
+    '/resend-confirmation',
+    stackRedis(registerRedisQuota, registerRateLimiter),
+    authController.resendConfirmation
+  );
   router.post('/login', stackRedis(loginRedisQuota, loginRateLimiter), authController.login);
   router.post('/refresh', stackRedis(refreshRedisQuota, refreshRateLimiter), authController.refresh);
   router.post('/logout', authController.logout);

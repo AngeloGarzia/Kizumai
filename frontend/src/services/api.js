@@ -11,7 +11,14 @@ const CSRF_COOKIE = 'kizumai_csrf';
 
 // Endpoints d'authentification qui ne doivent jamais déclencher de refresh
 // automatique (sinon boucle infinie sur un 401).
-const NO_REFRESH_ENDPOINTS = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/csrf'];
+const NO_REFRESH_ENDPOINTS = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/confirm-email',
+  '/auth/resend-confirmation',
+  '/auth/refresh',
+  '/auth/csrf',
+];
 
 // Une seule tentative de refresh partagée à la fois, pour éviter que plusieurs
 // requêtes simultanées ne lancent chacune leur propre rafraîchissement.

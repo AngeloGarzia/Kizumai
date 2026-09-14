@@ -1,40 +1,90 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import AuthLayout from '../components/AuthLayout.jsx';
 import Button from '../components/Button.jsx';
 import Input from '../components/Input.jsx';
-import { getProjectDraft } from '../services/projectService.js';
+import { authService } from '../services/authService.js';
 
 export default function Register() {
   const { register } = useAuth();
-  const navigate = useNavigate();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [resendMessage, setResendMessage] = useState('');
+  const [resending, setResending] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setResendMessage('');
     setSubmitting(true);
 
     try {
-      await register(name, email, password);
-
-      const draft = getProjectDraft();
-      if (draft) {
-        navigate('/projet/apercu');
-      } else {
-        navigate('/');
+      const result = await register(name, email, password);
+      if (result?.pendingVerification) {
+        setPendingEmail(result.email || email.trim().toLowerCase());
+        return;
       }
     } catch (err) {
-      setError(err.message || 'Échec de l\'inscription');
+      setError(err.message || "Échec de l'inscription");
     } finally {
       setSubmitting(false);
     }
   };
+
+  const handleResend = async () => {
+    if (!pendingEmail) return;
+    setResending(true);
+    setError('');
+    setResendMessage('');
+    try {
+      const result = await authService.resendConfirmation(pendingEmail);
+      setResendMessage(result.message || 'Email renvoyé si le compte est en attente.');
+    } catch (err) {
+      setError(err.message || "Impossible de renvoyer l'email");
+    } finally {
+      setResending(false);
+    }
+  };
+
+  if (pendingEmail) {
+    return (
+      <AuthLayout
+        title="Vérifiez votre email"
+        subtitle="Un dernier clic pour activer votre compte"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-prune-700">
+            Nous avons envoyé un lien de confirmation à{' '}
+            <strong className="text-prune-900">{pendingEmail}</strong>. Ouvrez cet email et
+            cliquez sur « Confirmer mon email » pour activer votre compte. Sans cette étape,
+            la connexion reste bloquée.
+          </p>
+          <p className="text-sm text-prune-600">
+            Pensez à vérifier vos indésirables. Le lien expire sous 48 heures.
+          </p>
+
+          {error && <p className="alert-error">{error}</p>}
+          {resendMessage && <p className="text-sm text-wasabi-700">{resendMessage}</p>}
+
+          <Button type="button" onClick={handleResend} disabled={resending}>
+            {resending ? 'Envoi…' : 'Renvoyer l’email de confirmation'}
+          </Button>
+
+          <p className="text-center text-sm text-prune-600">
+            Déjà confirmé ?{' '}
+            <Link to="/login" className="link-accent">
+              Se connecter
+            </Link>
+          </p>
+        </div>
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout title="Inscription" subtitle="Créez votre compte Kizumai">

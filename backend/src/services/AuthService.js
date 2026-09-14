@@ -1,16 +1,32 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { config } from '../config/index.js';
 import { PLANS } from '../constants/plans.js';
 import pool from '../database/pool.js';
 import { AppError } from '../utils/AppError.js';
 import { assertPasswordStrength } from '../utils/passwordPolicy.js';
 import { sanitizeUser } from '../utils/sanitize.js';
+import { TransactionalMail } from './TransactionalMail.js';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const VERIFY_TTL_HOURS = 48;
 
 /** Hash bcrypt fixe pour égaliser le timing login (email inconnu). */
 const DUMMY_PASSWORD_HASH =
   '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.G2oQ9zqK8Y5K2i';
+
+function hashVerificationToken(rawToken) {
+  return crypto.createHash('sha256').update(String(rawToken)).digest('hex');
+}
+
+function buildConfirmUrl(rawToken) {
+  const base = String(config.publicAppUrl || config.appUrl || '').replace(/\/$/, '');
+  return `${base}/confirm-email?token=${encodeURIComponent(rawToken)}`;
+}
+
+function isEmailVerified(user) {
+  return Boolean(user?.emailVerifiedAt);
+}
 
 export function createAuthService({
   userRepository,
@@ -47,8 +63,36 @@ export function createAuthService({
     };
   }
 
+  async function issueEmailVerification(user) {
+    const rawToken = crypto.randomBytes(32).toString('base64url');
+    const tokenHash = hashVerificationToken(rawToken);
+    const expiresAt = new Date(Date.now() + VERIFY_TTL_HOURS * 60 * 60 * 1000);
+
+    await userRepository.setEmailVerificationToken(user.id, { tokenHash, expiresAt });
+
+    const mailResult = await TransactionalMail.sendAccountConfirmationEmail({
+      to: user.email,
+      name: user.name,
+      confirmUrl: buildConfirmUrl(rawToken),
+      expiresHours: VERIFY_TTL_HOURS,
+    });
+
+    if (!mailResult?.ok && !mailResult?.skipped) {
+      console.warn(
+        `[auth] Échec envoi email de confirmation à ${user.email} : ${mailResult?.error || 'inconnu'}`
+      );
+    }
+
+    // En dev sans SMTP, log le lien pour tests manuels.
+    if (mailResult?.skipped) {
+      console.log(`[auth] Lien de confirmation (dev) : ${buildConfirmUrl(rawToken)}`);
+    }
+
+    return { expiresAt };
+  }
+
   return {
-    async register({ name, email, password }, meta = {}) {
+    async register({ name, email, password }) {
       if (!name || !email || !password) {
         throw new AppError('Le nom, l\'email et le mot de passe sont requis', 400);
       }
@@ -71,7 +115,14 @@ export function createAuthService({
       if (existing) {
         // Anti-énumération : coût bcrypt + message générique (pas de 409).
         await bcrypt.hash(password, config.bcrypt.saltRounds);
-        throw new AppError('Impossible de créer le compte avec ces informations', 400);
+        if (!isEmailVerified(existing)) {
+          // Compte non confirmé : renvoyer un mail plutôt que révéler l'existence.
+          await issueEmailVerification(existing);
+        }
+        return {
+          pendingVerification: true,
+          email: normalizedEmail,
+        };
       }
 
       const hashedPassword = await bcrypt.hash(password, config.bcrypt.saltRounds);
@@ -80,10 +131,59 @@ export function createAuthService({
         email: normalizedEmail,
         password: hashedPassword,
         plan: PLANS.FREE,
+        emailVerifiedAt: null,
       });
 
-      const tokens = await issueTokenPair(user, meta);
-      return { user: sanitizeUser(user), tokens };
+      await issueEmailVerification(user);
+
+      // Pas de session tant que l'email n'est pas confirmé.
+      return {
+        pendingVerification: true,
+        email: normalizedEmail,
+      };
+    },
+
+    async confirmEmail(rawToken, meta = {}) {
+      const token = String(rawToken || '').trim();
+      if (!token || token.length < 20) {
+        throw new AppError('Lien de confirmation invalide ou expiré', 400);
+      }
+
+      const tokenHash = hashVerificationToken(token);
+      const user = await userRepository.findByEmailVerificationTokenHash(tokenHash);
+      if (!user) {
+        throw new AppError('Lien de confirmation invalide ou expiré', 400);
+      }
+
+      if (
+        user.emailVerificationExpiresAt &&
+        new Date(user.emailVerificationExpiresAt).getTime() <= Date.now()
+      ) {
+        throw new AppError('Lien de confirmation expiré. Demandez un nouvel email.', 400);
+      }
+
+      const verified = await userRepository.markEmailVerified(user.id);
+      const tokens = await issueTokenPair(verified, meta);
+      return { user: sanitizeUser(verified), tokens };
+    },
+
+    async resendConfirmation({ email }) {
+      const normalizedEmail = String(email || '').trim().toLowerCase();
+      if (!EMAIL_REGEX.test(normalizedEmail)) {
+        throw new AppError('Adresse email invalide', 400);
+      }
+
+      const user = await userRepository.findByEmail(normalizedEmail);
+      // Anti-énumération : même réponse que le succès.
+      if (user && !isEmailVerified(user)) {
+        await issueEmailVerification(user);
+      }
+
+      return {
+        pendingVerification: true,
+        email: normalizedEmail,
+        message: 'Si un compte est en attente, un email de confirmation a été renvoyé.',
+      };
     },
 
     /** Infos publiques de facturation (aucune donnée sensible). */
@@ -110,6 +210,13 @@ export function createAuthService({
       const isValid = await bcrypt.compare(password, hash);
       if (!user || !isValid) {
         throw new AppError('Identifiants invalides', 401);
+      }
+
+      if (!isEmailVerified(user)) {
+        throw new AppError(
+          'Confirmez votre email avant de vous connecter. Vérifiez votre boîte de réception.',
+          403
+        );
       }
 
       const tokens = await issueTokenPair(user, { ...meta, rememberMe: Boolean(rememberMe) });
@@ -163,6 +270,13 @@ export function createAuthService({
           await client.query('COMMIT');
           finished = true;
           throw new AppError('Session révoquée, veuillez vous reconnecter', 401);
+        }
+
+        if (!isEmailVerified(user)) {
+          await refreshTokenRepository.revokeFamily(stored.familyId, client);
+          await client.query('COMMIT');
+          finished = true;
+          throw new AppError('Confirmez votre email avant de vous connecter', 403);
         }
 
         const opaque = tokenService.rotateOpaqueRefreshToken(stored.familyId);
@@ -305,6 +419,10 @@ export function createAuthService({
       // Révocation globale : logout-all / replay → bump rv → access JWT morts immédiatement.
       if (Number(payload.rv) !== Number(user.refreshTokenVersion)) {
         throw new AppError('Session révoquée, veuillez vous reconnecter', 401);
+      }
+
+      if (!isEmailVerified(user)) {
+        throw new AppError('Confirmez votre email avant de vous connecter', 403);
       }
 
       return sanitizeUser(user);

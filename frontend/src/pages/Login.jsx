@@ -4,7 +4,8 @@ import { useAuth } from '../context/AuthContext.jsx';
 import AuthLayout from '../components/AuthLayout.jsx';
 import Button from '../components/Button.jsx';
 import Input from '../components/Input.jsx';
-
+import { ApiError } from '../services/api.js';
+import { authService } from '../services/authService.js';
 import { getProjectDraft } from '../services/projectService.js';
 
 const REMEMBER_EMAIL_KEY = 'kizumai_remember_email';
@@ -17,6 +18,9 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
+  const [needsConfirmation, setNeedsConfirmation] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
+  const [resending, setResending] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -34,6 +38,8 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setNeedsConfirmation(false);
+    setResendMessage('');
     setSubmitting(true);
 
     try {
@@ -67,8 +73,25 @@ export default function Login() {
       }
     } catch (err) {
       setError(err.message || 'Échec de la connexion');
+      if (err instanceof ApiError && err.status === 403) {
+        setNeedsConfirmation(true);
+      }
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (!email.trim()) return;
+    setResending(true);
+    setResendMessage('');
+    try {
+      const result = await authService.resendConfirmation(email.trim());
+      setResendMessage(result.message || 'Email renvoyé si le compte est en attente.');
+    } catch (err) {
+      setError(err.message || "Impossible de renvoyer l'email");
+    } finally {
+      setResending(false);
     }
   };
 
@@ -107,10 +130,17 @@ export default function Login() {
         </label>
 
         {error && <p className="alert-error">{error}</p>}
+        {resendMessage && <p className="text-sm text-wasabi-700">{resendMessage}</p>}
 
         <Button type="submit" disabled={submitting}>
           {submitting ? 'Connexion...' : 'Se connecter'}
         </Button>
+
+        {needsConfirmation && (
+          <Button type="button" onClick={handleResend} disabled={resending}>
+            {resending ? 'Envoi…' : 'Renvoyer l’email de confirmation'}
+          </Button>
+        )}
       </form>
 
       <p className="mt-6 text-center text-sm text-prune-600">

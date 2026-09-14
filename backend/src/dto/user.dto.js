@@ -3,7 +3,16 @@ import { omit, optionalString, parseId, pick, requireString } from './helpers.js
 export const UserResponseDto = {
   from(user) {
     if (!user) return null;
-    return omit(user, ['password', 'refreshTokenVersion']);
+    const clean = omit(user, [
+      'password',
+      'refreshTokenVersion',
+      'emailVerificationTokenHash',
+      'emailVerificationExpiresAt',
+    ]);
+    return {
+      ...clean,
+      emailVerified: Boolean(user.emailVerifiedAt),
+    };
   },
   fromMany(users) {
     return (users || []).map((u) => UserResponseDto.from(u));

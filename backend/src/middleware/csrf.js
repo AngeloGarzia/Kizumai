@@ -84,7 +84,10 @@ export function csrfProtection(req, res, next) {
 
     const path = req.path || '';
     const isCredentialBootstrap =
-      path.endsWith('/auth/login') || path.endsWith('/auth/register');
+      path.endsWith('/auth/login') ||
+      path.endsWith('/auth/register') ||
+      path.endsWith('/auth/confirm-email') ||
+      path.endsWith('/auth/resend-confirmation');
     const hasAuthCookie = Boolean(
       req.cookies?.[config.cookies.accessName] ||
         req.cookies?.[config.cookies.refreshName]

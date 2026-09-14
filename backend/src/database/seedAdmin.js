@@ -16,6 +16,9 @@ export async function seedAdminUser() {
     if (existing.plan !== PLANS.PAID) {
       await UserRepository.updatePlan(existing.id, PLANS.PAID);
     }
+    if (!existing.emailVerifiedAt) {
+      await UserRepository.markEmailVerified(existing.id);
+    }
     return;
   }
 
@@ -34,6 +37,7 @@ export async function seedAdminUser() {
     password: hashedPassword,
     role: ROLES.ADMIN,
     plan: PLANS.PAID,
+    emailVerifiedAt: new Date(),
   });
 
   console.log(`[seed] Compte administrateur créé : ${email}`);

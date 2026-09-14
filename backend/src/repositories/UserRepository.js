@@ -11,6 +11,9 @@ const mapUser = (row) => {
     refreshTokenVersion: row.refresh_token_version,
     role: row.role || 'user',
     plan: row.plan || 'free',
+    emailVerifiedAt: row.email_verified_at || null,
+    emailVerificationTokenHash: row.email_verification_token_hash || null,
+    emailVerificationExpiresAt: row.email_verification_expires_at || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -40,12 +43,69 @@ export const UserRepository = {
     return mapUser(rows[0]);
   },
 
-  async create({ name, email, password, role = 'user', plan = 'free' }) {
+  async findByEmailVerificationTokenHash(tokenHash) {
     const { rows } = await pool.query(
-      `INSERT INTO users (name, email, password, role, plan)
-       VALUES ($1, $2, $3, $4, $5)
+      `SELECT * FROM users
+       WHERE email_verification_token_hash = $1
+       LIMIT 1`,
+      [tokenHash]
+    );
+    return mapUser(rows[0]);
+  },
+
+  async create({
+    name,
+    email,
+    password,
+    role = 'user',
+    plan = 'free',
+    emailVerifiedAt = null,
+    emailVerificationTokenHash = null,
+    emailVerificationExpiresAt = null,
+  }) {
+    const { rows } = await pool.query(
+      `INSERT INTO users (
+         name, email, password, role, plan,
+         email_verified_at, email_verification_token_hash, email_verification_expires_at
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [name, email.toLowerCase(), password, role, plan]
+      [
+        name,
+        email.toLowerCase(),
+        password,
+        role,
+        plan,
+        emailVerifiedAt,
+        emailVerificationTokenHash,
+        emailVerificationExpiresAt,
+      ]
+    );
+    return mapUser(rows[0]);
+  },
+
+  async setEmailVerificationToken(id, { tokenHash, expiresAt }) {
+    const { rows } = await pool.query(
+      `UPDATE users
+       SET email_verification_token_hash = $2,
+           email_verification_expires_at = $3,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [Number(id), tokenHash, expiresAt]
+    );
+    return mapUser(rows[0]);
+  },
+
+  async markEmailVerified(id) {
+    const { rows } = await pool.query(
+      `UPDATE users
+       SET email_verified_at = NOW(),
+           email_verification_token_hash = NULL,
+           email_verification_expires_at = NULL,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [Number(id)]
     );
     return mapUser(rows[0]);
   },
@@ -115,4 +175,3 @@ export const UserRepository = {
     return mapUser(rows[0]);
   },
 };
-

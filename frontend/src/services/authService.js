@@ -4,7 +4,17 @@ export const authService = {
   async register({ name, email, password }) {
     // Le plan n'est jamais envoyé au client — décidé uniquement côté serveur.
     const { data } = await api.post('/auth/register', { name, email, password });
+    return data;
+  },
+
+  async confirmEmail(token) {
+    const { data } = await api.post('/auth/confirm-email', { token });
     return data.user;
+  },
+
+  async resendConfirmation(email) {
+    const { data } = await api.post('/auth/resend-confirmation', { email });
+    return data;
   },
 
   async login(email, password, { rememberMe = true } = {}) {
