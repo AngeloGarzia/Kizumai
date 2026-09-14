@@ -70,23 +70,32 @@ export function createAuthService({
 
     await userRepository.setEmailVerificationToken(user.id, { tokenHash, expiresAt });
 
-    const mailResult = await TransactionalMail.sendAccountConfirmationEmail({
-      to: user.email,
-      name: user.name,
-      confirmUrl: buildConfirmUrl(rawToken),
-      expiresHours: VERIFY_TTL_HOURS,
-    });
+    // L’envoi SMTP ne doit jamais bloquer / faire planter l’inscription (502 nginx).
+    const confirmUrl = buildConfirmUrl(rawToken);
+    void (async () => {
+      try {
+        const mailResult = await TransactionalMail.sendAccountConfirmationEmail({
+          to: user.email,
+          name: user.name,
+          confirmUrl,
+          expiresHours: VERIFY_TTL_HOURS,
+        });
 
-    if (!mailResult?.ok && !mailResult?.skipped) {
-      console.warn(
-        `[auth] Échec envoi email de confirmation à ${user.email} : ${mailResult?.error || 'inconnu'}`
-      );
-    }
+        if (!mailResult?.ok && !mailResult?.skipped) {
+          console.warn(
+            `[auth] Échec envoi email de confirmation à ${user.email} : ${mailResult?.error || 'inconnu'}`
+          );
+        }
 
-    // En dev sans SMTP, log le lien pour tests manuels.
-    if (mailResult?.skipped) {
-      console.log(`[auth] Lien de confirmation (dev) : ${buildConfirmUrl(rawToken)}`);
-    }
+        if (mailResult?.skipped) {
+          console.log(`[auth] Lien de confirmation (dev) : ${confirmUrl}`);
+        }
+      } catch (err) {
+        console.warn(
+          `[auth] Exception envoi email de confirmation à ${user.email} : ${err.message || err}`
+        );
+      }
+    })();
 
     return { expiresAt };
   }
