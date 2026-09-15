@@ -6,11 +6,14 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import MainLayout from './MainLayout.jsx';
 import BrandLogo from './BrandLogo.jsx';
+import Button from './Button.jsx';
 import DocumentScanModal from './DocumentScanModal.jsx';
+import FabulousThinking from './FabulousThinking.jsx';
 import { IconChevronRight } from './icons.jsx';
 import { projectService } from '../services/projectService.js';
 import { PROJECT_STAGE_LABELS, nextStageId, stageHref } from '../constants/projectStages.js';
 import { useProject } from '../context/ProjectContext.jsx';
+import { assistantPhrases } from '../constants/assistant.js';
 import { DOCUMENT_ACCEPT } from '../utils/safeDisplay.js';
 
 const STATUS_LABELS = {
@@ -28,6 +31,13 @@ const DEFAULT_CONTACT_ROLE = {
   lancement: 'partenaire',
 };
 
+/** Jalons validés seulement quand toutes les actions obligatoires sont faites. */
+const TASK_GATED_MILESTONE_SLUGS = new Set(['kickoff']);
+
+function isMilestoneTaskGated(milestone) {
+  return TASK_GATED_MILESTONE_SLUGS.has(milestone?.slug);
+}
+
 function formatDate(value) {
   if (!value) return '—';
   return new Intl.DateTimeFormat('fr-FR', {
@@ -37,39 +47,178 @@ function formatDate(value) {
   }).format(new Date(value));
 }
 
-function TaskRow({ task, busy, onToggle }) {
+function TaskPanel({
+  task,
+  busy,
+  checklistBusy,
+  expanded,
+  onToggleExpand,
+  onToggleDone,
+  onUpload,
+  onChecklist,
+  onToggleChecklistItem,
+}) {
   const done = task.status === 'done';
+  const docs = Array.isArray(task.documents) ? task.documents : [];
+  const checklist = task.checklist || task.metadata?.checklist || null;
+  const fileInputRef = useRef(null);
+
   return (
-    <li className="flex items-start gap-3 py-3 border-b border-prune-50 last:border-0">
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => onToggle(task)}
-        className={[
-          'mt-0.5 shrink-0 w-5 h-5 rounded border flex items-center justify-center transition-colors',
-          done
-            ? 'bg-wasabi-500 border-wasabi-500 text-white'
-            : 'border-prune-300 bg-white hover:border-topaz-400',
-        ].join(' ')}
-        aria-label={done ? 'Marquer à faire' : 'Marquer terminé'}
-      >
-        {done ? (
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-        ) : null}
-      </button>
-      <div className="min-w-0 flex-1">
-        <p className={`font-medium ${done ? 'text-prune-500 line-through' : 'text-prune-900'}`}>
-          {task.action?.title || 'Action'}
-        </p>
-        {task.action?.description && (
-          <p className="text-sm text-prune-500 mt-0.5">{task.action.description}</p>
-        )}
-        {task.action?.isRequired && (
-          <span className="inline-block mt-1 text-xs font-semibold text-topaz-600">Obligatoire</span>
-        )}
+    <li className="border-b border-prune-50 last:border-0">
+      <div className="flex items-start gap-3 py-3">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => onToggleDone(task)}
+          className={[
+            'mt-0.5 shrink-0 w-5 h-5 rounded border flex items-center justify-center transition-colors',
+            done
+              ? 'bg-wasabi-500 border-wasabi-500 text-white'
+              : 'border-prune-300 bg-white hover:border-topaz-400',
+          ].join(' ')}
+          aria-label={done ? 'Marquer à faire' : 'Marquer terminé'}
+        >
+          {done ? (
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          ) : null}
+        </button>
+        <button
+          type="button"
+          className="min-w-0 flex-1 text-left"
+          onClick={() => onToggleExpand(task.id)}
+          aria-expanded={expanded}
+        >
+          <p className={`font-medium ${done ? 'text-prune-500 line-through' : 'text-prune-900'}`}>
+            {task.action?.title || 'Action'}
+          </p>
+          {task.action?.description && (
+            <p className="text-sm text-prune-500 mt-0.5">{task.action.description}</p>
+          )}
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            {task.action?.isRequired && (
+              <span className="text-xs font-semibold text-topaz-600">Obligatoire</span>
+            )}
+            {docs.length > 0 && (
+              <span className="text-xs text-prune-500">{docs.length} doc{docs.length > 1 ? 's' : ''}</span>
+            )}
+            <span className="text-xs font-semibold text-prune-400 inline-flex items-center gap-0.5">
+              {expanded ? 'Replier' : 'Ouvrir'}
+              <IconChevronRight
+                className={`w-3.5 h-3.5 transition-transform ${expanded ? 'rotate-90' : ''}`}
+              />
+            </span>
+          </div>
+        </button>
       </div>
+
+      {expanded && (
+        <div className="ml-8 mb-4 rounded-xl border border-prune-100 bg-prune-50/70 p-4 space-y-4">
+          <div>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <p className="text-sm font-semibold text-prune-900">Documents</p>
+              <button
+                type="button"
+                disabled={busy}
+                className="text-xs font-semibold text-topaz-600 hover:text-topaz-500"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                + Ajouter (PDF, image…)
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={DOCUMENT_ACCEPT}
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) onUpload(task, file);
+                  e.target.value = '';
+                }}
+              />
+            </div>
+            {docs.length === 0 ? (
+              <p className="text-xs text-prune-500">
+                Aucun document lié à cette action. Ils apparaîtront aussi dans Docs.
+              </p>
+            ) : (
+              <ul className="space-y-1.5">
+                {docs.map((link) => {
+                  const doc = link.entity || link;
+                  return (
+                    <li
+                      key={link.id || doc.id}
+                      className="text-sm text-prune-800 flex items-center gap-2"
+                    >
+                      <span className="truncate flex-1">
+                        {doc.title || doc.fileName || `Document #${doc.id}`}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
+          <div className="border-t border-prune-100 pt-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-prune-900">Aide Fabulous</p>
+              <button
+                type="button"
+                disabled={busy || checklistBusy}
+                className="text-xs font-semibold text-wasabi-700 hover:text-wasabi-600"
+                onClick={() => onChecklist(task)}
+              >
+                {checklist ? 'Régénérer la checklist' : 'Proposer une checklist'}
+              </button>
+            </div>
+            {checklistBusy && (
+              <FabulousThinking message={assistantPhrases.taskChecklist} size="sm" compact />
+            )}
+            {!checklistBusy && checklist && (
+              <div className="rounded-lg bg-white border border-prune-100 p-3 space-y-2">
+                <p className="text-sm font-semibold text-prune-900">{checklist.title}</p>
+                {checklist.summary ? (
+                  <p className="text-xs text-prune-500">{checklist.summary}</p>
+                ) : null}
+                <ul className="space-y-2">
+                  {(checklist.items || []).map((item) => (
+                    <li key={item.id || item.text} className="flex items-start gap-2">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => onToggleChecklistItem(task, item)}
+                        className={[
+                          'mt-0.5 shrink-0 w-4 h-4 rounded border flex items-center justify-center',
+                          item.done
+                            ? 'bg-wasabi-500 border-wasabi-500 text-white'
+                            : 'border-prune-300 bg-white',
+                        ].join(' ')}
+                        aria-label={item.done ? 'Décocher' : 'Cocher'}
+                      >
+                        {item.done ? (
+                          <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : null}
+                      </button>
+                      <div className="min-w-0">
+                        <p className={`text-sm ${item.done ? 'text-prune-400 line-through' : 'text-prune-800'}`}>
+                          {item.text}
+                        </p>
+                        {item.why ? (
+                          <p className="text-xs text-prune-500 mt-0.5">{item.why}</p>
+                        ) : null}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </li>
   );
 }
@@ -96,6 +245,9 @@ export default function StageWorkspace({ projectId, stage }) {
   });
   const [projectDocs, setProjectDocs] = useState([]);
   const [scanModal, setScanModal] = useState(null);
+  const [confirmMilestone, setConfirmMilestone] = useState(null);
+  const [expandedTaskId, setExpandedTaskId] = useState(null);
+  const [checklistBusyId, setChecklistBusyId] = useState(null);
 
   const applyPayload = (payload) => {
     setData(payload);
@@ -153,13 +305,95 @@ export default function StageWorkspace({ projectId, stage }) {
     }
   };
 
-  const toggleMilestone = async (milestone) => {
-    setSelectedMilestone(milestone);
+  const uploadForTask = async (task, file) => {
     setBusy(true);
+    setError('');
     try {
-      const next = milestone.status === 'done' ? 'planned' : 'done';
+      const doc = await projectService.uploadDocument(id, file, {
+        title: file.name,
+        forceScan: true,
+      });
+      const payload = await projectService.addStageLink(id, stage, {
+        entityType: 'document',
+        entityId: doc.id,
+        role: 'preuve',
+        taskId: task.id,
+        taskSlug: task.action?.slug || null,
+      });
+      applyPayload(payload);
+      const docs = await projectService.listDocuments(id);
+      setProjectDocs(Array.isArray(docs) ? docs : []);
+      if (doc.scanId) {
+        setScanModal({ scanId: doc.scanId, documentId: doc.id });
+      } else {
+        try {
+          const data = await projectService.retryDocumentScan(id, doc.id);
+          const scan = data?.scan || data;
+          if (scan?.id) setScanModal({ scanId: scan.id, documentId: doc.id });
+        } catch {
+          // scan optionnel si le moteur refuse le format
+        }
+      }
+    } catch (err) {
+      setError(err.message || 'Téléversement impossible');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const generateChecklist = async (task) => {
+    setChecklistBusyId(task.id);
+    setError('');
+    try {
+      const payload = await projectService.generateStageTaskChecklist(id, stage, task.id);
+      applyPayload(payload);
+      setExpandedTaskId(task.id);
+    } catch (err) {
+      setError(err.message || 'Impossible de générer la checklist');
+    } finally {
+      setChecklistBusyId(null);
+    }
+  };
+
+  const toggleChecklistItem = async (task, item) => {
+    const current = task.checklist || task.metadata?.checklist;
+    if (!current?.items?.length) return;
+    const nextChecklist = {
+      ...current,
+      items: current.items.map((it) =>
+        (it.id && it.id === item.id) || it.text === item.text
+          ? { ...it, done: !it.done }
+          : it
+      ),
+    };
+    setBusy(true);
+    setError('');
+    try {
+      const payload = await projectService.updateStageTask(id, stage, task.id, {
+        checklist: nextChecklist,
+      });
+      applyPayload(payload);
+    } catch (err) {
+      setError(err.message || 'Mise à jour impossible');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const requiredTasksStats = () => {
+    const tasks = (data?.workflows || []).flatMap((wf) => wf.tasks || []);
+    const required = tasks.filter((t) => t.action?.isRequired !== false);
+    const pool = required.length ? required : tasks;
+    const pending = pool.filter((t) => t.status !== 'done' && t.status !== 'skipped');
+    return { total: pool.length, pending: pending.length, done: pool.length - pending.length };
+  };
+
+  const applyMilestoneStatus = async (milestone, status) => {
+    setBusy(true);
+    setError('');
+    try {
       const payload = await projectService.updateStageMilestone(id, stage, milestone.id, {
-        status: next,
+        status,
       });
       applyPayload(payload);
       const updated = payload.milestones?.find((m) => m.id === milestone.id);
@@ -169,6 +403,27 @@ export default function StageWorkspace({ projectId, stage }) {
     } finally {
       setBusy(false);
     }
+  };
+
+  const toggleMilestone = async (milestone) => {
+    setSelectedMilestone(milestone);
+    const next = milestone.status === 'done' ? 'planned' : 'done';
+    if (
+      next === 'done' &&
+      isMilestoneTaskGated(milestone) &&
+      (data?.progressPercent || 0) < 100
+    ) {
+      setConfirmMilestone(milestone);
+      return;
+    }
+    await applyMilestoneStatus(milestone, next);
+  };
+
+  const confirmEarlyMilestone = async () => {
+    if (!confirmMilestone) return;
+    const milestone = confirmMilestone;
+    setConfirmMilestone(null);
+    await applyMilestoneStatus(milestone, 'done');
   };
 
   const handleUpload = async (e) => {
@@ -329,6 +584,23 @@ export default function StageWorkspace({ projectId, stage }) {
                             ? ` · ${selectedMilestone.description}`
                             : ''}
                         </p>
+                        {isMilestoneTaskGated(selectedMilestone) &&
+                          selectedMilestone.status !== 'done' &&
+                          (data?.progressPercent || 0) < 100 && (
+                            <p className="text-xs text-prune-500 mt-2">
+                              Idéalement après toutes les actions obligatoires
+                              ({data?.progressPercent || 0} %). Une confirmation sera demandée
+                              pour valider plus tôt.
+                            </p>
+                          )}
+                        {isMilestoneTaskGated(selectedMilestone) &&
+                          selectedMilestone.status === 'done' && (
+                            <p className="text-xs text-wasabi-700 mt-2">
+                              {(data?.progressPercent || 0) >= 100
+                                ? 'Validé : toutes les actions obligatoires sont terminées.'
+                                : 'Validé manuellement alors que des actions restent en cours.'}
+                            </p>
+                          )}
                       </div>
                       <button
                         type="button"
@@ -369,7 +641,20 @@ export default function StageWorkspace({ projectId, stage }) {
                     </summary>
                     <ul className="px-5 pb-2">
                       {wf.tasks.map((task) => (
-                        <TaskRow key={task.id} task={task} busy={busy} onToggle={toggleTask} />
+                        <TaskPanel
+                          key={task.id}
+                          task={task}
+                          busy={busy}
+                          checklistBusy={checklistBusyId === task.id}
+                          expanded={expandedTaskId === task.id}
+                          onToggleExpand={(taskId) =>
+                            setExpandedTaskId((cur) => (cur === taskId ? null : taskId))
+                          }
+                          onToggleDone={toggleTask}
+                          onUpload={uploadForTask}
+                          onChecklist={generateChecklist}
+                          onToggleChecklistItem={toggleChecklistItem}
+                        />
                       ))}
                     </ul>
                   </details>
@@ -541,7 +826,75 @@ export default function StageWorkspace({ projectId, stage }) {
           scanId={scanModal.scanId}
           documentId={scanModal.documentId}
           onClose={() => setScanModal(null)}
+          onApplied={async () => {
+            try {
+              const payload = await projectService.getStage(id, stage);
+              applyPayload(payload);
+            } catch {
+              // ignore
+            }
+          }}
         />
+      )}
+
+      {confirmMilestone && (
+        <div
+          className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-milestone-title"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 bg-prune-900/50"
+            aria-label="Fermer"
+            disabled={busy}
+            onClick={() => setConfirmMilestone(null)}
+          />
+          <div className="relative w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-white shadow-xl p-5 sm:p-6 space-y-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-topaz-600">
+                Confirmation
+              </p>
+              <h2 id="confirm-milestone-title" className="text-lg font-bold text-prune-900 mt-1">
+                Valider « {confirmMilestone.title} » ?
+              </h2>
+              <p className="text-sm text-prune-600 mt-2 leading-relaxed">
+                {(() => {
+                  const stats = requiredTasksStats();
+                  if (stats.pending <= 0) {
+                    return 'Toutes les actions obligatoires sont terminées.';
+                  }
+                  return (
+                    <>
+                      Il reste{' '}
+                      <strong className="text-prune-900">
+                        {stats.pending} action{stats.pending > 1 ? 's' : ''}
+                      </strong>{' '}
+                      obligatoire{stats.pending > 1 ? 's' : ''} non terminée
+                      {stats.pending > 1 ? 's' : ''} sur {stats.total} (
+                      {data?.progressPercent || 0} %). Tu peux quand même valider ce jalon
+                      manuellement.
+                    </>
+                  );
+                })()}
+              </p>
+            </div>
+            <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={busy}
+                onClick={() => setConfirmMilestone(null)}
+              >
+                Annuler
+              </Button>
+              <Button type="button" onClick={confirmEarlyMilestone} disabled={busy}>
+                {busy ? 'Validation…' : 'Valider quand même'}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </MainLayout>
   );

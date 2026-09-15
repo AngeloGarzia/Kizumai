@@ -38,17 +38,40 @@ export const StageMilestoneParamDto = {
 
 export const UpdateStageTaskRequestDto = {
   from(body = {}) {
-    return pick(body, ['status', 'notes', 'dueAt']);
+    const out = pick(body, ['status', 'notes', 'dueAt']);
+    if (body.metadata != null && typeof body.metadata === 'object' && !Array.isArray(body.metadata)) {
+      out.metadata = body.metadata;
+    }
+    if (body.checklist != null && typeof body.checklist === 'object') {
+      out.checklist = body.checklist;
+    }
+    return out;
   },
 };
 
 export const CreateStageLinkRequestDto = {
   from(body = {}) {
+    const taskId =
+      body.taskId != null && body.taskId !== ''
+        ? Number(body.taskId)
+        : body.task_id != null && body.task_id !== ''
+          ? Number(body.task_id)
+          : null;
+    const taskSlug = optionalString(body.taskSlug || body.task_slug, { max: 80 });
+    const metadata =
+      body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata)
+        ? { ...body.metadata }
+        : {};
+    if (Number.isInteger(taskId) && taskId > 0) metadata.taskId = taskId;
+    if (taskSlug) metadata.taskSlug = taskSlug;
     return {
       entityType: optionalString(body.entityType, { max: 30 }),
       entityId: body.entityId != null ? Number(body.entityId) : null,
       role: optionalString(body.role, { max: 80 }),
       note: optionalString(body.note, { max: 2000 }),
+      taskId: Number.isInteger(taskId) && taskId > 0 ? taskId : null,
+      taskSlug: taskSlug || null,
+      metadata,
     };
   },
 };

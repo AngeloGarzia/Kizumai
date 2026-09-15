@@ -18,4 +18,5 @@ export const assistantPhrases = {
   scan: `Scan ${ASSISTANT_NAME}`,
   filterLabel: ASSISTANT_NAME,
   pageGuide: `${ASSISTANT_NAME} prépare ton guide…`,
+  taskChecklist: `${ASSISTANT_NAME} prépare ta checklist…`,
 };

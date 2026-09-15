@@ -254,10 +254,13 @@ export const projectService = {
 
   // Upload multipart : on n'utilise pas le wrapper JSON (le navigateur doit
   // fixer lui-même le boundary multipart).
-  async uploadDocument(projectId, file, title) {
+  async uploadDocument(projectId, file, options = {}) {
+    const title = typeof options === 'string' ? options : options?.title;
+    const forceScan = typeof options === 'object' && options?.forceScan === true;
     const form = new FormData();
     form.append('file', file);
     if (title) form.append('title', title);
+    if (forceScan) form.append('forceScan', 'true');
 
     await ensureCsrfToken();
     const response = await fetch(`${publicConfig.apiUrl}/projects/${projectId}/documents`, {
@@ -357,6 +360,14 @@ export const projectService = {
     const { data } = await api.patch(
       `/projects/${projectId}/stages/${stage}/tasks/${taskId}`,
       fields
+    );
+    return data;
+  },
+
+  async generateStageTaskChecklist(projectId, stage, taskId) {
+    const { data } = await api.post(
+      `/projects/${projectId}/stages/${stage}/tasks/${taskId}/checklist`,
+      {}
     );
     return data;
   },

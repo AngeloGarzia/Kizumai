@@ -1684,6 +1684,49 @@ export function createAiService({ settingsService, currencyService }) {
       };
     },
 
+    /**
+     * Checklist Fabulous pour clôturer une action de parcours — prompt fabulous_task_checklist.
+     * Sortie : { title, summary, items: [{ text, why }] }
+     */
+    async generateFabulousTaskChecklist(context = {}) {
+      const aiConfig = await settingsService.getAiConfig();
+      if (!aiConfig.fabulousTaskChecklistPrompt) {
+        throw new AppError('Le prompt « fabulous_task_checklist » est introuvable en base.', 500);
+      }
+      const userContent = interpolate(aiConfig.fabulousTaskChecklistPrompt, {
+        stage: String(context.stage || '').slice(0, 40),
+        stage_label: String(context.stageLabel || context.stage || '').slice(0, 120),
+        workflow_title: String(context.workflowTitle || '—').slice(0, 200),
+        task_title: String(context.taskTitle || 'Action').slice(0, 200),
+        task_slug: String(context.taskSlug || '').slice(0, 80),
+        task_description: String(context.taskDescription || '—').slice(0, 800),
+        project_title: String(context.projectTitle || '(aucun)').slice(0, 200),
+        linked_docs: String(context.linkedDocs || '(aucun)').slice(0, 1200),
+        task_notes: String(context.taskNotes || '(aucune)').slice(0, 800),
+        progress_percent: String(context.progressPercent ?? 0),
+      });
+      const data = await requestStepJson(userContent, { temperature: 0.55 });
+      const items = (Array.isArray(data.items) ? data.items : [])
+        .map((item) => {
+          if (typeof item === 'string') {
+            return { text: item.trim().slice(0, 300), why: '' };
+          }
+          return {
+            text: String(item?.text || '').trim().slice(0, 300),
+            why: String(item?.why || '').trim().slice(0, 300),
+          };
+        })
+        .filter((i) => i.text)
+        .slice(0, 10);
+      return {
+        title: clipAiOutput(String(data.title || context.taskTitle || 'Checklist').trim(), 200),
+        summary: clipAiOutput(String(data.summary || '').trim(), 800),
+        items,
+        provider: aiConfig.provider,
+        model: aiConfig.model,
+      };
+    },
+
     async testCurrentEngine(overrides = {}) {
       const baseConfig = await settingsService.getAiConfig();
       const aiConfig = {

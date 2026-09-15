@@ -1,5 +1,6 @@
 import { AppError } from '../utils/AppError.js';
-import { PROJECT_STAGE_IDS } from '../constants/projectStages.js';
+import { PROJECT_STAGE_IDS, PROJECT_STAGE_LABELS } from '../constants/projectStages.js';
+import { withAiUsageContext } from '../utils/aiUsage.js';
 
 const STAGES = new Set(PROJECT_STAGE_IDS);
 const TASK_STATUSES = new Set(['todo', 'in_progress', 'done', 'skipped']);
@@ -22,6 +23,42 @@ function computeProgress(tasks) {
   if (!pool.length) return 0;
   const done = pool.filter((t) => t.status === 'done' || t.status === 'skipped').length;
   return Math.round((done / pool.length) * 100);
+}
+
+/** Jalon « Lancement de l'étude » : confirmation UI si validation anticipée ; auto-validé à 100 %. */
+const TASK_GATED_MILESTONE_SLUGS = new Set(['kickoff']);
+
+function requiredTasksComplete(tasks) {
+  const required = tasks.filter((t) => t.action?.isRequired !== false);
+  const pool = required.length ? required : tasks;
+  if (!pool.length) return false;
+  return pool.every((t) => t.status === 'done' || t.status === 'skipped');
+}
+
+function normalizeChecklist(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const items = (Array.isArray(raw.items) ? raw.items : [])
+    .map((item, index) => {
+      if (typeof item === 'string') {
+        return { id: `i${index}`, text: item.trim().slice(0, 300), why: '', done: false };
+      }
+      return {
+        id: String(item.id || `i${index}`).slice(0, 40),
+        text: String(item.text || '').trim().slice(0, 300),
+        why: String(item.why || '').trim().slice(0, 300),
+        done: Boolean(item.done),
+      };
+    })
+    .filter((i) => i.text)
+    .slice(0, 10);
+  return {
+    title: String(raw.title || 'Checklist').trim().slice(0, 200),
+    summary: String(raw.summary || '').trim().slice(0, 800),
+    items,
+    generatedAt: raw.generatedAt || new Date().toISOString(),
+    provider: raw.provider || null,
+    model: raw.model || null,
+  };
 }
 
 function groupWorkflows(tasks) {
@@ -48,6 +85,7 @@ export function createProjectStageService({
   contactRepository,
   plannerEventRepository,
   projectMemoryUpdateService = null,
+  aiService = null,
 }) {
   async function assertProjectOwner(userId, projectId) {
     const project = await projectRepository.findById(projectId);
@@ -84,6 +122,15 @@ export function createProjectStageService({
     return { documents, contacts, events, raw: links };
   }
 
+  function documentsForTask(task, linkedDocuments) {
+    return linkedDocuments.filter((d) => {
+      const meta = d.metadata || {};
+      if (meta.taskId != null && Number(meta.taskId) === Number(task.id)) return true;
+      if (meta.taskSlug && task.action?.slug && meta.taskSlug === task.action.slug) return true;
+      return false;
+    });
+  }
+
   async function hydrateRun(run, userId, projectId) {
     const tasks = await projectStageRepository.listTasks(run.id);
     const links = await projectStageRepository.listLinks(run.id);
@@ -91,10 +138,16 @@ export function createProjectStageService({
     const linked = await resolveLinkedEntities(userId, projectId, links);
     const progressPercent = computeProgress(tasks);
 
+    const tasksWithDocs = tasks.map((task) => ({
+      ...task,
+      documents: documentsForTask(task, linked.documents),
+      checklist: task.metadata?.checklist || null,
+    }));
+
     return {
       run: { ...run, progressPercent },
-      workflows: groupWorkflows(tasks),
-      tasks,
+      workflows: groupWorkflows(tasksWithDocs),
+      tasks: tasksWithDocs,
       milestones,
       documents: linked.documents,
       contacts: linked.contacts,
@@ -108,9 +161,7 @@ export function createProjectStageService({
     const tasks = await projectStageRepository.listTasks(run.id);
     const progressPercent = computeProgress(tasks);
     const required = tasks.filter((t) => t.action?.isRequired !== false);
-    const allRequiredDone =
-      required.length > 0 &&
-      required.every((t) => t.status === 'done' || t.status === 'skipped');
+    const allRequiredDone = requiredTasksComplete(tasks);
 
     let status = run.status;
     let completedAt = run.completedAt || null;
@@ -134,6 +185,16 @@ export function createProjectStageService({
       startedAt,
       completedAt,
     });
+
+    // Auto-valide « Lancement de l'étude » quand tout est terminé (ne force pas le retour en arrière).
+    if (allRequiredDone) {
+      const milestones = await projectStageRepository.listMilestones(run.id);
+      for (const m of milestones) {
+        if (TASK_GATED_MILESTONE_SLUGS.has(m.slug) && m.status !== 'done') {
+          await projectStageRepository.updateMilestone(m.id, { status: 'done' });
+        }
+      }
+    }
 
     if (status === 'completed') {
       const project = await projectRepository.findById(projectId);
@@ -199,7 +260,7 @@ export function createProjectStageService({
         );
       }
 
-      return hydrateRun(run, userId, projectId);
+      return refreshProgress(run, userId, projectId);
     },
 
     async updateTask(userId, projectId, stage, taskId, payload) {
@@ -233,6 +294,17 @@ export function createProjectStageService({
       }
       if (payload.dueAt !== undefined) {
         fields.dueAt = payload.dueAt || null;
+      }
+      if (payload.metadata !== undefined || payload.checklist !== undefined) {
+        const currentMeta =
+          task.metadata && typeof task.metadata === 'object' ? { ...task.metadata } : {};
+        if (payload.metadata && typeof payload.metadata === 'object') {
+          Object.assign(currentMeta, payload.metadata);
+        }
+        if (payload.checklist && typeof payload.checklist === 'object') {
+          currentMeta.checklist = normalizeChecklist(payload.checklist);
+        }
+        fields.metadata = currentMeta;
       }
 
       await projectStageRepository.updateTask(task.id, fields);
@@ -324,9 +396,72 @@ export function createProjectStageService({
         entityId,
         role: payload.role ? String(payload.role).slice(0, 80) : null,
         note: payload.note ? String(payload.note).slice(0, 2000) : null,
+        metadata: payload.metadata && typeof payload.metadata === 'object' ? payload.metadata : {},
       });
 
       return hydrateRun(run, userId, projectId);
+    },
+
+    async generateTaskChecklist(userId, projectId, stage, taskId) {
+      if (!STAGES.has(stage)) throw new AppError('Étape invalide', 400);
+      if (!aiService?.generateFabulousTaskChecklist) {
+        throw new AppError('Service Fabulous indisponible', 503);
+      }
+      const project = await assertProjectOwner(userId, projectId);
+      const run = await projectStageRepository.findRun(projectId, stage);
+      if (!run) throw new AppError('Étude introuvable', 404);
+
+      const task = await projectStageRepository.findTask(run.id, taskId);
+      if (!task) throw new AppError('Action introuvable', 404);
+
+      const links = await projectStageRepository.listLinks(run.id);
+      const linked = await resolveLinkedEntities(userId, projectId, links);
+      const taskDocs = documentsForTask(task, linked.documents);
+      const linkedDocsLabel = taskDocs.length
+        ? taskDocs
+            .map((d) => d.entity?.title || d.entity?.fileName || `#${d.entityId}`)
+            .join(', ')
+        : '(aucun)';
+
+      const checklistRaw = await withAiUsageContext(
+        { userId, projectId, purpose: 'fabulous_task_checklist' },
+        () =>
+          aiService.generateFabulousTaskChecklist({
+            stage,
+            stageLabel: PROJECT_STAGE_LABELS[stage] || stage,
+            workflowTitle: task.action?.templateTitle || '—',
+            taskTitle: task.action?.title || 'Action',
+            taskSlug: task.action?.slug || '',
+            taskDescription: task.action?.description || '',
+            projectTitle: project.title || project.quoi || '',
+            linkedDocs: linkedDocsLabel,
+            taskNotes: task.notes || '',
+            progressPercent: computeProgress(await projectStageRepository.listTasks(run.id)),
+          })
+      );
+
+      const checklist = normalizeChecklist({
+        ...checklistRaw,
+        generatedAt: new Date().toISOString(),
+      });
+
+      const meta = task.metadata && typeof task.metadata === 'object' ? { ...task.metadata } : {};
+      meta.checklist = checklist;
+      await projectStageRepository.updateTask(task.id, { metadata: meta });
+
+      if (projectMemoryUpdateService) {
+        projectMemoryUpdateService.recordEventSafe({
+          projectId,
+          nodeType: 'insight',
+          content: `Checklist Fabulous pour « ${task.action?.title || task.action?.slug} » (${checklist.items.length} points)`,
+          sourceEntityType: 'project_stage_task',
+          sourceEntityId: task.id,
+          importance: 0.5,
+        });
+      }
+
+      const payload = await hydrateRun(run, userId, projectId);
+      return { ...payload, checklist };
     },
 
     async removeLink(userId, projectId, stage, linkId) {

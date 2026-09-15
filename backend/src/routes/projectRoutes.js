@@ -107,6 +107,11 @@ export function createProjectRoutes({
 
   router.get('/:id/stages/:stage', authenticate, requirePaid, projectStageController.getOrCreate);
   router.patch('/:id/stages/:stage/tasks/:taskId', authenticate, requirePaid, projectStageController.updateTask);
+  router.post(
+    '/:id/stages/:stage/tasks/:taskId/checklist',
+    ...paidAi,
+    projectStageController.generateTaskChecklist
+  );
   router.post('/:id/stages/:stage/links', authenticate, requirePaid, projectStageController.addLink);
   router.delete('/:id/stages/:stage/links/:linkId', authenticate, requirePaid, projectStageController.removeLink);
   router.post('/:id/stages/:stage/contacts', authenticate, requirePaid, projectStageController.createContact);

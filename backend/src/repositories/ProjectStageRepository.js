@@ -88,6 +88,7 @@ function mapLink(row) {
     entityId: row.entity_id,
     role: row.role,
     note: row.note,
+    metadata: row.metadata ?? {},
     createdAt: row.created_at,
   };
 }
@@ -353,15 +354,21 @@ export const ProjectStageRepository = {
     return rows.map(mapLink);
   },
 
-  async createLink({ stageRunId, entityType, entityId, role = null, note = null }) {
+  async createLink({ stageRunId, entityType, entityId, role = null, note = null, metadata = {} }) {
+    const meta = metadata && typeof metadata === 'object' ? metadata : {};
     const { rows } = await pool.query(
-      `INSERT INTO project_stage_links (stage_run_id, entity_type, entity_id, role, note)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO project_stage_links (stage_run_id, entity_type, entity_id, role, note, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb)
        ON CONFLICT (stage_run_id, entity_type, entity_id)
        DO UPDATE SET role = COALESCE(EXCLUDED.role, project_stage_links.role),
-                     note = COALESCE(EXCLUDED.note, project_stage_links.note)
+                     note = COALESCE(EXCLUDED.note, project_stage_links.note),
+                     metadata = CASE
+                       WHEN EXCLUDED.metadata IS NULL OR EXCLUDED.metadata = '{}'::jsonb
+                         THEN project_stage_links.metadata
+                       ELSE project_stage_links.metadata || EXCLUDED.metadata
+                     END
        RETURNING *`,
-      [Number(stageRunId), entityType, Number(entityId), role, note]
+      [Number(stageRunId), entityType, Number(entityId), role, note, JSON.stringify(meta)]
     );
     return mapLink(rows[0]);
   },

@@ -32,6 +32,17 @@ export function createProjectStageController({ projectStageService }) {
       successResponse(res, data);
     }),
 
+    generateTaskChecklist: asyncHandler(async (req, res) => {
+      const { projectId, stage, taskId } = StageTaskParamDto.from(req.params);
+      const data = await projectStageService.generateTaskChecklist(
+        req.user.id,
+        projectId,
+        stage,
+        taskId
+      );
+      successResponse(res, data);
+    }),
+
     addLink: asyncHandler(async (req, res) => {
       const { projectId, stage } = StageParamDto.from(req.params);
       const dto = CreateStageLinkRequestDto.from(req.body);

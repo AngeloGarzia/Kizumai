@@ -89,7 +89,7 @@ export function createDocumentService({
   }
 
   return {
-    async addDocument({ userId, projectId, file, title, categoryId, description }) {
+    async addDocument({ userId, projectId, file, title, categoryId, description, forceScan = false }) {
       if (!file) throw new AppError('Aucun fichier reçu', 400);
       if (!file.buffer?.length) {
         throw new AppError('Fichier vide ou non reçu en mémoire', 400);
@@ -154,7 +154,9 @@ export function createDocumentService({
       });
 
       let scan = null;
-      if (documentScanService && process.env.DOCUMENT_AUTO_SCAN === 'true') {
+      const shouldScan =
+        Boolean(forceScan) || process.env.DOCUMENT_AUTO_SCAN === 'true';
+      if (documentScanService && shouldScan) {
         try {
           scan = await documentScanService.startScan({
             userId,

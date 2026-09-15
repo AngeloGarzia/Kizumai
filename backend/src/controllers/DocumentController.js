@@ -19,6 +19,11 @@ export function createDocumentController({ documentService, storageService }) {
     upload: asyncHandler(async (req, res) => {
       const { projectId } = DocumentParamsDto.from(req.params);
       const dto = UploadDocumentRequestDto.from(req.body, req.file);
+      const forceScan =
+        req.body?.forceScan === true ||
+        req.body?.forceScan === 'true' ||
+        req.body?.force_scan === true ||
+        req.body?.force_scan === 'true';
       const document = await documentService.addDocument({
         userId: req.user.id,
         projectId,
@@ -26,6 +31,7 @@ export function createDocumentController({ documentService, storageService }) {
         title: dto.title,
         categoryId: dto.categoryId,
         description: dto.description,
+        forceScan,
       });
       successResponse(res, { document: DocumentResponseDto.from(document) }, 201);
     }),

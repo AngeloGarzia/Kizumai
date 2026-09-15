@@ -251,6 +251,7 @@ export function createContainer() {
     contactRepository,
     plannerEventRepository,
     projectMemoryUpdateService,
+    aiService,
   });
 
   const learningRecordService = createLearningRecordService({

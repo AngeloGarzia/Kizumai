@@ -41,6 +41,9 @@ export function createSettingsService({ settingsRepository, aiPromptRepository }
         'project_preview_analysis'
       );
       const fabulousPageGuidePrompt = await aiPromptRepository.findByKey('fabulous_page_guide');
+      const fabulousTaskChecklistPrompt = await aiPromptRepository.findByKey(
+        'fabulous_task_checklist'
+      );
 
       const provider = settings.ai_provider || config.ai.defaultProvider;
       const providerDef = getProviderById(provider);
@@ -69,6 +72,7 @@ export function createSettingsService({ settingsRepository, aiPromptRepository }
         memoryContextPrefixPrompt: memoryContextPrefixPrompt?.content || null,
         projectPreviewAnalysisPrompt: projectPreviewAnalysisPrompt?.content || null,
         fabulousPageGuidePrompt: fabulousPageGuidePrompt?.content || null,
+        fabulousTaskChecklistPrompt: fabulousTaskChecklistPrompt?.content || null,
       };
     },
 
