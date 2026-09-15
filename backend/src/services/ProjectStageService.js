@@ -423,6 +423,11 @@ export function createProjectStageService({
             .join(', ')
         : '(aucun)';
 
+      const allTasks = await projectStageRepository.listTasks(run.id);
+      const progressPercent = computeProgress(allTasks);
+
+      // Checklist Fabulous (prompt en base) — contexte déjà résolu hors callback.
+
       const checklistRaw = await withAiUsageContext(
         { userId, projectId, purpose: 'fabulous_task_checklist' },
         () =>
@@ -436,7 +441,7 @@ export function createProjectStageService({
             projectTitle: project.title || project.quoi || '',
             linkedDocs: linkedDocsLabel,
             taskNotes: task.notes || '',
-            progressPercent: computeProgress(await projectStageRepository.listTasks(run.id)),
+            progressPercent,
           })
       );
 
