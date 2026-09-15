@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import BottomNav from '../components/BottomNav.jsx';
+import MainLayout from '../components/MainLayout.jsx';
 import BrandLogo from '../components/BrandLogo.jsx';
 import Button from '../components/Button.jsx';
 import Input from '../components/Input.jsx';
@@ -135,12 +135,7 @@ export default function Setup() {
   const canSelfUpgrade = Boolean(billingConfig?.selfServePaidEnabled) && !isPaid && !isAdmin;
 
   return (
-    <div className="min-h-screen min-h-dvh page-bg flex flex-col lg:flex-row">
-      <div className="hidden lg:block lg:sticky lg:top-0 lg:self-start lg:h-screen lg:shrink-0">
-        <BottomNav />
-      </div>
-
-      <div className="flex-1 flex flex-col min-w-0 pb-28 sm:pb-32 lg:pb-8">
+    <MainLayout>
         <main className="page-container flex-1 space-y-6 sm:space-y-8 max-w-[50.4rem] lg:max-w-[67.2rem] py-6 sm:py-8">
           <section className="space-y-2">
             <BrandLogo size="sm" asLink={false} />
@@ -236,11 +231,7 @@ export default function Setup() {
             </div>
           </section>
         </main>
-      </div>
 
-      <div className="lg:hidden">
-        <BottomNav />
-      </div>
-    </div>
+    </MainLayout>
   );
 }

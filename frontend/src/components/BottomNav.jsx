@@ -75,10 +75,11 @@ export default function BottomNav() {
   const { isAuthenticated, isAdmin, user } = useAuth();
   const [fabulousOpen, setFabulousOpen] = useState(false);
 
+  // Setup : mobile uniquement (footer desktop). Admin : liste + mobile.
   const items = [
     ...navItems,
     ...(isAuthenticated
-      ? [{ id: 'setup', label: 'Setup', icon: IconSetup, path: '/setup' }]
+      ? [{ id: 'setup', label: 'Setup', icon: IconSetup, path: '/setup', mobileOnly: true }]
       : []),
     ...(isAdmin
       ? [{ id: 'admin', label: 'Admin', icon: IconAdmin, path: '/admin' }]
@@ -114,7 +115,10 @@ export default function BottomNav() {
     const hideLabelMobile = item.id === 'admin';
 
     return (
-      <li key={item.id} className="flex-1 lg:flex-none min-w-[3.25rem]">
+      <li
+        key={item.id}
+        className={`flex-1 lg:flex-none min-w-[3.25rem]${item.mobileOnly ? ' lg:hidden' : ''}`}
+      >
         <Link
           to={item.path}
           className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-2 sm:py-2
@@ -220,17 +224,34 @@ export default function BottomNav() {
             {isAuthenticated ? (
               <Link
                 to="/setup"
-                className="flex items-center gap-3 px-3 py-2 rounded-xl w-full
-                           hover:bg-prune-50 transition-colors"
+                className={`flex items-center gap-3 px-3 py-2 rounded-xl w-full transition-colors ${
+                  location.pathname.startsWith('/setup')
+                    ? 'bg-prune-900 text-wasabi-400'
+                    : 'hover:bg-prune-50'
+                }`}
               >
-                <span className="flex items-center justify-center w-9 h-9 rounded-full bg-prune-100 text-prune-700 shrink-0">
+                <span
+                  className={`flex items-center justify-center w-9 h-9 rounded-full shrink-0 ${
+                    location.pathname.startsWith('/setup')
+                      ? 'bg-prune-800 text-wasabi-400'
+                      : 'bg-prune-100 text-prune-700'
+                  }`}
+                >
                   <IconSetup className="w-5 h-5" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium text-prune-900 truncate">
+                  <span
+                    className={`block text-sm font-medium truncate ${
+                      location.pathname.startsWith('/setup') ? 'text-wasabi-400' : 'text-prune-900'
+                    }`}
+                  >
                     {user?.name || user?.email || 'Setup'}
                   </span>
-                  <span className="block text-xs text-prune-500 truncate">
+                  <span
+                    className={`block text-xs truncate ${
+                      location.pathname.startsWith('/setup') ? 'text-wasabi-400/80' : 'text-prune-500'
+                    }`}
+                  >
                     Setup · {isAdmin ? 'Administrateur' : 'Mon compte'}
                   </span>
                 </span>

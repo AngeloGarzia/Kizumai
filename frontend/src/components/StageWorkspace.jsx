@@ -4,7 +4,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import BottomNav from './BottomNav.jsx';
+import MainLayout from './MainLayout.jsx';
 import BrandLogo from './BrandLogo.jsx';
 import DocumentScanModal from './DocumentScanModal.jsx';
 import { IconChevronRight } from './icons.jsx';
@@ -240,12 +240,7 @@ export default function StageWorkspace({ projectId, stage }) {
   }
 
   return (
-    <div className="min-h-screen min-h-dvh page-bg flex flex-col lg:flex-row">
-      <div className="hidden lg:block lg:sticky lg:top-0 lg:h-screen">
-        <BottomNav />
-      </div>
-
-      <div className="flex-1 flex flex-col min-w-0 pb-28 sm:pb-32 lg:pb-8">
+    <MainLayout>
         <header className="sticky top-0 z-10 header-glass">
           <div className="page-container py-4 sm:py-5 flex items-center justify-between gap-3">
             <BrandLogo size="sm" />
@@ -538,11 +533,7 @@ export default function StageWorkspace({ projectId, stage }) {
             );
           })()}
         </main>
-      </div>
 
-      <div className="lg:hidden">
-        <BottomNav />
-      </div>
 
       {scanModal && (
         <DocumentScanModal
@@ -552,6 +543,6 @@ export default function StageWorkspace({ projectId, stage }) {
           onClose={() => setScanModal(null)}
         />
       )}
-    </div>
+    </MainLayout>
   );
 }

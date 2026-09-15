@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import BottomNav from '../components/BottomNav.jsx';
+import MainLayout from '../components/MainLayout.jsx';
 import BrandLogo from '../components/BrandLogo.jsx';
 import DocumentScanModal from '../components/DocumentScanModal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -608,12 +608,7 @@ export default function Resources() {
   const projectLabel = project?.title || project?.quoi || 'Mon projet';
 
   return (
-    <div className="min-h-screen min-h-dvh page-bg flex flex-col lg:flex-row">
-      <div className="hidden lg:block lg:sticky lg:top-0 lg:h-screen">
-        <BottomNav />
-      </div>
-
-      <div className="flex-1 flex flex-col min-w-0 pb-28 sm:pb-32 lg:pb-10">
+    <MainLayout>
         <header className="sticky top-0 z-10 header-glass">
           <div className="page-container py-4 sm:py-5 flex items-center justify-between gap-3">
             <BrandLogo size="sm" />
@@ -805,11 +800,6 @@ export default function Resources() {
             </>
           )}
         </main>
-      </div>
-
-      <div className="lg:hidden">
-        <BottomNav />
-      </div>
 
       {scanModal && project && (
         <DocumentScanModal
@@ -820,6 +810,6 @@ export default function Resources() {
           onApplied={() => load(project.id)}
         />
       )}
-    </div>
+    </MainLayout>
   );
 }

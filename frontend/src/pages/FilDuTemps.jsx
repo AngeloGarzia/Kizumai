@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import BottomNav from '../components/BottomNav.jsx';
 import BrandLogo from '../components/BrandLogo.jsx';
+import MainLayout from '../components/MainLayout.jsx';
 import Button from '../components/Button.jsx';
 import Input from '../components/Input.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -376,7 +376,7 @@ export default function FilDuTemps() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-prune-50 via-white to-wasabi-50/40 pb-28">
+    <MainLayout>
       <header className="sticky top-0 z-20 border-b border-prune-100/80 bg-white/85 backdrop-blur-md">
         <div className="mx-auto max-w-3xl px-4 py-3 flex items-center justify-between gap-3">
           <BrandLogo size="sm" />
@@ -392,7 +392,7 @@ export default function FilDuTemps() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 pt-5 space-y-5">
+      <main className="mx-auto max-w-3xl px-4 pt-5 space-y-5 flex-1 w-full">
         {loading && (
           <p className="text-sm text-prune-500 animate-pulse">Chargement du fil…</p>
         )}
@@ -650,8 +650,6 @@ export default function FilDuTemps() {
           </>
         )}
       </main>
-
-      <BottomNav />
-    </div>
+    </MainLayout>
   );
 }

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useProject } from '../context/ProjectContext.jsx';
 import BrandLogo from '../components/BrandLogo.jsx';
-import BottomNav from '../components/BottomNav.jsx';
+import MainLayout from '../components/MainLayout.jsx';
 import ProgressCard from '../components/ProgressCard.jsx';
 import ModulesSection from '../components/ModulesSection.jsx';
 import NextStepGuide from '../components/NextStepGuide.jsx';
@@ -262,13 +262,8 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen min-h-dvh page-bg flex flex-col lg:flex-row">
-      <div className="hidden lg:block lg:sticky lg:top-0 lg:h-screen">
-        <BottomNav />
-      </div>
-
-      <div className="flex-1 flex flex-col min-w-0 pb-28 sm:pb-32 lg:pb-8">
-        <main className="page-container flex-1 space-y-6 sm:space-y-8 lg:space-y-10 max-w-[50.4rem] lg:max-w-[67.2rem]">
+    <MainLayout>
+      <main className="page-container flex-1 space-y-6 sm:space-y-8 lg:space-y-10 max-w-[50.4rem] lg:max-w-[67.2rem]">
           <section className="flex justify-center pt-4 sm:pt-8 lg:pt-10">
             <BrandLogo size="hero" asLink={false} className="mx-auto" />
           </section>
@@ -299,11 +294,6 @@ export default function Home() {
             }
           />
         </main>
-      </div>
-
-      <div className="lg:hidden">
-        <BottomNav />
-      </div>
 
       <NextStepGuide
         open={guideOpen}
@@ -311,6 +301,6 @@ export default function Home() {
         onDismiss={dismissGuide}
         onContinue={continueGuide}
       />
-    </div>
+    </MainLayout>
   );
 }
