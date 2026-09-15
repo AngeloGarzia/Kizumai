@@ -1,5 +1,8 @@
+import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import FabulousGuideModal from './FabulousGuideModal.jsx';
+import { publicAssetUrl } from '../config/appBase.js';
 import {
   IconHome,
   IconPath,
@@ -41,6 +44,17 @@ function IconAgenda({ className = 'w-5 h-5' }) {
   );
 }
 
+function IconFabulous({ className = 'w-5 h-5' }) {
+  return (
+    <img
+      src={publicAssetUrl('fabulous.svg')}
+      alt=""
+      className={`${className} select-none`}
+      decoding="async"
+    />
+  );
+}
+
 const navItems = [
   { id: 'home', label: 'Accueil', icon: IconHome, path: '/' },
   { id: 'path', label: 'Parcours', icon: IconPath, path: '/parcours' },
@@ -49,9 +63,17 @@ const navItems = [
   { id: 'agenda', label: 'Agenda', icon: IconAgenda, path: '/planner' },
 ];
 
+const fabulousItem = {
+  id: 'fabulous',
+  type: 'fabulous',
+  label: 'Fabulous',
+  icon: IconFabulous,
+};
+
 export default function BottomNav() {
   const location = useLocation();
   const { isAuthenticated, isAdmin, user } = useAuth();
+  const [fabulousOpen, setFabulousOpen] = useState(false);
 
   const items = [
     ...navItems,
@@ -86,103 +108,150 @@ export default function BottomNav() {
     'transition-colors text-prune-500 hover:bg-prune-50 lg:hover:bg-prune-50',
   ].join(' ');
 
-  return (
-    <nav
-      className="fixed bottom-0 inset-x-0 z-20 pb-safe
-                 lg:static lg:pb-0 lg:h-screen lg:flex lg:flex-col
-                 lg:border-r lg:border-prune-100 lg:bg-white lg:w-56 lg:shrink-0"
-      aria-label="Navigation principale"
-    >
-      <div
-        className="mx-3 mb-3 sm:mx-4 sm:mb-4 lg:mx-0 lg:mb-0 lg:p-4
-                   bg-white rounded-2xl sm:rounded-3xl shadow-lg shadow-prune-900/10
-                   border border-prune-100
-                   lg:rounded-none lg:shadow-none lg:border-0
-                   lg:flex lg:flex-col lg:flex-1 lg:min-h-0 lg:h-full"
-      >
-        <ul className="flex items-stretch justify-around py-2 px-1 sm:py-3 lg:flex-col lg:gap-1 lg:p-0 overflow-x-auto">
-          {items.map((item) => {
-            const isActive = isItemActive(item);
-            const Icon = item.icon;
-            const hideLabelMobile = item.id === 'admin';
+  const renderNavLink = (item) => {
+    const isActive = isItemActive(item);
+    const Icon = item.icon;
+    const hideLabelMobile = item.id === 'admin';
 
-            return (
-              <li key={item.id} className="flex-1 lg:flex-none min-w-[3.25rem]">
-                <Link
-                  to={item.path}
-                  className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-2 sm:py-2
-                              lg:flex-row lg:justify-start lg:gap-3 lg:px-4 lg:py-3 lg:rounded-xl lg:w-full
-                              transition-colors
-                              ${isActive
-                    ? 'lg:bg-prune-900'
-                    : 'hover:bg-prune-50 lg:hover:bg-prune-50'}`}
-                >
-                  <span
-                    className={`flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-2xl
-                                lg:w-9 lg:h-9 lg:rounded-xl transition-colors
-                                ${isActive
-                      ? 'bg-prune-900 text-wasabi-400 lg:bg-transparent'
-                      : 'text-prune-500'}`}
-                  >
-                    <Icon className="w-5 h-5" />
+    return (
+      <li key={item.id} className="flex-1 lg:flex-none min-w-[3.25rem]">
+        <Link
+          to={item.path}
+          className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-2 sm:py-2
+                      lg:flex-row lg:justify-start lg:gap-3 lg:px-4 lg:py-3 lg:rounded-xl lg:w-full
+                      transition-colors
+                      ${isActive
+            ? 'lg:bg-prune-900'
+            : 'hover:bg-prune-50 lg:hover:bg-prune-50'}`}
+        >
+          <span
+            className={`flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-2xl
+                        lg:w-9 lg:h-9 lg:rounded-xl transition-colors
+                        ${isActive
+              ? 'bg-prune-900 text-wasabi-400 lg:bg-transparent'
+              : 'text-prune-500'}`}
+          >
+            <Icon className="w-5 h-5" />
+          </span>
+          <span
+            className={`text-xs sm:text-sm font-medium lg:text-sm
+                        ${hideLabelMobile ? 'hidden lg:inline' : ''}
+                        ${isActive ? 'text-wasabi-500 lg:text-wasabi-400' : 'text-prune-500'}`}
+          >
+            {item.label}
+          </span>
+        </Link>
+      </li>
+    );
+  };
+
+  const renderFabulousButton = () => {
+    const Icon = fabulousItem.icon;
+    const isActive = fabulousOpen;
+
+    return (
+      <li key={fabulousItem.id} className="flex-1 lg:flex-none min-w-[3.25rem]">
+        <button
+          type="button"
+          onClick={() => setFabulousOpen(true)}
+          className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-2 sm:py-2 w-full
+                      lg:flex-row lg:justify-start lg:gap-3 lg:px-4 lg:py-3 lg:rounded-xl
+                      transition-colors
+                      ${isActive
+            ? 'lg:bg-prune-900'
+            : 'hover:bg-prune-50 lg:hover:bg-prune-50'}`}
+          aria-label="Ouvrir le guide Fabulous pour cette page"
+        >
+          <span
+            className={`flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-2xl
+                        lg:w-9 lg:h-9 lg:rounded-xl transition-colors
+                        ${isActive
+              ? 'bg-prune-900 lg:bg-transparent ring-2 ring-wasabi-400/80'
+              : 'text-prune-500 bg-wasabi-50/60'}`}
+          >
+            <Icon className="w-5 h-5" />
+          </span>
+          <span
+            className={`text-xs sm:text-sm font-medium lg:text-sm
+                        ${isActive ? 'text-wasabi-500 lg:text-wasabi-400' : 'text-prune-500'}`}
+          >
+            {fabulousItem.label}
+          </span>
+        </button>
+      </li>
+    );
+  };
+
+  return (
+    <>
+      <nav
+        className="fixed bottom-0 inset-x-0 z-20 pb-safe
+                   lg:static lg:pb-0 lg:h-screen lg:flex lg:flex-col
+                   lg:border-r lg:border-prune-100 lg:bg-white lg:w-56 lg:shrink-0"
+        aria-label="Navigation principale"
+      >
+        <div
+          className="mx-3 mb-3 sm:mx-4 sm:mb-4 lg:mx-0 lg:mb-0 lg:p-4
+                     bg-white rounded-2xl sm:rounded-3xl shadow-lg shadow-prune-900/10
+                     border border-prune-100
+                     lg:rounded-none lg:shadow-none lg:border-0
+                     lg:flex lg:flex-col lg:flex-1 lg:min-h-0 lg:h-full"
+        >
+          <ul className="flex items-stretch justify-around py-2 px-1 sm:py-3 lg:flex-col lg:gap-1 lg:p-0 overflow-x-auto">
+            {items.flatMap((item, index) => {
+              const nodes = [renderNavLink(item)];
+              if (index === 0) nodes.push(renderFabulousButton());
+              return nodes;
+            })}
+
+            {!isAuthenticated && (
+              <li className="flex-1 lg:hidden min-w-[3.25rem]">
+                <Link to="/login" className={setupLinkClass}>
+                  <span className="flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-2xl text-prune-500">
+                    <IconUser className="w-5 h-5" />
                   </span>
-                  <span
-                    className={`text-xs sm:text-sm font-medium lg:text-sm
-                                ${hideLabelMobile ? 'hidden lg:inline' : ''}
-                                ${isActive ? 'text-wasabi-500 lg:text-wasabi-400' : 'text-prune-500'}`}
-                  >
-                    {item.label}
-                  </span>
+                  <span className="text-xs sm:text-sm font-medium text-prune-500">Compte</span>
                 </Link>
               </li>
-            );
-          })}
+            )}
+          </ul>
 
-          {!isAuthenticated && (
-            <li className="flex-1 lg:hidden min-w-[3.25rem]">
-              <Link to="/login" className={setupLinkClass}>
-                <span className="flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-2xl text-prune-500">
+          <div className="hidden lg:block mt-auto pt-4 border-t border-prune-100 shrink-0">
+            {isAuthenticated ? (
+              <Link
+                to="/setup"
+                className="flex items-center gap-3 px-3 py-2 rounded-xl w-full
+                           hover:bg-prune-50 transition-colors"
+              >
+                <span className="flex items-center justify-center w-9 h-9 rounded-full bg-prune-100 text-prune-700 shrink-0">
+                  <IconSetup className="w-5 h-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-prune-900 truncate">
+                    {user?.name || user?.email || 'Setup'}
+                  </span>
+                  <span className="block text-xs text-prune-500 truncate">
+                    Setup · {isAdmin ? 'Administrateur' : 'Mon compte'}
+                  </span>
+                </span>
+              </Link>
+            ) : (
+              <Link
+                to="/login"
+                className="flex items-center gap-3 px-3 py-2 rounded-xl w-full
+                           hover:bg-prune-50 transition-colors"
+              >
+                <span className="flex items-center justify-center w-9 h-9 rounded-full bg-prune-100 text-prune-700 shrink-0">
                   <IconUser className="w-5 h-5" />
                 </span>
-                <span className="text-xs sm:text-sm font-medium text-prune-500">Compte</span>
+                <span className="text-sm font-medium text-prune-900">Connexion</span>
               </Link>
-            </li>
-          )}
-        </ul>
-
-        <div className="hidden lg:block mt-auto pt-4 border-t border-prune-100 shrink-0">
-          {isAuthenticated ? (
-            <Link
-              to="/setup"
-              className="flex items-center gap-3 px-3 py-2 rounded-xl w-full
-                         hover:bg-prune-50 transition-colors"
-            >
-              <span className="flex items-center justify-center w-9 h-9 rounded-full bg-prune-100 text-prune-700 shrink-0">
-                <IconSetup className="w-5 h-5" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium text-prune-900 truncate">
-                  {user?.name || user?.email || 'Setup'}
-                </span>
-                <span className="block text-xs text-prune-500 truncate">
-                  Setup · {isAdmin ? 'Administrateur' : 'Mon compte'}
-                </span>
-              </span>
-            </Link>
-          ) : (
-            <Link
-              to="/login"
-              className="flex items-center gap-3 px-3 py-2 rounded-xl w-full
-                         hover:bg-prune-50 transition-colors"
-            >
-              <span className="flex items-center justify-center w-9 h-9 rounded-full bg-prune-100 text-prune-700 shrink-0">
-                <IconUser className="w-5 h-5" />
-              </span>
-              <span className="text-sm font-medium text-prune-900">Connexion</span>
-            </Link>
-          )}
+            )}
+          </div>
         </div>
-      </div>
-    </nav>
+      </nav>
+
+      <FabulousGuideModal open={fabulousOpen} onClose={() => setFabulousOpen(false)} />
+    </>
   );
 }

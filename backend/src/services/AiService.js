@@ -1651,6 +1651,39 @@ export function createAiService({ settingsService, currencyService }) {
       };
     },
 
+    /**
+     * Guide Fabulous contextuel (page + rubrique) — prompt fabulous_page_guide en base.
+     * Sortie JSON : { title, summary, steps[], tip? }
+     */
+    async generateFabulousPageGuide(context = {}) {
+      const aiConfig = await settingsService.getAiConfig();
+      if (!aiConfig.fabulousPageGuidePrompt) {
+        throw new AppError('Le prompt « fabulous_page_guide » est introuvable en base.', 500);
+      }
+      const userContent = interpolate(aiConfig.fabulousPageGuidePrompt, {
+        pathname: String(context.pathname || '/').slice(0, 300),
+        page_label: String(context.pageLabel || 'Page').slice(0, 200),
+        section_label: String(context.sectionLabel || '—').slice(0, 200),
+        page_detail: String(context.pageDetail || '—').slice(0, 800),
+        is_paid: context.isPaid ? 'oui' : 'non',
+        project_title: String(context.projectTitle || '(aucun)').slice(0, 200),
+        project_stage: String(context.projectStage || '(aucune)').slice(0, 120),
+      });
+      const data = await requestStepJson(userContent, { temperature: 0.5 });
+      const steps = (Array.isArray(data.steps) ? data.steps : [])
+        .map((s) => String(s || '').trim().slice(0, 400))
+        .filter(Boolean)
+        .slice(0, 8);
+      return {
+        title: clipAiOutput(String(data.title || context.pageLabel || 'Guide Fabulous').trim(), 200),
+        summary: clipAiOutput(String(data.summary || '').trim(), 1200),
+        steps,
+        tip: clipAiOutput(String(data.tip || '').trim(), 500),
+        provider: aiConfig.provider,
+        model: aiConfig.model,
+      };
+    },
+
     async testCurrentEngine(overrides = {}) {
       const baseConfig = await settingsService.getAiConfig();
       const aiConfig = {

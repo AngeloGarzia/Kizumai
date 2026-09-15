@@ -227,3 +227,17 @@ export const ProjectResponseDto = {
     return (projects || []).map((p) => ProjectResponseDto.from(p));
   },
 };
+
+export const FabulousPageGuideRequestDto = {
+  from(body = {}) {
+    return {
+      pathname: optionalString(body.pathname, { max: 300 }) || '/',
+      pageLabel: optionalString(body.pageLabel, { max: 200 }) || 'Page',
+      sectionLabel: optionalString(body.sectionLabel, { max: 200 }) || '—',
+      pageDetail: optionalString(body.pageDetail, { max: 800 }) || '—',
+      projectId: optionalProjectId(body),
+      projectTitle: optionalString(body.projectTitle, { max: 200 }) || '',
+      projectStage: optionalString(body.projectStage, { max: 120 }) || '',
+    };
+  },
+};

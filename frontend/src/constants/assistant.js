@@ -17,4 +17,5 @@ export const assistantPhrases = {
   summaryFailed: `Échec du résumé ${ASSISTANT_NAME}`,
   scan: `Scan ${ASSISTANT_NAME}`,
   filterLabel: ASSISTANT_NAME,
+  pageGuide: `${ASSISTANT_NAME} prépare ton guide…`,
 };

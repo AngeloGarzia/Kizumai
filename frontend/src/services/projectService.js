@@ -210,6 +210,11 @@ export const projectService = {
     return data.coach;
   },
 
+  async fetchFabulousPageGuide(payload) {
+    const { data } = await api.post('/projects/guide/page', payload);
+    return data.guide;
+  },
+
   async scanProjectMemory() {
     const { data } = await api.post('/projects/mine/memory/scan', {});
     return data.scan;

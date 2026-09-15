@@ -80,6 +80,7 @@ export function createProjectRoutes({
   router.post('/search/city-eval', ...publicAi, projectController.evaluateCityImplantation);
   router.post('/search/proposals', ...publicAi, projectController.buildProposals);
   router.post('/search/preview-analysis', ...publicAi, projectController.analyzeProjectPreview);
+  router.post('/guide/page', ...publicAi, projectController.fabulousPageGuide);
 
   const paidAi = [
     authenticate,

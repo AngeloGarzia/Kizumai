@@ -169,6 +169,11 @@ const PROMPT_GROUPS = [
     keys: ['memory_snapshot', 'memory_recall'],
   },
   {
+    id: 'fabulous',
+    title: 'Fabulous',
+    keys: ['fabulous_page_guide'],
+  },
+  {
     id: 'systeme',
     title: 'Système AiService',
     keys: [

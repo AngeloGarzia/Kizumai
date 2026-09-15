@@ -8,6 +8,7 @@ import {
   ProjectPreviewAnalysisRequestDto,
   ProjectPreviewRequestDto,
   ProjectResponseDto,
+  FabulousPageGuideRequestDto,
   SearchBusinessesRequestDto,
   SearchLocationsRequestDto,
   SearchTrainingsRequestDto,
@@ -83,6 +84,12 @@ export function createProjectController({ projectService }) {
         withUserContext(dto, req)
       );
       successResponse(res, { analysis });
+    }),
+
+    fabulousPageGuide: asyncHandler(async (req, res) => {
+      const dto = FabulousPageGuideRequestDto.from(req.body);
+      const guide = await projectService.getFabulousPageGuide(req.user, dto);
+      successResponse(res, { guide });
     }),
 
     create: asyncHandler(async (req, res) => {

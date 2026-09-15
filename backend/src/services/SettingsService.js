@@ -40,6 +40,7 @@ export function createSettingsService({ settingsRepository, aiPromptRepository }
       const projectPreviewAnalysisPrompt = await aiPromptRepository.findByKey(
         'project_preview_analysis'
       );
+      const fabulousPageGuidePrompt = await aiPromptRepository.findByKey('fabulous_page_guide');
 
       const provider = settings.ai_provider || config.ai.defaultProvider;
       const providerDef = getProviderById(provider);
@@ -67,6 +68,7 @@ export function createSettingsService({ settingsRepository, aiPromptRepository }
         franceSystemExtraPrompt: franceSystemExtraPrompt?.content || null,
         memoryContextPrefixPrompt: memoryContextPrefixPrompt?.content || null,
         projectPreviewAnalysisPrompt: projectPreviewAnalysisPrompt?.content || null,
+        fabulousPageGuidePrompt: fabulousPageGuidePrompt?.content || null,
       };
     },
 

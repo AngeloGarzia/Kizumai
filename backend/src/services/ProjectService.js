@@ -772,6 +772,46 @@ export function createProjectService({
     },
 
     /**
+     * Guide Fabulous selon page / rubrique (prompt fabulous_page_guide).
+     */
+    async getFabulousPageGuide(user, body = {}) {
+      const userId = user?.id || null;
+      const isPaid = userId ? hasPaidAccess(user) : false;
+
+      let projectTitle = String(body.projectTitle || '').trim();
+      let projectStage = String(body.projectStage || '').trim();
+      const projectId = body.projectId ?? null;
+
+      if (userId && isPaid && projectId) {
+        try {
+          const project = await this.getUserProject(userId, Number(projectId));
+          projectTitle = project.title || project.quoi || projectTitle;
+          projectStage =
+            project.progress?.currentLabel ||
+            project.progress?.nextLabel ||
+            project.stage ||
+            projectStage;
+        } catch {
+          // guide sans détail projet
+        }
+      }
+
+      return withAiUsageContext(
+        { userId, projectId, purpose: 'fabulous_page_guide' },
+        () =>
+          aiService.generateFabulousPageGuide({
+            pathname: body.pathname,
+            pageLabel: body.pageLabel,
+            sectionLabel: body.sectionLabel,
+            pageDetail: body.pageDetail,
+            isPaid,
+            projectTitle: projectTitle || null,
+            projectStage: projectStage || null,
+          })
+      );
+    },
+
+    /**
      * Scan complet du projet + d?pendances ? m?moire cr??e / mise ? jour + snapshot.
      */
     async scanProjectMemory(userId, { projectId = null } = {}) {
