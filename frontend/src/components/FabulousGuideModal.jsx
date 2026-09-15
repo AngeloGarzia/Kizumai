@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 import Button from './Button.jsx';
 import FabulousThinking from './FabulousThinking.jsx';
@@ -47,14 +48,32 @@ export default function FabulousGuideModal({ open, onClose }) {
     };
   }, [open, location.pathname, location.search, currentProject?.id]);
 
-  if (!open) return null;
+  useEffect(() => {
+    if (!open) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose?.();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
+  if (!open || typeof document === 'undefined') return null;
 
   const steps = Array.isArray(guide?.steps) ? guide.steps : [];
   const context = buildPageGuidePayload(location, { project: currentProject });
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="fabulous-guide-title"
@@ -65,7 +84,7 @@ export default function FabulousGuideModal({ open, onClose }) {
         aria-label="Fermer"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-lg rounded-t-3xl sm:rounded-3xl bg-white shadow-xl p-5 sm:p-6 space-y-4 max-h-[85dvh] overflow-y-auto">
+      <div className="relative z-[1] w-full max-w-lg rounded-t-3xl sm:rounded-3xl bg-white shadow-xl p-5 sm:p-6 space-y-4 max-h-[85dvh] overflow-y-auto">
         <div className="flex items-start gap-3">
           <img
             src={publicAssetUrl('fabulous.svg')}
@@ -107,7 +126,7 @@ export default function FabulousGuideModal({ open, onClose }) {
             </div>
 
             {steps.length > 0 && (
-              <ol className="space-y-2.5 list-none counter-reset-fabulous">
+              <ol className="space-y-2.5 list-none">
                 {steps.map((step, index) => (
                   <li
                     key={`${index}-${step.slice(0, 40)}`}
@@ -139,6 +158,7 @@ export default function FabulousGuideModal({ open, onClose }) {
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

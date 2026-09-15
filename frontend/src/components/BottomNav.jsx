@@ -1,7 +1,5 @@
-import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import FabulousGuideModal from './FabulousGuideModal.jsx';
 import { publicAssetUrl } from '../config/appBase.js';
 import {
   IconHome,
@@ -70,10 +68,9 @@ const fabulousItem = {
   icon: IconFabulous,
 };
 
-export default function BottomNav() {
+export default function BottomNav({ fabulousOpen = false, onFabulousOpen }) {
   const location = useLocation();
   const { isAuthenticated, isAdmin, user } = useAuth();
-  const [fabulousOpen, setFabulousOpen] = useState(false);
 
   // Setup : mobile uniquement (footer desktop). Admin : liste + mobile.
   const items = [
@@ -157,7 +154,7 @@ export default function BottomNav() {
       <li key={fabulousItem.id} className="flex-1 lg:flex-none min-w-[3.25rem]">
         <button
           type="button"
-          onClick={() => setFabulousOpen(true)}
+          onClick={() => onFabulousOpen?.()}
           className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-2 sm:py-2 w-full
                       lg:flex-row lg:justify-start lg:gap-3 lg:px-4 lg:py-3 lg:rounded-xl
                       transition-colors
@@ -187,7 +184,6 @@ export default function BottomNav() {
   };
 
   return (
-    <>
       <nav
         className="fixed bottom-0 inset-x-0 z-20 pb-safe
                    lg:static lg:pb-0 lg:h-screen lg:flex lg:flex-col
@@ -271,8 +267,5 @@ export default function BottomNav() {
           </div>
         </div>
       </nav>
-
-      <FabulousGuideModal open={fabulousOpen} onClose={() => setFabulousOpen(false)} />
-    </>
   );
 }

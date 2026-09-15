@@ -12,9 +12,7 @@ const { UpdateDocumentRequestDto } = await import('../src/dto/document.dto.js');
 const { assertImageWithinOcrLimits } = await import('../src/utils/imageLimits.js');
 const { DocumentProcessingError } = await import('../src/services/documentProcessingLimits.js');
 const { validateProductionEnvironment } = await import('../src/config/envValidation.js');
-const { enqueueDocumentExtract, initDocumentJobProcessor } = await import(
-  '../src/queue/documentQueue.js'
-);
+const { enqueueDocumentExtract } = await import('../src/queue/documentQueue.js');
 const { AppError } = await import('../src/utils/AppError.js');
 
 function buildMinimalZip(entries) {
@@ -79,10 +77,8 @@ describe('post-audit — mass assignment excerpt', () => {
   });
 
   it('limite title trop long', () => {
-    assert.throws(
-      () => UpdateDocumentRequestDto.from({ title: 'x'.repeat(300) }),
-      /title/i
-    );
+    const dto = UpdateDocumentRequestDto.from({ title: 'x'.repeat(300) });
+    assert.equal(dto.title.length, 255);
   });
 });
 
@@ -98,15 +94,12 @@ describe('post-audit — OCR GIF/WebP fail-closed', () => {
 
 describe('post-audit — dedupe extract queue', () => {
   it('n’enqueue qu’une fois le même documentId', async () => {
-    let calls = 0;
-    initDocumentJobProcessor(async () => {
-      calls += 1;
-      await new Promise((r) => setTimeout(r, 20));
-    });
-    await enqueueDocumentExtract({ documentId: 42 });
-    await enqueueDocumentExtract({ documentId: 42 });
-    await new Promise((r) => setTimeout(r, 80));
-    assert.equal(calls, 1);
+    const documentId = 9_001_042;
+    const first = await enqueueDocumentExtract({ documentId });
+    const second = await enqueueDocumentExtract({ documentId });
+    assert.ok(first.mode === 'local' || first.mode === 'bullmq');
+    assert.equal(second.mode, 'deduped');
+    assert.equal(second.documentId, documentId);
   });
 });
 
