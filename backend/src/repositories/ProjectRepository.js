@@ -178,5 +178,13 @@ export const ProjectRepository = {
     if (!rows[0]) return null;
     return this.findById(rows[0].id);
   },
+
+  async delete(id) {
+    const { rows } = await pool.query(
+      `DELETE FROM projects WHERE id = $1 RETURNING id`,
+      [Number(id)]
+    );
+    return Boolean(rows[0]);
+  },
 };
 

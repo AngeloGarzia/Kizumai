@@ -186,6 +186,11 @@ export const projectService = {
     return data.project;
   },
 
+  async deleteProject(id) {
+    const { data } = await api.delete(`/projects/${id}`, { confirm: true });
+    return data.deleted;
+  },
+
   async getSituationSummary(intent = '') {
     const { data } = await api.post('/projects/mine/memory/situation', { intent });
     return data.situation;

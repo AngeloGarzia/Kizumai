@@ -45,7 +45,7 @@ const navItems = [
   { id: 'home', label: 'Accueil', icon: IconHome, path: '/' },
   { id: 'path', label: 'Parcours', icon: IconPath, path: '/parcours' },
   { id: 'timeline', label: 'Fil', icon: IconTimeline, path: '/fil-du-temps' },
-  { id: 'resources', label: 'Ressources', icon: IconBook, path: '/ressources' },
+  { id: 'resources', label: 'Docs', icon: IconBook, path: '/ressources' },
   { id: 'agenda', label: 'Agenda', icon: IconAgenda, path: '/planner' },
 ];
 

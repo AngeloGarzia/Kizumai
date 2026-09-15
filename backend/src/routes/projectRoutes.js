@@ -98,6 +98,7 @@ export function createProjectRoutes({
   router.get('/:id', authenticate, requirePaid, projectController.getOne);
   router.patch('/:id', authenticate, requirePaid, projectController.update);
   router.put('/:id/location', authenticate, requirePaid, projectController.updateLocation);
+  router.delete('/:id', authenticate, requirePaid, projectController.remove);
   router.post('/:id/memory/situation', ...paidAi, projectController.recallSituationForProject);
   router.post('/:id/memory/scan', ...paidAi, projectController.scanMemoryForProject);
   router.post('/:id/advancement', ...paidAi, projectController.advancementCoachForProject);

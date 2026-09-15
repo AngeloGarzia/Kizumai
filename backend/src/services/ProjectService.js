@@ -3,6 +3,7 @@ import { hasPaidAccess } from '../constants/plans.js';
 import { computeProjectProgress } from '../constants/projectStages.js';
 import { withAiUsageContext } from '../utils/aiUsage.js';
 import { createAdvancementCoachService } from './AdvancementCoachService.js';
+import pool from '../database/pool.js';
 
 const LOCATION_SUGGEST_TIMEOUT_MS = 4500;
 
@@ -117,6 +118,8 @@ export function createProjectService({
   projectMemoryScanService = null,
   projectTimelineService = null,
   projectStageRepository = null,
+  documentRepository = null,
+  storageService = null,
 }) {
   const advancementCoach = createAdvancementCoachService({
     projectMemoryRecallService,
@@ -631,6 +634,52 @@ export function createProjectService({
         throw new AppError('Projet introuvable', 404);
       }
       return withProgress(project);
+    },
+
+    /**
+     * Suppression définitive d’un projet + mémoire IA + données liées.
+     * Le compte payant est conservé ; l’utilisateur peut recommencer via « Créer son avenir ».
+     */
+    async deleteProject(userId, projectId, { confirm = false } = {}) {
+      if (!confirm) {
+        throw new AppError(
+          'Confirmation requise pour supprimer définitivement le projet',
+          400
+        );
+      }
+
+      const project = await this.getUserProject(userId, projectId);
+      const pid = Number(project.id);
+
+      // Fichiers sur disque avant cascade SQL documents.
+      if (documentRepository?.findByProjectId) {
+        const docs = await documentRepository.findByProjectId(pid);
+        if (storageService?.remove) {
+          await Promise.allSettled(
+            (docs || [])
+              .map((d) => d.storageKey)
+              .filter(Boolean)
+              .map((key) => storageService.remove(key))
+          );
+        }
+      }
+
+      // Tables en ON DELETE SET NULL : purge explicite pour un vrai « recommencer à zéro ».
+      await pool.query('DELETE FROM planner_events WHERE project_id = $1', [pid]);
+      await pool.query('DELETE FROM learning_records WHERE project_id = $1', [pid]);
+      await pool.query('DELETE FROM contacts WHERE project_id = $1', [pid]);
+
+      // CASCADE : stages, documents, scans, companies, mémoire (nodes/edges/snapshots).
+      const deleted = await projectRepository.delete(pid);
+      if (!deleted) {
+        throw new AppError('Projet introuvable', 404);
+      }
+
+      return {
+        deleted: true,
+        projectId: pid,
+        title: project.title || project.quoi || null,
+      };
     },
 
     async updateProject(userId, projectId, fields) {

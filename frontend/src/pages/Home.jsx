@@ -280,6 +280,14 @@ export default function Home() {
             }
             project={isAuthenticated ? project : null}
             onOpenNext={isAuthenticated && hasProject ? openNextStage : undefined}
+            onOpenStage={
+              isAuthenticated && hasProject
+                ? (stageId) => {
+                    if (!project?.id) return;
+                    navigate(stageHref(stageId, project.id));
+                  }
+                : undefined
+            }
           />
 
           <ModulesSection

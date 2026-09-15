@@ -214,6 +214,8 @@ export function createContainer() {
     projectMemoryScanService,
     projectTimelineService,
     projectStageRepository,
+    documentRepository,
+    storageService,
   });
 
   const documentScanService = createDocumentScanService({

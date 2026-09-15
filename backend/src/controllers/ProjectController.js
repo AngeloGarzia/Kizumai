@@ -119,6 +119,16 @@ export function createProjectController({ projectService }) {
       successResponse(res, { project: ProjectResponseDto.from(project) });
     }),
 
+    remove: asyncHandler(async (req, res) => {
+      const { id } = ProjectIdParamDto.from(req.params);
+      const confirm =
+        req.body?.confirm === true ||
+        req.body?.confirm === 'true' ||
+        String(req.body?.confirm || '').toUpperCase() === 'SUPPRIMER';
+      const result = await projectService.deleteProject(req.user.id, id, { confirm });
+      successResponse(res, { deleted: result });
+    }),
+
     recallSituation: asyncHandler(async (req, res) => {
       const intent =
         typeof req.body?.intent === 'string' ? req.body.intent.trim().slice(0, 500) : '';
