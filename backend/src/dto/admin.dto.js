@@ -53,6 +53,19 @@ export const UpdateUserRoleRequestDto = {
   },
 };
 
+export const UpdateUserPlanRequestDto = {
+  from(params, body = {}) {
+    const plan = requireString(body.plan, 'plan', { min: 1, max: 40 });
+    if (plan !== 'free' && plan !== 'paid') {
+      throw new AppError('Plan invalide (free ou paid)', 400);
+    }
+    return {
+      id: parseId(params.id),
+      plan,
+    };
+  },
+};
+
 export const BroadcastNotificationRequestDto = {
   from(body = {}) {
     const title = requireString(body.title, 'title', { min: 1, max: 120 });

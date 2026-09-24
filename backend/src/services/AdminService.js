@@ -2,6 +2,7 @@ import { AppError } from '../utils/AppError.js';
 import { sanitizeUsers } from '../utils/sanitize.js';
 import { UserResponseDto } from '../dto/user.dto.js';
 import { ROLES } from '../constants/roles.js';
+import { PLANS } from '../constants/plans.js';
 import { config } from '../config/index.js';
 import pool from '../database/pool.js';
 import {
@@ -401,6 +402,21 @@ export function createAdminService({
       }
 
       const user = await userRepository.updateRole(targetId, role);
+      if (!user) throw new AppError('Utilisateur introuvable', 404);
+      await userRepository.incrementRefreshTokenVersion(targetId);
+      return UserResponseDto.from(user);
+    },
+
+    async updateUserPlan(userId, plan) {
+      if (![PLANS.FREE, PLANS.PAID].includes(plan)) {
+        throw new AppError('Plan invalide', 400);
+      }
+
+      const targetId = Number(userId);
+      const target = await userRepository.findById(targetId);
+      if (!target) throw new AppError('Utilisateur introuvable', 404);
+
+      const user = await userRepository.updatePlan(targetId, plan);
       if (!user) throw new AppError('Utilisateur introuvable', 404);
       await userRepository.incrementRefreshTokenVersion(targetId);
       return UserResponseDto.from(user);

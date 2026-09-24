@@ -518,6 +518,26 @@ export default function Admin() {
     }
   };
 
+  const togglePlan = async (user) => {
+    const nextPlan = user.plan === 'paid' ? 'free' : 'paid';
+    try {
+      await adminService.updateUserPlan(user.id, nextPlan);
+      await loadOps({ silent: true });
+      if (userDetails?.user?.id === user.id) {
+        setUserDetails((prev) =>
+          prev?.user
+            ? { ...prev, user: { ...prev.user, plan: nextPlan } }
+            : prev
+        );
+      }
+      setMessage(
+        `Plan de ${user.email} passé en ${nextPlan === 'paid' ? 'payant' : 'gratuit'}`
+      );
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   const openUserDetails = async (user) => {
     setError('');
     setDetailsLoading(true);
@@ -1172,7 +1192,13 @@ export default function Admin() {
                               <td className="px-4 py-3">{user.name}</td>
                               <td className="px-4 py-3">{user.email}</td>
                               <td className="px-4 py-3">
-                                <span className="px-2 py-1 rounded-lg text-xs font-semibold bg-prune-100 text-prune-700">
+                                <span
+                                  className={`px-2 py-1 rounded-lg text-xs font-semibold ${
+                                    user.plan === 'paid'
+                                      ? 'bg-wasabi-100 text-wasabi-800'
+                                      : 'bg-prune-100 text-prune-700'
+                                  }`}
+                                >
                                   {user.plan === 'paid' ? 'Payant' : 'Gratuit'}
                                 </span>
                               </td>
@@ -1196,6 +1222,13 @@ export default function Admin() {
                                     className="text-xs font-semibold text-topaz-600 hover:underline"
                                   >
                                     Détails
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => togglePlan(user)}
+                                    className="text-xs font-semibold text-wasabi-700 hover:underline"
+                                  >
+                                    {user.plan === 'paid' ? 'Passer gratuit' : 'Passer payant'}
                                   </button>
                                   <button
                                     type="button"
@@ -1368,7 +1401,7 @@ export default function Admin() {
                       ['Nom', userDetails.user.name],
                       ['Email', userDetails.user.email],
                       ['Rôle', userDetails.user.role],
-                      ['Plan', userDetails.user.plan],
+                      ['Plan', userDetails.user.plan === 'paid' ? 'Payant' : 'Gratuit'],
                       ['Créé le', formatAdminDate(userDetails.user.createdAt)],
                       ['Mis à jour', formatAdminDate(userDetails.user.updatedAt)],
                     ].map(([label, value]) => (
@@ -1378,6 +1411,17 @@ export default function Admin() {
                       </div>
                     ))}
                   </dl>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <Button
+                      type="button"
+                      className="w-auto text-sm"
+                      onClick={() => togglePlan(userDetails.user)}
+                    >
+                      {userDetails.user.plan === 'paid'
+                        ? 'Passer en gratuit'
+                        : 'Passer en payant'}
+                    </Button>
+                  </div>
                 </section>
 
                 <section className="space-y-2">

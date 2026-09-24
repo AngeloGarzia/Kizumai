@@ -5,6 +5,7 @@ import {
   UpdatePromptRequestDto,
   UpdateSettingsRequestDto,
   UpdateUserRoleRequestDto,
+  UpdateUserPlanRequestDto,
 } from '../dto/admin.dto.js';
 import { asyncHandler } from '../utils/AppError.js';
 import { successResponse } from '../utils/response.js';
@@ -75,6 +76,12 @@ export function createAdminController({ adminService, notificationService }) {
     updateUserRole: asyncHandler(async (req, res) => {
       const dto = UpdateUserRoleRequestDto.from(req.params, req.body);
       const user = await adminService.updateUserRole(dto.id, dto.role, req.user.id);
+      successResponse(res, AdminUserResponseDto.from(user));
+    }),
+
+    updateUserPlan: asyncHandler(async (req, res) => {
+      const dto = UpdateUserPlanRequestDto.from(req.params, req.body);
+      const user = await adminService.updateUserPlan(dto.id, dto.plan);
       successResponse(res, AdminUserResponseDto.from(user));
     }),
 

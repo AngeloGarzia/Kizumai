@@ -26,6 +26,7 @@ export function createAdminRoutes({
   router.get('/users/:id', adminController.getUserDetails);
   router.delete('/users/:id', adminController.deleteUser);
   router.patch('/users/:id/role', adminController.updateUserRole);
+  router.patch('/users/:id/plan', adminController.updateUserPlan);
   router.get('/connections', adminController.getConnections);
   router.get('/ai-usage', adminController.getAiUsage);
   router.post('/notifications/broadcast', adminController.broadcastNotification);

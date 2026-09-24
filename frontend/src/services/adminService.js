@@ -37,6 +37,10 @@ export const adminService = {
     return api.patch(`/admin/users/${id}/role`, { role }).then((r) => r.data);
   },
 
+  updateUserPlan(id, plan) {
+    return api.patch(`/admin/users/${id}/plan`, { plan }).then((r) => r.data);
+  },
+
   getConnections() {
     return api.get('/admin/connections').then((r) => r.data);
   },
