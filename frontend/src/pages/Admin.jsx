@@ -295,7 +295,8 @@ export default function Admin() {
         String(u.email || '').toLowerCase().includes(q) ||
         String(u.id).includes(q) ||
         String(u.role || '').toLowerCase().includes(q) ||
-        String(u.plan || '').toLowerCase().includes(q)
+        String(u.plan || '').toLowerCase().includes(q) ||
+        (u.emailVerified ? 'validé' : 'attente').includes(q)
     );
   }, [usersOverview, userSearch]);
 
@@ -533,6 +534,31 @@ export default function Admin() {
       setMessage(
         `Plan de ${user.email} passé en ${nextPlan === 'paid' ? 'payant' : 'gratuit'}`
       );
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const verifyUserAccount = async (user) => {
+    if (user.emailVerified) return;
+    try {
+      const updated = await adminService.verifyUserEmail(user.id);
+      await loadOps({ silent: true });
+      if (userDetails?.user?.id === user.id) {
+        setUserDetails((prev) =>
+          prev?.user
+            ? {
+                ...prev,
+                user: {
+                  ...prev.user,
+                  emailVerified: true,
+                  emailVerifiedAt: updated?.emailVerifiedAt || new Date().toISOString(),
+                },
+              }
+            : prev
+        );
+      }
+      setMessage(`Compte ${user.email} validé`);
     } catch (err) {
       setError(err.message);
     }
@@ -1179,6 +1205,7 @@ export default function Admin() {
                         <tr>
                           <th className="px-4 py-3 font-semibold text-prune-700">Nom</th>
                           <th className="px-4 py-3 font-semibold text-prune-700">Email</th>
+                          <th className="px-4 py-3 font-semibold text-prune-700">Compte</th>
                           <th className="px-4 py-3 font-semibold text-prune-700">Plan</th>
                           <th className="px-4 py-3 font-semibold text-prune-700">Rôle</th>
                           <th className="px-4 py-3 font-semibold text-prune-700">Actions</th>
@@ -1191,6 +1218,17 @@ export default function Admin() {
                             <tr key={user.id} className="border-t border-prune-100">
                               <td className="px-4 py-3">{user.name}</td>
                               <td className="px-4 py-3">{user.email}</td>
+                              <td className="px-4 py-3">
+                                <span
+                                  className={`px-2 py-1 rounded-lg text-xs font-semibold ${
+                                    user.emailVerified
+                                      ? 'bg-wasabi-100 text-wasabi-800'
+                                      : 'bg-amber-100 text-amber-800'
+                                  }`}
+                                >
+                                  {user.emailVerified ? 'Validé' : 'En attente'}
+                                </span>
+                              </td>
                               <td className="px-4 py-3">
                                 <span
                                   className={`px-2 py-1 rounded-lg text-xs font-semibold ${
@@ -1223,6 +1261,15 @@ export default function Admin() {
                                   >
                                     Détails
                                   </button>
+                                  {!user.emailVerified && (
+                                    <button
+                                      type="button"
+                                      onClick={() => verifyUserAccount(user)}
+                                      className="text-xs font-semibold text-wasabi-700 hover:underline"
+                                    >
+                                      Valider le compte
+                                    </button>
+                                  )}
                                   <button
                                     type="button"
                                     onClick={() => togglePlan(user)}
@@ -1253,7 +1300,7 @@ export default function Admin() {
                         })}
                         {filteredUsers.length === 0 && (
                           <tr>
-                            <td colSpan={5} className="px-4 py-8 text-center text-prune-500">
+                            <td colSpan={6} className="px-4 py-8 text-center text-prune-500">
                               Aucun utilisateur ne correspond à la recherche.
                             </td>
                           </tr>
@@ -1400,6 +1447,10 @@ export default function Admin() {
                       ['ID', userDetails.user.id],
                       ['Nom', userDetails.user.name],
                       ['Email', userDetails.user.email],
+                      [
+                        'Compte',
+                        userDetails.user.emailVerified ? 'Validé' : 'En attente de validation',
+                      ],
                       ['Rôle', userDetails.user.role],
                       ['Plan', userDetails.user.plan === 'paid' ? 'Payant' : 'Gratuit'],
                       ['Créé le', formatAdminDate(userDetails.user.createdAt)],
@@ -1412,6 +1463,15 @@ export default function Admin() {
                     ))}
                   </dl>
                   <div className="flex flex-wrap gap-2 pt-1">
+                    {!userDetails.user.emailVerified && (
+                      <Button
+                        type="button"
+                        className="w-auto text-sm"
+                        onClick={() => verifyUserAccount(userDetails.user)}
+                      >
+                        Valider le compte
+                      </Button>
+                    )}
                     <Button
                       type="button"
                       className="w-auto text-sm"

@@ -422,6 +422,20 @@ export function createAdminService({
       return UserResponseDto.from(user);
     },
 
+    async verifyUserEmail(userId) {
+      const targetId = Number(userId);
+      const target = await userRepository.findById(targetId);
+      if (!target) throw new AppError('Utilisateur introuvable', 404);
+
+      if (target.emailVerifiedAt) {
+        return UserResponseDto.from(target);
+      }
+
+      const user = await userRepository.markEmailVerified(targetId);
+      if (!user) throw new AppError('Utilisateur introuvable', 404);
+      return UserResponseDto.from(user);
+    },
+
     async getConnections(limit = 100) {
       return connectionService.getRecentConnections(limit);
     },

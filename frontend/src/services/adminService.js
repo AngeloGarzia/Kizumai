@@ -41,6 +41,10 @@ export const adminService = {
     return api.patch(`/admin/users/${id}/plan`, { plan }).then((r) => r.data);
   },
 
+  verifyUserEmail(id) {
+    return api.patch(`/admin/users/${id}/verify-email`).then((r) => r.data);
+  },
+
   getConnections() {
     return api.get('/admin/connections').then((r) => r.data);
   },
