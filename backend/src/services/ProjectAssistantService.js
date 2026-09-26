@@ -319,7 +319,22 @@ export function createProjectAssistantService({
       }
       const insights = await projectAssistantRepository.listOpenByProject(projectId);
       const openCount = await projectAssistantRepository.countOpenByProject(projectId);
-      return { insights, openCount };
+      const lastRun = await projectAssistantRepository.findLatestRun(projectId);
+      return {
+        insights,
+        openCount,
+        lastRun: lastRun
+          ? {
+              id: lastRun.id,
+              status: lastRun.status,
+              aiUsed: lastRun.aiUsed,
+              signalsCount: lastRun.signalsCount,
+              finishedAt: lastRun.finishedAt,
+              createdAt: lastRun.createdAt,
+              errorMessage: lastRun.errorMessage,
+            }
+          : null,
+      };
     },
 
     async updateInsight(userId, projectId, insightId, status) {

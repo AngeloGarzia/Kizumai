@@ -1574,6 +1574,67 @@ export function createAiService({ settingsService, currencyService }) {
     },
 
     /**
+     * Audit expert forcé : viabilité + rentabilité + propositions.
+     * Prompt : ai_prompts.project_audit
+     */
+    async analyzeProjectAudit({
+      title,
+      business,
+      location,
+      budget,
+      currency,
+      stage,
+      status,
+      description,
+      company,
+      memorySnapshot,
+      documents,
+      planner,
+      extras,
+      rejected = 'aucune',
+    }) {
+      const aiConfig = await settingsService.getAiConfig();
+      if (!aiConfig.projectAuditPrompt) {
+        throw new AppError('Le prompt « project_audit » est introuvable en base.', 500);
+      }
+
+      const userContent = interpolate(aiConfig.projectAuditPrompt, {
+        title: String(title || '').trim().slice(0, 200) || 'sans titre',
+        business: String(business || '').trim().slice(0, 300) || 'non défini',
+        location: String(location || '').trim().slice(0, 300) || 'non défini',
+        budget: budget != null && String(budget).trim() !== '' ? String(budget) : 'non défini',
+        currency: String(currency || 'EUR').slice(0, 8),
+        stage: String(stage || '').slice(0, 40),
+        status: String(status || '').slice(0, 40),
+        description: String(description || '').trim().slice(0, 4000) || 'aucune',
+        company: String(company || '').trim().slice(0, 500) || 'aucune',
+        memory_snapshot: String(memorySnapshot || '').trim().slice(0, 8000) || 'aucune',
+        documents: String(documents || '').trim().slice(0, 8000) || 'aucun',
+        planner: String(planner || '').trim().slice(0, 3000) || 'aucune',
+        extras: String(extras || '').trim().slice(0, 2000) || '—',
+        rejected: String(rejected || '').trim().slice(0, 4000) || 'aucune',
+      });
+
+      const data = await requestStepJson(userContent);
+      return {
+        viabilitySummary: clipAiOutput(String(data.viabilitySummary || '').trim(), 3000),
+        profitabilitySummary: clipAiOutput(
+          String(data.profitabilitySummary || '').trim(),
+          3000
+        ),
+        overallVerdict: clipAiOutput(String(data.overallVerdict || '').trim(), 2000),
+        fieldProposals: Array.isArray(data.fieldProposals)
+          ? data.fieldProposals.slice(0, 10)
+          : [],
+        actionProposals: Array.isArray(data.actionProposals)
+          ? data.actionProposals.slice(0, 12)
+          : [],
+        raw: data,
+        provider: aiConfig.provider,
+      };
+    },
+
+    /**
      * Extraction résumé + contacts / dates / adresses depuis un texte de document.
      * Le prompt vient exclusivement de ai_prompts.document_scan.
      */

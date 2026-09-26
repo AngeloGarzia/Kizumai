@@ -95,6 +95,17 @@ export const ProjectAssistantRepository = {
     return mapRun(rows[0]);
   },
 
+  async findLatestRun(projectId) {
+    const { rows } = await pool.query(
+      `SELECT * FROM project_assistant_runs
+       WHERE project_id = $1
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [Number(projectId)]
+    );
+    return mapRun(rows[0]);
+  },
+
   async hasProcessingRun(projectId) {
     const { rows } = await pool.query(
       `SELECT 1 FROM project_assistant_runs

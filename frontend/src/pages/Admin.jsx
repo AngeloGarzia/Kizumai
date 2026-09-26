@@ -198,7 +198,7 @@ const PROMPT_GROUPS = [
   {
     id: 'fabulous',
     title: 'Fabulous',
-    keys: ['fabulous_page_guide', 'fabulous_task_checklist', 'project_assistant'],
+    keys: ['fabulous_page_guide', 'fabulous_task_checklist', 'project_assistant', 'project_audit'],
   },
   {
     id: 'memory',

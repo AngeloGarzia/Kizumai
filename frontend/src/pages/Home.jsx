@@ -9,6 +9,7 @@ import ModulesSection from '../components/ModulesSection.jsx';
 import NextStepGuide from '../components/NextStepGuide.jsx';
 import AssistantInsightsPanel from '../components/AssistantInsightsPanel.jsx';
 import ProjectReorientationModal from '../components/ProjectReorientationModal.jsx';
+import ProjectAuditModal from '../components/ProjectAuditModal.jsx';
 import { IconRocket, IconBulb, IconPin, IconUser } from '../components/icons.jsx';
 import { stageHref } from '../constants/projectStages.js';
 import { competencesPercent, learningService } from '../services/learningService.js';
@@ -33,6 +34,8 @@ export default function Home() {
   const [guideOpen, setGuideOpen] = useState(false);
   const [activeGuide, setActiveGuide] = useState(null);
   const [reviewModal, setReviewModal] = useState(null);
+  const [auditModal, setAuditModal] = useState(null);
+  const [auditBusy, setAuditBusy] = useState(false);
   const welcomeLockRef = useRef(false);
 
   const goToCreateFuture = () => navigate('/creer-son-avenir');
@@ -264,6 +267,21 @@ export default function Home() {
     navigate(stageHref(next, project.id));
   };
 
+  const startFabulousAudit = async () => {
+    if (!project?.id || auditBusy) return;
+    setAuditBusy(true);
+    try {
+      const data = await projectService.startProjectAudit(project.id);
+      if (data?.audit?.id) {
+        setAuditModal({ auditId: data.audit.id });
+      }
+    } catch (err) {
+      console.warn('[audit]', err.message);
+    } finally {
+      setAuditBusy(false);
+    }
+  };
+
   return (
     <MainLayout>
       <main className="page-container flex-1 space-y-6 sm:space-y-8 lg:space-y-10 max-w-[50.4rem] lg:max-w-[67.2rem]">
@@ -286,6 +304,10 @@ export default function Home() {
                   }
                 : undefined
             }
+            onAuditProject={
+              isAuthenticated && isPaid && hasProject ? startFabulousAudit : undefined
+            }
+            auditBusy={auditBusy}
           />
 
           {isAuthenticated && isPaid && project?.id && (
@@ -335,6 +357,17 @@ export default function Home() {
           projectId={project.id}
           reviewId={reviewModal.reviewId}
           onClose={() => setReviewModal(null)}
+          onApplied={async () => {
+            await refreshProjects?.();
+          }}
+        />
+      )}
+
+      {auditModal && project?.id && (
+        <ProjectAuditModal
+          projectId={project.id}
+          auditId={auditModal.auditId}
+          onClose={() => setAuditModal(null)}
           onApplied={async () => {
             await refreshProjects?.();
           }}

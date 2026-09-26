@@ -132,6 +132,8 @@ export default function ProgressCard({
   project = null,
   onOpenNext,
   onOpenStage,
+  onAuditProject,
+  auditBusy = false,
 }) {
   const title = project?.title || project?.quoi || null;
   const progress = project?.progress;
@@ -153,7 +155,7 @@ export default function ProgressCard({
     <section className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-prune-900 via-prune-800 to-prune-950 p-4 sm:p-5 lg:p-6 shadow-xl shadow-prune-900/20">
       <div className={showOverlay ? 'blur-[2px] opacity-60 pointer-events-none select-none' : ''}>
         <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-white/10 text-wasabi-400 shrink-0">
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 17l4-4 4 4 8-10" />
@@ -162,6 +164,17 @@ export default function ProgressCard({
             <span className="text-xs sm:text-sm font-semibold tracking-widest text-prune-300 uppercase truncate">
               {title || 'Mon projet'}
             </span>
+            {typeof onAuditProject === 'function' && project?.id && (
+              <button
+                type="button"
+                onClick={onAuditProject}
+                disabled={auditBusy}
+                title="Audit Fabulous — viabilité & rentabilité"
+                className="shrink-0 text-[11px] sm:text-xs font-semibold px-2.5 py-1 rounded-lg bg-wasabi-400/90 text-prune-950 hover:bg-wasabi-300 disabled:opacity-50 transition-colors"
+              >
+                {auditBusy ? 'Audit…' : 'Audit Fabulous'}
+              </button>
+            )}
           </div>
         </div>
 

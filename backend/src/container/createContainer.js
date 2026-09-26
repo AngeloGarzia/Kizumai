@@ -77,6 +77,9 @@ import { createProjectReorientationController } from '../controllers/ProjectReor
 import { ProjectAssistantRepository } from '../repositories/ProjectAssistantRepository.js';
 import { createProjectAssistantService } from '../services/ProjectAssistantService.js';
 import { createProjectAssistantController } from '../controllers/ProjectAssistantController.js';
+import { ProjectAuditRepository } from '../repositories/ProjectAuditRepository.js';
+import { createProjectAuditService } from '../services/ProjectAuditService.js';
+import { createProjectAuditController } from '../controllers/ProjectAuditController.js';
 
 export function createContainer() {
   // ── Infrastructure (repositories) ─────────────────────────────
@@ -108,6 +111,7 @@ export function createContainer() {
   const projectMemorySnapshotRepository = ProjectMemorySnapshotRepository;
   const projectReviewRepository = ProjectReviewRepository;
   const projectAssistantRepository = ProjectAssistantRepository;
+  const projectAuditRepository = ProjectAuditRepository;
 
   const tokenService = TokenService;
   const storageService = StorageService;
@@ -316,6 +320,22 @@ export function createContainer() {
     projectReorientationService,
   });
 
+  const projectAuditService = createProjectAuditService({
+    projectAuditRepository,
+    projectRepository,
+    documentRepository,
+    documentScanRepository,
+    companyRepository,
+    plannerEventRepository,
+    activityRepository,
+    locationRepository,
+    currencyService,
+    aiService,
+    projectMemoryScanService,
+    projectMemorySnapshotRepository,
+    projectMemoryUpdateService,
+  });
+
   const adminService = createAdminService({
     settingsRepository,
     aiPromptRepository,
@@ -378,6 +398,9 @@ export function createContainer() {
   const projectAssistantController = createProjectAssistantController({
     projectAssistantService,
   });
+  const projectAuditController = createProjectAuditController({
+    projectAuditService,
+  });
   const projectStageController = createProjectStageController({
     projectStageService,
   });
@@ -428,6 +451,7 @@ export function createContainer() {
       projectMemoryScanService,
       projectReorientationService,
       projectAssistantService,
+      projectAuditService,
     },
     middleware: {
       authenticate,
@@ -441,6 +465,7 @@ export function createContainer() {
       documentScanController,
       projectReorientationController,
       projectAssistantController,
+      projectAuditController,
       projectStageController,
       learningRecordController,
       plannerController,

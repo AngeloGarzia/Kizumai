@@ -77,6 +77,7 @@ export function createApiRouter(container) {
     documentScanController: controllers.documentScanController,
     projectReorientationController: controllers.projectReorientationController,
     projectAssistantController: controllers.projectAssistantController,
+    projectAuditController: controllers.projectAuditController,
     projectStageController: controllers.projectStageController,
     authenticate: middleware.authenticate,
     optionalAuth: middleware.optionalAuth,

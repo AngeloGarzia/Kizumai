@@ -397,6 +397,34 @@ export const projectService = {
     return data;
   },
 
+  async startProjectAudit(projectId) {
+    const { data } = await api.post(`/projects/${projectId}/audits`);
+    return data;
+  },
+
+  async getProjectAudit(projectId, auditId) {
+    const { data } = await api.get(`/projects/${projectId}/audits/${auditId}`);
+    return data;
+  },
+
+  async getLatestProjectAudit(projectId) {
+    const { data } = await api.get(`/projects/${projectId}/audits/latest`);
+    return data;
+  },
+
+  async applyProjectAudit(projectId, auditId, payload) {
+    const { data } = await api.post(
+      `/projects/${projectId}/audits/${auditId}/apply`,
+      payload
+    );
+    return data;
+  },
+
+  async dismissProjectAudit(projectId, auditId) {
+    const { data } = await api.post(`/projects/${projectId}/audits/${auditId}/dismiss`);
+    return data;
+  },
+
   async getStage(projectId, stage = 'etude_marche') {
     const { data } = await api.get(`/projects/${projectId}/stages/${stage}`);
     return data;

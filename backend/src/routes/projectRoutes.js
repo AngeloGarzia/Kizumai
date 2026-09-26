@@ -43,6 +43,7 @@ export function createProjectRoutes({
   documentScanController,
   projectReorientationController,
   projectAssistantController,
+  projectAuditController,
   projectStageController,
   authenticate,
   optionalAuth,
@@ -171,6 +172,12 @@ export function createProjectRoutes({
     projectAssistantController.updateInsight
   );
   router.post('/:id/assistant/checkup', ...paidAi, projectAssistantController.requestCheckup);
+
+  router.post('/:id/audits', ...paidAi, projectAuditController.start);
+  router.get('/:id/audits/latest', authenticate, requirePaid, projectAuditController.getLatest);
+  router.get('/:id/audits/:auditId', authenticate, requirePaid, projectAuditController.getOne);
+  router.post('/:id/audits/:auditId/apply', authenticate, requirePaid, projectAuditController.apply);
+  router.post('/:id/audits/:auditId/dismiss', authenticate, requirePaid, projectAuditController.dismiss);
 
   return router;
 }
