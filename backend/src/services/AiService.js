@@ -420,7 +420,8 @@ async function rawChatText({
           generationConfig: {
             temperature: aiConfig.temperature,
             maxOutputTokens: outTokens,
-            responseMimeType: 'application/json',
+            // Grounding Google Search : responseMimeType/json entre souvent en conflit.
+            ...(useGoogleSearch ? {} : { responseMimeType: 'application/json' }),
           },
         };
         if (schema) {
@@ -766,6 +767,16 @@ function competitionLabelFromScore(score) {
   return 'Très forte';
 }
 
+/** Clé de rapprochement titres (casse / accents / ponctuation). */
+function normalizeTitleKey(title) {
+  return String(title || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/[^a-z0-9]+/gi, ' ')
+    .trim();
+}
+
 function normalizeCompetitionItems(raw) {
   if (!Array.isArray(raw)) return [];
   return raw
@@ -792,11 +803,25 @@ function normalizeCompetitionItems(raw) {
 
 function mergeCompetitionIntoBusinesses(businesses, items, source) {
   const byTitle = new Map();
+  const byKey = new Map();
   for (const item of items || []) {
     byTitle.set(item.title.toLowerCase(), item);
+    byKey.set(normalizeTitleKey(item.title), item);
   }
-  return (businesses || []).map((b) => {
-    const hit = byTitle.get(String(b.title || '').toLowerCase());
+  const list = businesses || [];
+  const used = new Set();
+  return list.map((b, index) => {
+    let hit =
+      byTitle.get(String(b.title || '').toLowerCase()) ||
+      byKey.get(normalizeTitleKey(b.title));
+    // Repli : même index si le modèle a renvoyé N items pour N business.
+    if (!hit && items?.length === list.length && items[index] && !used.has(index)) {
+      hit = items[index];
+    }
+    if (hit) {
+      const idx = items.indexOf(hit);
+      if (idx >= 0) used.add(idx);
+    }
     if (!hit || hit.competitionScore == null) {
       return {
         ...b,
@@ -814,6 +839,21 @@ function mergeCompetitionIntoBusinesses(businesses, items, source) {
       competitionSource: source,
     };
   });
+}
+
+/**
+ * Aligne les items IA sur les titres business (ordre) quand le modèle dérive.
+ */
+function alignCompetitionItemsToBusinesses(businesses, items) {
+  const list = Array.isArray(items) ? [...items] : [];
+  if (!list.length || !businesses?.length) return list;
+  if (list.length === businesses.length) {
+    return list.map((item, i) => ({
+      ...item,
+      title: businesses[i].title,
+    }));
+  }
+  return list;
 }
 
 function normalizeLocations(raw) {
@@ -1438,19 +1478,65 @@ export function createAiService({ settingsService, currencyService }) {
         currency: String(currency || 'EUR').slice(0, 8),
       });
 
-      const useWeb = aiConfig.provider === 'gemini';
-      const data = await requestStepJson(userContent, {
+      // Google Search ne renvoie souvent qu'1 item pour N business → pastilles vides.
+      // On score d'abord tout le lot sans web ; web uniquement si 1 seule idée.
+      const useWeb = aiConfig.provider === 'gemini' && businesses.length === 1;
+      const strictCount = `\n\nIMPORTANT : renvoie EXACTEMENT ${payload.length} objet(s) dans "items", un par titre fourni, dans le MÊME ordre, avec les titres EXACTS.`;
+
+      const data = await requestStepJson(`${userContent}${strictCount}`, {
         temperature: temperature != null ? temperature : 0.4,
         googleSearch: useWeb,
         thinkingBudget: 0,
         maxOutputTokens: 8192,
       });
-      const items = normalizeCompetitionItems(data.items || data.businesses || []);
-      return mergeCompetitionIntoBusinesses(
+      let items = alignCompetitionItemsToBusinesses(
+        businesses,
+        normalizeCompetitionItems(data.items || data.businesses || [])
+      );
+      let merged = mergeCompetitionIntoBusinesses(
         businesses,
         items,
         useWeb ? 'web' : 'estimated'
       );
+
+      const missing = merged.filter((b) => b.competitionScore == null);
+      if (missing.length) {
+        console.warn(
+          `[ai] concurrence : ${items.length}/${businesses.length} item(s) — complément pour ${missing.length}`
+        );
+        const fillPayload = missing.map((b) => ({
+          title: b.title,
+          activity: b.activity || '',
+          pitch: b.pitch || '',
+          modes: (b.modes || []).map((m) => m.type).filter(Boolean),
+        }));
+        const fillContent = interpolate(aiConfig.businessCompetitionPrompt, {
+          businesses_json: JSON.stringify(fillPayload).slice(0, 12_000),
+          ou: String(ou || '').trim().slice(0, 200) || 'non précisée',
+          budget,
+          currency: String(currency || 'EUR').slice(0, 8),
+        });
+        try {
+          const fillData = await requestStepJson(
+            `${fillContent}\n\nIMPORTANT : renvoie EXACTEMENT ${fillPayload.length} objet(s) dans "items", un par titre, MÊME ordre, titres EXACTS.`,
+            {
+              temperature: temperature != null ? temperature : 0.4,
+              googleSearch: false,
+              thinkingBudget: 0,
+              maxOutputTokens: 8192,
+            }
+          );
+          const fillItems = alignCompetitionItemsToBusinesses(
+            missing,
+            normalizeCompetitionItems(fillData.items || fillData.businesses || [])
+          );
+          merged = mergeCompetitionIntoBusinesses(merged, fillItems, 'estimated');
+        } catch (fillErr) {
+          console.warn('[ai] concurrence complément :', fillErr.message);
+        }
+      }
+
+      return merged;
     },
 
     async searchLocations({

@@ -45,9 +45,26 @@ export function competitionPillStyle(score) {
   };
 }
 
-/** Pastille ronde coin de carte : concurrence vert → marron. */
+/** Pastille ronde coin de carte : concurrence vert → ambre → marron (plus saturée). */
 export function competitionRoundPillStyle(score) {
-  return competitionPillStyle(score);
+  const rgb = competitionRgb(score);
+  if (!rgb) {
+    return {
+      backgroundColor: 'rgb(243 240 237)',
+      color: 'rgb(100 90 85)',
+      borderColor: 'rgb(220 214 208)',
+    };
+  }
+  const [r, g, b] = rgb;
+  const textR = Math.max(28, Math.round(r * 0.42));
+  const textG = Math.max(24, Math.round(g * 0.42));
+  const textB = Math.max(18, Math.round(b * 0.42));
+  return {
+    backgroundColor: `rgba(${r}, ${g}, ${b}, 0.4)`,
+    color: `rgb(${textR}, ${textG}, ${textB})`,
+    borderColor: `rgba(${r}, ${g}, ${b}, 0.9)`,
+    boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.3)`,
+  };
 }
 
 /** Normalise business (API) ou snapshot metadata (`score`/`label`/…). */
