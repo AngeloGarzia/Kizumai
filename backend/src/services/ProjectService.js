@@ -446,6 +446,7 @@ export function createProjectService({
     async buildProposals({
       business,
       location,
+      locationMode = 'fixed',
       budget,
       currency = 'EUR',
       refine,
@@ -454,13 +455,13 @@ export function createProjectService({
       temperature = null,
     }) {
       if (!business?.trim() || !location?.trim()) {
-        throw new AppError('Business et lieu sont requis pour générer les projets.', 400);
+        throw new AppError('Business et contexte d’ancrage sont requis pour générer les projets.', 400);
       }
       await currencyService.getCurrencyData();
       const memoryContext = await resolveMemoryContext({
         userId,
         projectId,
-        intent: `Propositions budget pour ${business} à ${location}`,
+        intent: `Propositions budget pour ${business} (${locationMode}) — ${location}`,
       });
       const { proposals, assessment } = await withAiUsageContext(
         { userId, projectId, purpose: 'build_proposals' },
@@ -468,6 +469,7 @@ export function createProjectService({
           aiService.buildProposals({
             business: business.trim(),
             location: location.trim(),
+            locationMode,
             budget: await currencyService.clampBudget(budget, currency),
             currency,
             refine: refine || '',
@@ -523,7 +525,18 @@ export function createProjectService({
       );
     },
 
-    async startProject({ user, quoi, ou, budget, currency = 'EUR', title, report, sections }) {
+    async startProject({
+      user,
+      quoi,
+      ou,
+      budget,
+      currency = 'EUR',
+      title,
+      report,
+      sections,
+      locationMode = 'fixed',
+      metadata = undefined,
+    }) {
       if (!user?.id) {
         throw new AppError('Authentification requise pour enregistrer le projet', 401);
       }
@@ -534,12 +547,16 @@ export function createProjectService({
 
       await currencyService.getCurrencyData();
 
+      const mode = ['fixed', 'nomadic', 'dematerialized'].includes(locationMode)
+        ? locationMode
+        : 'fixed';
+
       let resolved;
       const alreadyResolved =
         quoi?.trim() && ou?.trim() && budget != null && budget !== '' && (report || (Array.isArray(sections) && sections.length));
 
       if (alreadyResolved) {
-        // Projet d?j? choisi via le parcours de recherche : on n'appelle pas
+        // Projet déjà choisi via le parcours de recherche : on n'appelle pas
         // l'IA une seconde fois, on enregistre la proposition retenue telle quelle.
         resolved = {
           quoi: quoi.trim(),
@@ -553,7 +570,7 @@ export function createProjectService({
       } else {
         const memoryContext = await resolveMemoryContext({
           userId: user.id,
-          intent: `Cr?ation projet : ${quoi || ''}`,
+          intent: `Création projet : ${quoi || ''}`,
         });
         resolved = await withAiUsageContext(
           { userId: user.id, purpose: 'complete_project' },
@@ -569,12 +586,19 @@ export function createProjectService({
       }
 
       if (!resolved.quoi || !resolved.ou || resolved.budget == null) {
-        throw new AppError('Impossible de compl?ter le projet', 422);
+        throw new AppError('Impossible de compléter le projet', 422);
       }
 
-      // Normalisation : on r?sout (ou cr?e) l'activit? et le lieu partag?s.
+      // Normalisation : on résout (ou crée) l'activité et le lieu partagés.
       const activity = await activityRepository.findOrCreate({ label: resolved.quoi });
       const location = await locationRepository.findOrCreate({ label: resolved.ou });
+
+      const metaIn =
+        metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? { ...metadata } : {};
+      const projectMeta = {
+        ...metaIn,
+        locationMode: mode,
+      };
 
       const project = await projectRepository.create({
         userId: user.id,
@@ -586,6 +610,7 @@ export function createProjectService({
         source: resolved.source,
         report: resolved.report || null,
         sections: resolved.sections || [],
+        metadata: projectMeta,
       });
 
       if (projectMemoryUpdateService) {
@@ -594,15 +619,16 @@ export function createProjectService({
               .slice(0, 6)
               .map((s) => (typeof s === 'string' ? s : s?.title || s?.label))
               .filter(Boolean)
-              .join(' ? ')
+              .join(' · ')
           : '';
         projectMemoryUpdateService.recordEventSafe({
           projectId: project.id,
           nodeType: 'fact',
           content: [
-            `Projet cr?? ? ${project.title || resolved.quoi} ?`,
-            `activit? : ${resolved.quoi}`,
-            `lieu : ${resolved.ou}`,
+            `Projet créé — ${project.title || resolved.quoi} —`,
+            `activité : ${resolved.quoi}`,
+            `ancrage : ${mode}`,
+            `lieu / contexte : ${resolved.ou}`,
             resolved.budget != null
               ? `budget : ${resolved.budget} ${resolved.currency || 'EUR'}`
               : null,
@@ -612,7 +638,7 @@ export function createProjectService({
             sectionBits ? `sections : ${sectionBits}` : null,
           ]
             .filter(Boolean)
-            .join(' ? '),
+            .join(' · '),
           sourceEntityType: 'project',
           sourceEntityId: project.id,
           importance: 0.95,

@@ -98,13 +98,15 @@ export const ProjectRepository = {
     description = null,
     report = null,
     sections = [],
+    metadata = {},
     source = 'manual',
     aiPrompt = null,
   }) {
+    const meta = metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? metadata : {};
     const { rows } = await pool.query(
       `INSERT INTO projects
-         (user_id, title, activity_id, location_id, budget, currency, legal_form, status, stage, description, report, sections, source, ai_prompt)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+         (user_id, title, activity_id, location_id, budget, currency, legal_form, status, stage, description, report, sections, metadata, source, ai_prompt)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        RETURNING id`,
       [
         userId ?? null,
@@ -119,10 +121,25 @@ export const ProjectRepository = {
         description,
         report,
         JSON.stringify(sections),
+        JSON.stringify(meta),
         source,
         aiPrompt,
       ]
     );
+    return this.findById(rows[0].id);
+  },
+
+  async mergeMetadata(id, patch = {}) {
+    const safe = patch && typeof patch === 'object' && !Array.isArray(patch) ? patch : {};
+    const { rows } = await pool.query(
+      `UPDATE projects
+       SET metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING id`,
+      [Number(id), JSON.stringify(safe)]
+    );
+    if (!rows[0]) return null;
     return this.findById(rows[0].id);
   },
 

@@ -7,7 +7,7 @@ export const projectService = {
     return data.preview;
   },
 
-  async createProject({ quoi, ou, budget, currency, title, report, sections }) {
+  async createProject({ quoi, ou, budget, currency, title, report, sections, locationMode, metadata }) {
     const { data } = await api.post('/projects', {
       quoi,
       ou,
@@ -16,6 +16,8 @@ export const projectService = {
       title,
       report,
       sections,
+      locationMode,
+      metadata,
     });
     return data.project;
   },
@@ -155,10 +157,11 @@ export const projectService = {
     return data.city;
   },
 
-  async buildProposals({ business, location, budget, currency, refine, projectId, temperature }) {
+  async buildProposals({ business, location, locationMode, budget, currency, refine, projectId, temperature }) {
     const { data } = await api.post('/projects/search/proposals', {
       business,
       location,
+      locationMode,
       budget,
       currency,
       refine,

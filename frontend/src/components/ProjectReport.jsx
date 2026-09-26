@@ -178,6 +178,16 @@ export default function ProjectReport({
   const activityLabel = project.quoi || project.activity?.label || project.title || '—';
   const training = project.training || project.metadata?.training;
   const analysis = fabulousAnalysis || project.fabulousAnalysis || null;
+  const locationMode =
+    project.locationMode ||
+    project.metadata?.locationMode ||
+    'fixed';
+  const locationFieldLabel =
+    locationMode === 'nomadic'
+      ? 'Mobilité'
+      : locationMode === 'dematerialized'
+        ? 'Setup digital'
+        : 'Lieu';
 
   return (
     <article className="rounded-2xl border border-prune-100 bg-gradient-to-b from-white to-prune-50/40 overflow-hidden">
@@ -257,7 +267,7 @@ export default function ProjectReport({
       <footer className="px-5 sm:px-8 py-4 sm:py-5 bg-prune-50/80 border-t border-prune-100">
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-prune-500">Lieu</dt>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-prune-500">{locationFieldLabel}</dt>
             <dd className="mt-1 text-sm font-medium text-prune-900">{locationLabel}</dd>
           </div>
           <div>

@@ -639,17 +639,75 @@ function normalizeFeasibility(value) {
   return Math.min(100, Math.max(0, num));
 }
 
+const LOCATION_MODES = new Set(['fixed', 'nomadic', 'dematerialized']);
+
+function normalizeLocationModeType(value) {
+  const raw = String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  if (raw === 'fixed' || raw === 'fixe' || raw === 'ancre' || raw === 'physique') {
+    return 'fixed';
+  }
+  if (raw === 'nomadic' || raw === 'nomade' || raw === 'mobile' || raw === 'itinerant') {
+    return 'nomadic';
+  }
+  if (
+    raw === 'dematerialized' ||
+    raw === 'dematerialise' ||
+    raw === 'digital' ||
+    raw === 'online' ||
+    raw === 'en_ligne' ||
+    raw === 'virtuel'
+  ) {
+    return 'dematerialized';
+  }
+  return null;
+}
+
+function normalizeBusinessModes(rawModes, fallbackFeasibility) {
+  const seen = new Set();
+  const modes = [];
+  if (Array.isArray(rawModes)) {
+    for (const item of rawModes.slice(0, 3)) {
+      const type = normalizeLocationModeType(item?.type ?? item?.mode ?? item?.locationMode);
+      if (!type || !LOCATION_MODES.has(type) || seen.has(type)) continue;
+      seen.add(type);
+      modes.push({
+        type,
+        label: String(item?.label || '').trim().slice(0, 80),
+        angle: String(item?.angle || item?.pitch || '').trim().slice(0, 400),
+        feasibility: normalizeFeasibility(item?.feasibility) ?? fallbackFeasibility,
+      });
+    }
+  }
+  if (!modes.length) {
+    modes.push({
+      type: 'fixed',
+      label: 'Ancré',
+      angle: '',
+      feasibility: fallbackFeasibility,
+    });
+  }
+  return modes;
+}
+
 function normalizeBusinesses(raw) {
   if (!Array.isArray(raw)) return [];
   return raw
     .slice(0, 12)
-    .map((item) => ({
-      title: String(item?.title || '').trim().slice(0, 200),
-      activity: String(item?.activity || '').trim().slice(0, 200),
-      pitch: String(item?.pitch || '').trim().slice(0, 800),
-      rationale: String(item?.rationale || '').trim().slice(0, 800),
-      feasibility: normalizeFeasibility(item?.feasibility),
-    }))
+    .map((item) => {
+      const feasibility = normalizeFeasibility(item?.feasibility);
+      return {
+        title: String(item?.title || '').trim().slice(0, 200),
+        activity: String(item?.activity || '').trim().slice(0, 200),
+        pitch: String(item?.pitch || '').trim().slice(0, 800),
+        rationale: String(item?.rationale || '').trim().slice(0, 800),
+        feasibility,
+        modes: normalizeBusinessModes(item?.modes, feasibility),
+      };
+    })
     .filter((item) => item.title);
 }
 
@@ -1360,6 +1418,7 @@ export function createAiService({ settingsService, currencyService }) {
     async buildProposals({
       business,
       location,
+      locationMode = 'fixed',
       budget,
       currency = 'EUR',
       refine = '',
@@ -1371,9 +1430,11 @@ export function createAiService({ settingsService, currencyService }) {
       if (!aiConfig.budgetPrompt) {
         throw new AppError('Le prompt « Budget » est introuvable en base.', 500);
       }
+      const mode = normalizeLocationModeType(locationMode) || 'fixed';
       const userContent = memCtx(interpolate(aiConfig.budgetPrompt, {
           business: String(business || '').trim().slice(0, 200),
-          location: String(location || '').trim().slice(0, 200),
+          location: String(location || '').trim().slice(0, 400),
+          location_mode: mode,
           budget,
           currency: String(currency || 'EUR').slice(0, 8),
           budget_min: limits.min,

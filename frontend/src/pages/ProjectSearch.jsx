@@ -18,15 +18,24 @@ import {
 import { IconChevronRight } from '../components/icons.jsx';
 import FranceImplantationModal from '../components/FranceImplantationModal.jsx';
 import FabulousThinking from '../components/FabulousThinking.jsx';
+import MobilitySetupPanel from '../components/MobilitySetupPanel.jsx';
+import DigitalSetupPanel from '../components/DigitalSetupPanel.jsx';
 import { assistantPhrases } from '../constants/assistant.js';
+import {
+  LOCATION_MODE,
+  LOCATION_MODE_META,
+  ensureBusinessModes,
+  formatDigitalSetupLabel,
+  formatMobilityLabel,
+} from '../constants/locationModes.js';
 
-const STEPS = [
+const BASE_STEPS = [
   { key: 'businesses', label: 'Business' },
   { key: 'locations', label: 'Lieu' },
   { key: 'proposals', label: 'Projet' },
 ];
 
-const VALID_STEPS = new Set(STEPS.map((s) => s.key));
+const VALID_STEPS = new Set(BASE_STEPS.map((s) => s.key));
 
 function normalizeStep(value) {
   return VALID_STEPS.has(value) ? value : 'businesses';
@@ -41,11 +50,14 @@ function formatBudget(amount, currency) {
   }).format(amount);
 }
 
-function Stepper({ current }) {
-  const currentIndex = STEPS.findIndex((s) => s.key === current);
+function Stepper({ current, middleLabel = 'Lieu' }) {
+  const steps = BASE_STEPS.map((s) =>
+    s.key === 'locations' ? { ...s, label: middleLabel } : s
+  );
+  const currentIndex = steps.findIndex((s) => s.key === current);
   return (
     <ol className="flex items-center justify-center gap-2 sm:gap-4">
-      {STEPS.map((step, index) => {
+      {steps.map((step, index) => {
         const state =
           index < currentIndex ? 'done' : index === currentIndex ? 'active' : 'todo';
         return (
@@ -72,7 +84,7 @@ function Stepper({ current }) {
                 {step.label}
               </span>
             </div>
-            {index < STEPS.length - 1 && (
+            {index < steps.length - 1 && (
               <span className="w-6 sm:w-10 h-px bg-prune-200" aria-hidden="true" />
             )}
           </li>
@@ -262,6 +274,9 @@ export default function ProjectSearch() {
 
   const [businesses, setBusinesses] = useState([]);
   const [selectedBusiness, setSelectedBusiness] = useState(null);
+  const [selectedMode, setSelectedMode] = useState(null);
+  const [mobilitySetup, setMobilitySetup] = useState(null);
+  const [digitalSetup, setDigitalSetup] = useState(null);
 
   const [locations, setLocations] = useState([]);
   const [selectedLocation, setSelectedLocation] = useState(null);
@@ -307,15 +322,21 @@ export default function ProjectSearch() {
     return 'bg-prune-100 text-prune-700';
   };
 
-  // Jauge parcours : idée / lieu / budget selon l'avancement des choix.
+  // Jauge parcours : idée / ancrage / budget selon l'avancement des choix.
   const feasibilityScore = useMemo(() => {
     const businessScore =
-      selectedBusiness?.feasibility ?? averageFeasibility(businesses);
+      selectedMode?.feasibility ??
+      selectedBusiness?.feasibility ??
+      averageFeasibility(businesses);
     const locationScore =
-      selectedLocation?.feasibility ??
-      (step === 'locations' || step === 'proposals'
-        ? averageFeasibility(locations)
-        : null);
+      selectedMode?.type === LOCATION_MODE.NOMADIC && mobilitySetup
+        ? selectedMode?.feasibility ?? selectedBusiness?.feasibility
+        : selectedMode?.type === LOCATION_MODE.DEMATERIALIZED && digitalSetup
+          ? selectedMode?.feasibility ?? selectedBusiness?.feasibility
+          : selectedLocation?.feasibility ??
+            (step === 'locations' || step === 'proposals'
+              ? averageFeasibility(locations)
+              : null);
     const budgetScore =
       budgetAssessment?.feasibility ??
       (step === 'proposals' ? averageFeasibility(proposals) : null);
@@ -329,11 +350,17 @@ export default function ProjectSearch() {
     step,
     businesses,
     selectedBusiness,
+    selectedMode,
     locations,
     selectedLocation,
+    mobilitySetup,
+    digitalSetup,
     proposals,
     budgetAssessment,
   ]);
+
+  const middleStepLabel =
+    LOCATION_MODE_META[selectedMode?.type]?.stepLabel || 'Lieu';
 
   const sortedBusinesses = useMemo(
     () =>
@@ -369,6 +396,9 @@ export default function ProjectSearch() {
         seed,
         businesses: result,
         selectedBusiness: prev.selectedBusiness || null,
+        selectedMode: prev.selectedMode || null,
+        mobilitySetup: prev.mobilitySetup || null,
+        digitalSetup: prev.digitalSetup || null,
         locations: prev.locations || [],
         selectedLocation: prev.selectedLocation || null,
         proposals: prev.proposals || [],
@@ -408,6 +438,9 @@ export default function ProjectSearch() {
         seed,
         businesses: prev.businesses || [],
         selectedBusiness: business,
+        selectedMode: prev.selectedMode || null,
+        mobilitySetup: prev.mobilitySetup || null,
+        digitalSetup: prev.digitalSetup || null,
         locations: result,
         selectedLocation: null,
         proposals: [],
@@ -463,15 +496,15 @@ export default function ProjectSearch() {
     setTrainingError('');
   };
 
-  const fetchProposals = useCallback(async (business, location, refineText = '') => {
+  const fetchProposals = useCallback(async (business, locationLabel, refineText = '', modeType = 'fixed') => {
     const seed = seedRef.current;
     setLoading(true);
     setError('');
     try {
-      const locationLabel = [location.label, location.city].filter(Boolean).join(' — ');
       const result = await projectService.buildProposals({
         business: business.title,
         location: locationLabel,
+        locationMode: modeType,
         budget: seed.budget,
         currency: seed.currency,
         refine: refineText,
@@ -486,8 +519,11 @@ export default function ProjectSearch() {
         seed,
         businesses: prev.businesses || [],
         selectedBusiness: business,
+        selectedMode: prev.selectedMode || null,
+        mobilitySetup: prev.mobilitySetup || null,
+        digitalSetup: prev.digitalSetup || null,
         locations: prev.locations || [],
-        selectedLocation: location,
+        selectedLocation: prev.selectedLocation || null,
         proposals: result.proposals || [],
         budgetAssessment: result.assessment || null,
         savedTraining: prev.savedTraining || null,
@@ -529,6 +565,9 @@ export default function ProjectSearch() {
     if (canRestore) {
       setBusinesses(progress.businesses || []);
       setSelectedBusiness(progress.selectedBusiness || null);
+      setSelectedMode(progress.selectedMode || null);
+      setMobilitySetup(progress.mobilitySetup || null);
+      setDigitalSetup(progress.digitalSetup || null);
       setLocations(progress.locations || []);
       setSelectedLocation(progress.selectedLocation || null);
       setProposals(progress.proposals || []);
@@ -537,8 +576,10 @@ export default function ProjectSearch() {
       goToStep(urlStep, { replace: true });
       persistReadyRef.current = true;
 
+      const modeType = progress.selectedMode?.type || LOCATION_MODE.FIXED;
       if (
         urlStep === 'locations' &&
+        modeType === LOCATION_MODE.FIXED &&
         !(progress.locations || []).length &&
         progress.selectedBusiness
       ) {
@@ -546,10 +587,23 @@ export default function ProjectSearch() {
       } else if (
         urlStep === 'proposals' &&
         !(progress.proposals || []).length &&
-        progress.selectedBusiness &&
-        progress.selectedLocation
+        progress.selectedBusiness
       ) {
-        fetchProposals(progress.selectedBusiness, progress.selectedLocation, '');
+        const label =
+          modeType === LOCATION_MODE.NOMADIC
+            ? formatMobilityLabel(progress.mobilitySetup)
+            : modeType === LOCATION_MODE.DEMATERIALIZED
+              ? formatDigitalSetupLabel(progress.digitalSetup)
+              : progress.selectedLocation
+                ? [progress.selectedLocation.label, progress.selectedLocation.city]
+                    .filter(Boolean)
+                    .join(' — ')
+                : '';
+        if (label) {
+          fetchProposals(progress.selectedBusiness, label, '', modeType);
+        } else {
+          setLoading(false);
+        }
       } else {
         setLoading(false);
       }
@@ -577,6 +631,9 @@ export default function ProjectSearch() {
       seed: seedRef.current,
       businesses,
       selectedBusiness,
+      selectedMode,
+      mobilitySetup,
+      digitalSetup,
       locations,
       selectedLocation,
       proposals,
@@ -587,6 +644,9 @@ export default function ProjectSearch() {
     step,
     businesses,
     selectedBusiness,
+    selectedMode,
+    mobilitySetup,
+    digitalSetup,
     locations,
     selectedLocation,
     proposals,
@@ -605,6 +665,26 @@ export default function ProjectSearch() {
     goToStep('locations');
     setMapOpen(false);
     fetchLocations(business, '', []);
+  };
+
+  const goToModeSetup = (business, mode) => {
+    setSelectedBusiness(business);
+    setSelectedMode(mode);
+    setRefine('');
+    setProposals([]);
+    setBudgetAssessment(null);
+    setSelectedLocation(null);
+    setLocations([]);
+    goToStep('locations');
+    if (mode.type === LOCATION_MODE.FIXED) {
+      const hasPlace = Boolean(seedRef.current?.ou?.trim());
+      if (!hasPlace) {
+        setMapOpen(true);
+        fetchFranceMap(business);
+        return;
+      }
+      fetchLocations(business, '', []);
+    }
   };
 
   const fetchFranceMap = useCallback(async (business) => {
@@ -633,22 +713,14 @@ export default function ProjectSearch() {
     }
   }, []);
 
-  const handleSelectBusiness = (business) => {
-    setSelectedBusiness(business);
-    const hasPlace = Boolean(seedRef.current?.ou?.trim());
-    if (!hasPlace) {
-      setMapOpen(true);
-      fetchFranceMap(business);
-      return;
-    }
-    goToLocations(business, null);
+  const handleSelectBusinessMode = (business, mode) => {
+    goToModeSetup(business, mode);
   };
 
   const openFranceMap = () => {
     if (!selectedBusiness) return;
     setMapOpen(true);
     setMapError('');
-    // Recharger la carte pour permettre un nouveau choix de région.
     fetchFranceMap(selectedBusiness);
   };
 
@@ -658,14 +730,45 @@ export default function ProjectSearch() {
     setBudgetAssessment(null);
     setRefine('');
     goToStep('proposals');
-    fetchProposals(selectedBusiness, location, '');
+    const locationLabel = [location.label, location.city].filter(Boolean).join(' — ');
+    fetchProposals(selectedBusiness, locationLabel, '', LOCATION_MODE.FIXED);
+  };
+
+  const handleMobilitySubmit = (mobility) => {
+    setMobilitySetup(mobility);
+    setProposals([]);
+    setBudgetAssessment(null);
+    setRefine('');
+    goToStep('proposals');
+    fetchProposals(selectedBusiness, formatMobilityLabel(mobility), '', LOCATION_MODE.NOMADIC);
+  };
+
+  const handleDigitalSubmit = (setup) => {
+    setDigitalSetup(setup);
+    setProposals([]);
+    setBudgetAssessment(null);
+    setRefine('');
+    goToStep('proposals');
+    fetchProposals(selectedBusiness, formatDigitalSetupLabel(setup), '', LOCATION_MODE.DEMATERIALIZED);
+  };
+
+  const resolveAnchorageLabel = () => {
+    if (selectedMode?.type === LOCATION_MODE.NOMADIC) {
+      return formatMobilityLabel(mobilitySetup);
+    }
+    if (selectedMode?.type === LOCATION_MODE.DEMATERIALIZED) {
+      return formatDigitalSetupLabel(digitalSetup);
+    }
+    if (selectedLocation) {
+      return [selectedLocation.label, selectedLocation.city].filter(Boolean).join(' — ');
+    }
+    return '';
   };
 
   const handleSelectProposal = (proposal) => {
     const seed = seedRef.current;
-    const locationLabel = [selectedLocation.label, selectedLocation.city]
-      .filter(Boolean)
-      .join(' — ');
+    const locationLabel = resolveAnchorageLabel();
+    const modeType = selectedMode?.type || LOCATION_MODE.FIXED;
 
     const trainingForBusiness =
       savedTraining?.businessTitle === selectedBusiness.title ? savedTraining : null;
@@ -679,6 +782,20 @@ export default function ProjectSearch() {
       title: proposal.title,
       report: proposal.report,
       sections: proposal.sections,
+      locationMode: modeType,
+      metadata: {
+        locationMode: modeType,
+        selectedMode: selectedMode
+          ? {
+              type: selectedMode.type,
+              label: selectedMode.label,
+              angle: selectedMode.angle,
+              feasibility: selectedMode.feasibility,
+            }
+          : null,
+        mobility: modeType === LOCATION_MODE.NOMADIC ? mobilitySetup : null,
+        digitalSetup: modeType === LOCATION_MODE.DEMATERIALIZED ? digitalSetup : null,
+      },
       training: trainingForBusiness
         ? {
             title: trainingForBusiness.title,
@@ -689,8 +806,11 @@ export default function ProjectSearch() {
           }
         : null,
       feasibility: computeJourneyFeasibility({
-        businessScore: selectedBusiness?.feasibility,
-        locationScore: selectedLocation?.feasibility,
+        businessScore: selectedMode?.feasibility ?? selectedBusiness?.feasibility,
+        locationScore:
+          modeType === LOCATION_MODE.FIXED
+            ? selectedLocation?.feasibility
+            : selectedMode?.feasibility ?? selectedBusiness?.feasibility,
         budgetScore: proposal.feasibility ?? budgetAssessment?.feasibility,
       }),
     });
@@ -700,6 +820,9 @@ export default function ProjectSearch() {
       seed: seedRef.current,
       businesses,
       selectedBusiness,
+      selectedMode,
+      mobilitySetup,
+      digitalSetup,
       locations,
       selectedLocation,
       proposals,
@@ -712,18 +835,25 @@ export default function ProjectSearch() {
   const handleRefine = () => {
     if (step === 'businesses') {
       fetchBusinesses(refine, businesses.map((b) => b.title));
-    } else if (step === 'locations') {
+    } else if (step === 'locations' && selectedMode?.type === LOCATION_MODE.FIXED) {
       fetchLocations(selectedBusiness, refine, locations.map((l) => l.label));
     } else if (step === 'proposals') {
-      fetchProposals(selectedBusiness, selectedLocation, refine);
+      const label = resolveAnchorageLabel();
+      if (label) {
+        fetchProposals(selectedBusiness, label, refine, selectedMode?.type || LOCATION_MODE.FIXED);
+      }
     }
   };
 
   const goBack = () => {
     setError('');
     setRefine('');
-    if (step === 'locations') goToStep('businesses');
-    else if (step === 'proposals') goToStep('locations');
+    if (step === 'locations') {
+      setSelectedMode(null);
+      setMobilitySetup(null);
+      setDigitalSetup(null);
+      goToStep('businesses');
+    } else if (step === 'proposals') goToStep('locations');
     else navigate('/creer-son-avenir');
   };
 
@@ -739,7 +869,7 @@ export default function ProjectSearch() {
 
       <main className="page-container flex-1 py-6 sm:py-10 max-w-[57.6rem]">
         <div className="mb-6 sm:mb-8">
-          <Stepper current={step} />
+          <Stepper current={step} middleLabel={middleStepLabel} />
         </div>
 
         {seed && (
@@ -771,13 +901,23 @@ export default function ProjectSearch() {
           <header>
             <h1 className="text-xl sm:text-2xl font-bold text-prune-900">
               {step === 'businesses' && 'Choisissez un business'}
-              {step === 'locations' && 'Choisissez un lieu'}
+              {step === 'locations' &&
+                (selectedMode?.type === LOCATION_MODE.NOMADIC
+                  ? 'Définissez votre mobilité'
+                  : selectedMode?.type === LOCATION_MODE.DEMATERIALIZED
+                    ? 'Configurez le setup digital'
+                    : 'Choisissez un lieu')}
               {step === 'proposals' && 'Choisissez votre projet'}
             </h1>
             <p className="mt-1 text-sm text-prune-500">
-              {step === 'businesses' && assistantPhrases.ideasBy}
+              {step === 'businesses' &&
+                `${assistantPhrases.ideasBy} Chaque idée peut proposer un mode ancré, nomade ou dématérialisé (une idée = une carte).`}
               {step === 'locations' &&
-                `Lieux adaptés à « ${selectedBusiness?.title} »${seed?.ou ? ` autour de ${seed.ou}` : ''}. Sélectionnez-en un ou affinez.`}
+                (selectedMode?.type === LOCATION_MODE.NOMADIC
+                  ? `Point de référence et rayon pour « ${selectedBusiness?.title} ».`
+                  : selectedMode?.type === LOCATION_MODE.DEMATERIALIZED
+                    ? `Hébergement, marché, travail et siège légal pour « ${selectedBusiness?.title} ».`
+                    : `Lieux adaptés à « ${selectedBusiness?.title} »${seed?.ou ? ` autour de ${seed.ou}` : ''}. Sélectionnez-en un ou affinez.`)}
               {step === 'proposals' &&
                 (budgetAssessment?.adjustedProposed
                   ? `4 projets : votre budget, flexible, ${assistantPhrases.idealBudgetShort}, et un budget ajusté plus bas jugé viable.`
@@ -796,6 +936,7 @@ export default function ProjectSearch() {
                       savedTraining?.businessTitle === business.title && savedTraining?.title;
                     const tileStyle = feasibilityTileStyle(business.feasibility);
                     const accent = feasibilityAccentColor(business.feasibility);
+                    const modes = ensureBusinessModes(business);
                     return (
                       <div
                         key={index}
@@ -824,23 +965,52 @@ export default function ProjectSearch() {
                         {business.rationale && (
                           <p className="text-sm text-prune-500 mt-1">{business.rationale}</p>
                         )}
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {modes.map((mode) => {
+                            const meta = LOCATION_MODE_META[mode.type];
+                            return (
+                              <span
+                                key={mode.type}
+                                className={[
+                                  'inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-xs font-semibold',
+                                  meta.chipClass,
+                                ].join(' ')}
+                                title={mode.angle || meta.shortLabel}
+                              >
+                                {mode.label || meta.shortLabel}
+                                {mode.feasibility != null ? ` · ${mode.feasibility}%` : ''}
+                              </span>
+                            );
+                          })}
+                        </div>
                         {hasSaved && (
                           <p className="mt-2 text-xs font-medium text-wasabi-700">
                             Formation mise de côté : {savedTraining.title}
                           </p>
                         )}
-                        <div className="mt-4 flex flex-col sm:flex-row gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleSelectBusiness(business)}
-                            className="btn-primary flex-1"
-                          >
-                            Choisir ce business
-                          </button>
+                        <div className="mt-4 flex flex-col gap-2">
+                          <div className="flex flex-col sm:flex-row flex-wrap gap-2">
+                            {modes.map((mode) => {
+                              const meta = LOCATION_MODE_META[mode.type];
+                              return (
+                                <button
+                                  key={mode.type}
+                                  type="button"
+                                  onClick={() => handleSelectBusinessMode(business, mode)}
+                                  className={[
+                                    'flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors',
+                                    meta.buttonClass,
+                                  ].join(' ')}
+                                >
+                                  {mode.label || meta.shortLabel}
+                                </button>
+                              );
+                            })}
+                          </div>
                           <button
                             type="button"
                             onClick={(e) => openTrainingAssist(business, e)}
-                            className="btn-secondary flex-1"
+                            className="btn-secondary w-full"
                           >
                             Formation utile ?
                           </button>
@@ -851,7 +1021,26 @@ export default function ProjectSearch() {
                 </div>
               )}
 
-              {step === 'locations' && (
+              {step === 'locations' && selectedMode?.type === LOCATION_MODE.NOMADIC && (
+                <MobilitySetupPanel
+                  businessTitle={selectedBusiness?.title}
+                  initial={mobilitySetup}
+                  onSubmit={handleMobilitySubmit}
+                  disabled={loading}
+                />
+              )}
+
+              {step === 'locations' && selectedMode?.type === LOCATION_MODE.DEMATERIALIZED && (
+                <DigitalSetupPanel
+                  businessTitle={selectedBusiness?.title}
+                  initial={digitalSetup}
+                  onSubmit={handleDigitalSubmit}
+                  disabled={loading}
+                />
+              )}
+
+              {step === 'locations' &&
+                (!selectedMode || selectedMode.type === LOCATION_MODE.FIXED) && (
                 <div className="grid gap-4">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-prune-100 bg-white p-4">
                     <p className="text-sm text-prune-600">
@@ -939,14 +1128,21 @@ export default function ProjectSearch() {
                   placeholder={
                     step === 'businesses'
                       ? 'Ex : plutôt tourné vers le bio et le local'
-                      : step === 'locations'
+                      : step === 'locations' && selectedMode?.type === LOCATION_MODE.FIXED
                         ? 'Ex : proche des transports, zone piétonne'
-                        : 'Ex : réduire les coûts de départ'
+                        : step === 'proposals'
+                          ? 'Ex : réduire les coûts de départ'
+                          : 'Ex : préciser une contrainte'
                   }
                   value={refine}
                   onChange={setRefine}
                   onSubmit={handleRefine}
-                  disabled={loading}
+                  disabled={
+                    loading ||
+                    (step === 'locations' &&
+                      selectedMode?.type &&
+                      selectedMode.type !== LOCATION_MODE.FIXED)
+                  }
                 />
               </div>
             </>

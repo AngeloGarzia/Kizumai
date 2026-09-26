@@ -125,11 +125,21 @@ export const CityImplantationRequestDto = {
   },
 };
 
+const LOCATION_MODES = new Set(['fixed', 'nomadic', 'dematerialized']);
+
+function optionalLocationMode(body = {}) {
+  const raw = String(body.locationMode ?? body.location_mode ?? 'fixed')
+    .trim()
+    .toLowerCase();
+  return LOCATION_MODES.has(raw) ? raw : 'fixed';
+}
+
 export const BuildProposalsRequestDto = {
   from(body = {}) {
     return {
       business: optionalString(body.business, { max: 200 }),
-      location: optionalString(body.location, { max: 300 }),
+      location: optionalString(body.location, { max: 400 }),
+      locationMode: optionalLocationMode(body),
       ...normalizeBudgetCurrency(body),
       temperature: optionalSearchTemperature(body),
       refine: optionalString(body.refine, { max: 400 }) || '',
@@ -157,13 +167,19 @@ export const ProjectPreviewAnalysisRequestDto = {
 
 export const CreateProjectRequestDto = {
   from(body = {}) {
+    const metadata =
+      body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata)
+        ? body.metadata
+        : undefined;
     return {
       quoi: optionalString(body.quoi, { max: 500 }),
-      ou: optionalString(body.ou, { max: 300 }),
+      ou: optionalString(body.ou, { max: 400 }),
+      locationMode: optionalLocationMode(body),
       ...normalizeBudgetCurrency(body),
       title: optionalString(body.title, { max: 160 }),
       report: optionalString(body.report, { max: 50_000 }),
       sections: Array.isArray(body.sections) ? body.sections : undefined,
+      metadata,
     };
   },
 };
