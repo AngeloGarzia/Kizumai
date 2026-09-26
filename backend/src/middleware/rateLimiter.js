@@ -120,14 +120,14 @@ export const authActionRateLimiter = buildLimiter({
 
 export const aiRateLimiter = buildLimiter({
   windowMs: 15 * 60 * 1000,
-  max: Number(process.env.AI_RATE_MAX) || 30,
+  max: Number(process.env.AI_RATE_MAX) || 60,
   message: 'Trop de recherches IA, réessayez dans 15 minutes',
   prefix: 'ai',
 });
 
 export const aiAnonymousRateLimiter = buildLimiter({
   windowMs: 60 * 60 * 1000,
-  max: Number(process.env.AI_ANON_RATE_MAX) || 3,
+  max: Number(process.env.AI_ANON_RATE_MAX) || 24,
   message: 'Trop de recherches IA anonymes, connectez-vous ou réessayez plus tard',
   keyGenerator: (req) => req.ip || 'unknown',
 });
@@ -143,14 +143,14 @@ export const documentScanRateLimiter = buildLimiter({
 export const aiRedisQuota = redisQuotaMiddleware({
   prefix: 'ai',
   windowMs: 15 * 60 * 1000,
-  max: Number(process.env.AI_RATE_MAX) || 30,
+  max: Number(process.env.AI_RATE_MAX) || 60,
   failClosed: true,
 });
 
 export const aiAnonRedisQuota = redisQuotaMiddleware({
   prefix: 'ai-anon',
   windowMs: 60 * 60 * 1000,
-  max: Number(process.env.AI_ANON_RATE_MAX) || 3,
+  max: Number(process.env.AI_ANON_RATE_MAX) || 24,
   failClosed: true,
 });
 

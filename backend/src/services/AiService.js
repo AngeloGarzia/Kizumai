@@ -472,7 +472,15 @@ async function rawChatText({
                 },
                 requestTimeout
               );
-              if (!retry.ok) throw new Error(`Gemini ${retry.status}`);
+              if (!retry.ok) {
+                if (retry.status === 429) {
+                  throw new AppError(
+                    'Quota Gemini atteint. Patientez une minute puis réessayez.',
+                    429
+                  );
+                }
+                throw new Error(`Gemini ${retry.status}`);
+              }
               const retryData = await retry.json();
               return finalizeGeminiChat({
                 data: retryData,
@@ -482,6 +490,12 @@ async function rawChatText({
                 startedAt,
               });
             }
+          }
+          if (response.status === 429) {
+            throw new AppError(
+              'Quota Gemini atteint. Patientez une minute puis réessayez.',
+              429
+            );
           }
           throw new Error(`Gemini ${response.status}${errBody ? `: ${errBody.slice(0, 240)}` : ''}`);
         }
@@ -520,6 +534,12 @@ async function rawChatText({
       );
       if (!response.ok) {
         const errBody = await response.text().catch(() => '');
+        if (response.status === 429) {
+          throw new AppError(
+            `Quota ${providerId} atteint. Patientez une minute puis réessayez.`,
+            429
+          );
+        }
         throw new Error(`${providerId} ${response.status}${errBody ? `: ${errBody.slice(0, 240)}` : ''}`);
       }
 
@@ -1014,6 +1034,12 @@ export function createAiService({ settingsService, currencyService }) {
         throw new AppError(
           'Fabulous met trop de temps à répondre pour cette carte. Réessayez dans un instant.',
           502
+        );
+      }
+      if (/\b429\b|RESOURCE_EXHAUSTED|rate[\s_-]?limit/i.test(error.message || '')) {
+        throw new AppError(
+          'Quota IA atteint. Patientez une minute puis réessayez.',
+          429
         );
       }
       throw new AppError('La recherche a échoué. Réessayez dans un instant.', 502);
