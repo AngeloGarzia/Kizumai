@@ -458,6 +458,20 @@ export function createProjectAuditService({
             const currency = project.currency || 'EUR';
             const clamped = await currencyService.clampBudget(Number(value), currency);
             project = await projectRepository.setBudget(projectId, clamped, currency);
+            // Garde metadata.budgetPlan aligné avec le budget retenu (audit).
+            const prevPlan =
+              project?.metadata?.budgetPlan && typeof project.metadata.budgetPlan === 'object'
+                ? project.metadata.budgetPlan
+                : null;
+            if (prevPlan || clamped != null) {
+              project = await projectRepository.mergeMetadata(projectId, {
+                budgetPlan: {
+                  ...(prevPlan || {}),
+                  selectedBudget: clamped,
+                  currency,
+                },
+              });
+            }
           } else if (item.fieldKey === 'title') {
             project = await projectRepository.updateLifecycle(projectId, { title: value });
           } else if (item.fieldKey === 'description') {

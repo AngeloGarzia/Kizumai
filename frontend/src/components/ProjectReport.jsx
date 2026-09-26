@@ -104,11 +104,23 @@ function CompetitionBlock({ competition, analysis }) {
             try {
               const withProto = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
               const u = new URL(withProto);
-              if (
-                (u.protocol === 'http:' || u.protocol === 'https:') &&
-                u.hostname.includes('.')
-              ) {
-                url = u.toString();
+              if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+                /* skip */
+              } else if (u.username || u.password) {
+                /* skip */
+              } else {
+                const host = String(u.hostname || '').toLowerCase();
+                const blocked =
+                  !host ||
+                  !host.includes('.') ||
+                  host === 'localhost' ||
+                  host.endsWith('.localhost') ||
+                  /^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(host) ||
+                  /^172\.(1[6-9]|2\d|3[0-1])\./.test(host);
+                if (!blocked) {
+                  u.hash = '';
+                  url = u.toString();
+                }
               }
             } catch {
               url = null;
@@ -199,6 +211,7 @@ function CompetitionBlock({ competition, analysis }) {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-topaz-700 hover:text-topaz-900 underline-offset-2 hover:underline break-all"
+                  rel="noopener noreferrer nofollow"
                 >
                   {linkHost(c.url)}
                   <span aria-hidden="true" className="text-xs">

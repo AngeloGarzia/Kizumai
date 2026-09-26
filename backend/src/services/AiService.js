@@ -133,8 +133,8 @@ function interpolatePrompt(template, fields, limits) {
     .replace(/\{\{missing_fields\}\}/g, missing.join(', ') || 'aucun');
 }
 
-// Interpolation générique {{clé}} → valeur. Les champs métier utilisateur
-// sont encapsulés UNTRUSTED ; les limites / compteurs restent bruts.
+// Interpolation générique {{clé}} → valeur.
+// Contenu métier / long → UNTRUSTED (wrap). Compteurs / codes → tronqués court.
 const UNTRUSTED_INTERPOLATION_KEYS = new Set([
   'quoi',
   'ou',
@@ -153,7 +153,61 @@ const UNTRUSTED_INTERPOLATION_KEYS = new Set([
   'snapshot',
   'nodes',
   'mime_type',
+  // Contextes longs (aperçu, audit, mémoire…) — ne jamais couper à 64 car.
+  'title',
+  'report',
+  'sections',
+  'training',
+  'competition',
+  'feasibility_breakdown',
+  'budget_plan',
+  'description',
+  'company',
+  'memory_snapshot',
+  'documents',
+  'planner',
+  'extras',
+  'rejected',
+  'situation',
+  'page_label',
+  'page_detail',
+  'section_label',
+  'project_title',
+  'task_title',
+  'task_description',
+  'task_notes',
+  'linked_docs',
+  'workflow_title',
+  'stage_label',
 ]);
+
+const INTERPOLATION_MAX = {
+  title: 300,
+  report: 12_000,
+  sections: 12_000,
+  training: 800,
+  competition: 800,
+  feasibility_breakdown: 800,
+  budget_plan: 600,
+  description: 4_000,
+  company: 500,
+  memory_snapshot: 8_000,
+  documents: 8_000,
+  planner: 3_000,
+  extras: 2_000,
+  rejected: 4_000,
+  text: 45_000,
+  memories: 8_000,
+  snapshot: 8_000,
+  nodes: 8_000,
+  budget: 24,
+  currency: 8,
+  feasibility: 16,
+  count: 8,
+  stage: 40,
+  status: 40,
+  trigger: 80,
+};
 
 function interpolate(template, vars) {
   if (!template) return '';
@@ -161,9 +215,11 @@ function interpolate(template, vars) {
     const v = vars[key];
     if (v == null || v === '') return '';
     if (UNTRUSTED_INTERPOLATION_KEYS.has(key)) {
-      return wrapUntrusted(key.toUpperCase(), v, { max: 45_000 });
+      const max = INTERPOLATION_MAX[key] ?? 45_000;
+      return wrapUntrusted(key.toUpperCase(), v, { max });
     }
-    return String(v).slice(0, 64);
+    const max = INTERPOLATION_MAX[key] ?? 64;
+    return String(v).slice(0, max);
   });
 }
 
@@ -672,7 +728,12 @@ function joinAvoid(avoid) {
 }
 
 function normalizeFeasibility(value) {
-  const num = Math.round(Number(value));
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  // Modèles qui renvoient parfois 0–1 au lieu de 0–100
+  const scaled = n > 0 && n <= 1 ? n * 100 : n;
+  const num = Math.round(scaled);
   if (Number.isNaN(num)) return null;
   return Math.min(100, Math.max(0, num));
 }
@@ -1857,7 +1918,30 @@ export function createAiService({ settingsService, currencyService }) {
           const withProto = /^https?:\/\//i.test(s) ? s : `https://${s}`;
           const u = new URL(withProto);
           if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
-          if (!u.hostname || !u.hostname.includes('.')) return null;
+          if (u.username || u.password) return null;
+          const host = String(u.hostname || '').toLowerCase();
+          if (!host || !host.includes('.')) return null;
+          if (
+            host === 'localhost' ||
+            host.endsWith('.localhost') ||
+            host === 'metadata.google.internal'
+          ) {
+            return null;
+          }
+          // Bloque IP privées / loopback (sans DNS — filtre détermiste).
+          if (
+            /^(127\.|10\.|192\.168\.|169\.254\.|0\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/.test(
+              host
+            ) ||
+            /^172\.(1[6-9]|2\d|3[0-1])\./.test(host) ||
+            host === '::1' ||
+            host.startsWith('fe80:') ||
+            host.startsWith('fc') ||
+            host.startsWith('fd')
+          ) {
+            return null;
+          }
+          u.hash = '';
           return u.toString().slice(0, 500);
         } catch {
           return null;

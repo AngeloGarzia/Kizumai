@@ -599,7 +599,22 @@ export function createProjectService({
 
       const metaIn =
         metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? { ...metadata } : {};
-      const competitionRaw = metaIn.competition;
+      // Allowlist metadata projet (évite mass-assignment JSONB).
+      const META_KEYS = [
+        'locationMode',
+        'selectedMode',
+        'mobility',
+        'digitalSetup',
+        'competition',
+        'profitability',
+        'budgetPlan',
+        'training',
+      ];
+      const metaAllowed = {};
+      for (const key of META_KEYS) {
+        if (metaIn[key] !== undefined) metaAllowed[key] = metaIn[key];
+      }
+      const competitionRaw = metaAllowed.competition;
       let competition = null;
       if (competitionRaw && typeof competitionRaw === 'object' && !Array.isArray(competitionRaw)) {
         const score =
@@ -621,7 +636,7 @@ export function createProjectService({
         }
       }
 
-      const profitabilityRaw = metaIn.profitability;
+      const profitabilityRaw = metaAllowed.profitability;
       let profitability = null;
       if (
         profitabilityRaw &&
@@ -643,6 +658,9 @@ export function createProjectService({
             label: label ? String(label).slice(0, 40) : null,
             note: note ? String(note).slice(0, 280) : null,
           };
+        } else {
+          // Toujours conserver l’objet pour l’UI (pastille n/d).
+          profitability = { score: null, label: null, note: null };
         }
       }
 
@@ -652,7 +670,7 @@ export function createProjectService({
         'budget_ideal',
         'budget_ajuste',
       ]);
-      const budgetPlanRaw = metaIn.budgetPlan;
+      const budgetPlanRaw = metaAllowed.budgetPlan;
       let budgetPlan = null;
       if (budgetPlanRaw && typeof budgetPlanRaw === 'object' && !Array.isArray(budgetPlanRaw)) {
         const kind = String(budgetPlanRaw.kind || '').trim();
@@ -679,7 +697,7 @@ export function createProjectService({
       }
 
       const projectMeta = {
-        ...metaIn,
+        ...metaAllowed,
         locationMode: mode,
         ...(competition ? { competition } : {}),
         ...(profitability ? { profitability } : {}),

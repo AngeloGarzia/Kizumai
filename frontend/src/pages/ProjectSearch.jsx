@@ -22,6 +22,8 @@ import TrainingAssistModal from '../components/TrainingAssistModal.jsx';
 import MobilitySetupPanel from '../components/MobilitySetupPanel.jsx';
 import DigitalSetupPanel from '../components/DigitalSetupPanel.jsx';
 import { assistantPhrases } from '../constants/assistant.js';
+import BusinessMetricPills from '../components/BusinessMetricPills.jsx';
+import MetricPillDetailModal from '../components/MetricPillDetailModal.jsx';
 import {
   LOCATION_MODE,
   LOCATION_MODE_META,
@@ -29,16 +31,12 @@ import {
   formatDigitalSetupLabel,
   formatMobilityLabel,
 } from '../constants/locationModes.js';
-import {
-  competitionDisplayLabel,
-  normalizeCompetition,
-} from '../utils/competitionPill.js';
+import ProfitabilitySegmentsPill from '../components/ProfitabilitySegmentsPill.jsx';
 import {
   normalizeProfitability,
   profitabilityDisplayLabel,
 } from '../utils/profitabilityPill.js';
-import CompetitionSegmentsPill from '../components/CompetitionSegmentsPill.jsx';
-import ProfitabilitySegmentsPill from '../components/ProfitabilitySegmentsPill.jsx';
+import { buildMetricPillDetail } from '../utils/metricPillDetail.js';
 
 const BASE_STEPS = [
   { key: 'businesses', label: 'Business' },
@@ -188,6 +186,7 @@ export default function ProjectSearch() {
   const [mapSummary, setMapSummary] = useState('');
   const [mapRegions, setMapRegions] = useState([]);
   const [mapSelectedCode, setMapSelectedCode] = useState(null);
+  const [metricDetail, setMetricDetail] = useState(null);
 
   const goToStep = useCallback(
     (nextStep, { replace = false } = {}) => {
@@ -696,20 +695,14 @@ export default function ProjectSearch() {
                 source: selectedBusiness.competitionSource || null,
               }
             : null,
-        profitability:
-          selectedBusiness.profitabilityScore != null ||
-          selectedBusiness.profitabilityLabel ||
-          selectedBusiness.profitabilityNote ||
-          proposal.profitabilityScore != null
-            ? {
-                score:
-                  proposal.profitabilityScore ?? selectedBusiness.profitabilityScore ?? null,
-                label:
-                  proposal.profitabilityLabel || selectedBusiness.profitabilityLabel || null,
-                note:
-                  proposal.profitabilityNote || selectedBusiness.profitabilityNote || null,
-              }
-            : null,
+        profitability: {
+          score:
+            proposal.profitabilityScore ?? selectedBusiness.profitabilityScore ?? null,
+          label:
+            proposal.profitabilityLabel || selectedBusiness.profitabilityLabel || null,
+          note:
+            proposal.profitabilityNote || selectedBusiness.profitabilityNote || null,
+        },
         budgetPlan: {
           kind: proposal.kind || 'budget_utilisateur',
           label: proposalKindLabel(proposal.kind),
@@ -884,24 +877,6 @@ export default function ProjectSearch() {
                       savedTraining?.businessTitle === business.title && savedTraining?.title;
                     const tileStyle = feasibilityTileStyle(business.feasibility);
                     const modes = ensureBusinessModes(business);
-                    const competition = normalizeCompetition(business);
-                    const competitionTitle =
-                      [
-                        competition?.note,
-                        competitionDisplayLabel(competition),
-                        competition?.source === 'web'
-                          ? 'Estimation avec recherche web'
-                          : competition?.source === 'estimated'
-                            ? 'Estimation sans recherche web'
-                            : null,
-                      ]
-                        .filter(Boolean)
-                        .join(' — ') || 'Concurrence estimée';
-                    const profitability = normalizeProfitability(business);
-                    const profitabilityTitle =
-                      [profitability?.note, profitabilityDisplayLabel(profitability)]
-                        .filter(Boolean)
-                        .join(' — ') || 'Rentabilité estimée';
                     return (
                       <div
                         key={index}
@@ -912,17 +887,10 @@ export default function ProjectSearch() {
                           <div className="min-w-0 flex-1">
                             <h3 className="font-semibold text-prune-900 pr-2">{business.title}</h3>
                           </div>
-                          <div className="shrink-0 flex flex-wrap items-center justify-end gap-2">
-                            <CompetitionSegmentsPill
-                              competition={competition}
-                              title={competitionTitle}
-                            />
-                            <ProfitabilitySegmentsPill
-                              profitability={profitability}
-                              title={profitabilityTitle}
-                            />
-                            <FeasibilityRoundPill score={business.feasibility} />
-                          </div>
+                          <BusinessMetricPills
+                            business={business}
+                            onOpenDetail={setMetricDetail}
+                          />
                         </div>
                         {business.activity && (
                           <p className="text-xs font-medium uppercase tracking-wide text-topaz-600 mt-0.5">
@@ -1081,24 +1049,39 @@ export default function ProjectSearch() {
                             {proposalKindLabel(proposal.kind)}
                           </span>
                           <div className="shrink-0 flex items-center gap-1.5">
-                            {(proposal.profitabilityScore != null ||
-                              proposal.profitabilityLabel) && (
-                              <ProfitabilitySegmentsPill
-                                profitability={proposal}
-                                size="sm"
-                                title={
-                                  [
-                                    proposal.profitabilityNote,
-                                    profitabilityDisplayLabel(proposal),
-                                  ]
-                                    .filter(Boolean)
-                                    .join(' — ') || 'Rentabilité'
-                                }
-                              />
-                            )}
-                            {proposal.feasibility != null && (
-                              <FeasibilityRoundPill score={proposal.feasibility} size="sm" />
-                            )}
+                            <ProfitabilitySegmentsPill
+                              profitability={normalizeProfitability(proposal) || proposal}
+                              size="sm"
+                              title={
+                                [
+                                  proposal.profitabilityNote,
+                                  profitabilityDisplayLabel(proposal),
+                                  'Cliquez pour le détail',
+                                ]
+                                  .filter(Boolean)
+                                  .join(' — ') || 'Rentabilité'
+                              }
+                              onClick={() =>
+                                setMetricDetail(
+                                  buildMetricPillDetail('profitability', {
+                                    score: proposal.profitabilityScore,
+                                    label: profitabilityDisplayLabel(proposal),
+                                    note: proposal.profitabilityNote,
+                                  })
+                                )
+                              }
+                            />
+                            <FeasibilityRoundPill
+                              score={proposal.feasibility}
+                              size="sm"
+                              onClick={() =>
+                                setMetricDetail(
+                                  buildMetricPillDetail('feasibility', {
+                                    score: proposal.feasibility,
+                                  })
+                                )
+                              }
+                            />
                           </div>
                         </div>
                         <h3 className="font-semibold text-prune-900">{proposal.title}</h3>
@@ -1140,6 +1123,11 @@ export default function ProjectSearch() {
           )}
         </section>
       </main>
+
+      <MetricPillDetailModal
+        detail={metricDetail}
+        onClose={() => setMetricDetail(null)}
+      />
 
       {mapOpen && selectedBusiness && (
         <FranceImplantationModal

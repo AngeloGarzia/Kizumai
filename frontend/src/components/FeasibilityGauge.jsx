@@ -87,6 +87,28 @@ export function feasibilityRoundPillStyle(score) {
   };
 }
 
+export const FEASIBILITY_SEGMENT_COUNT = 6;
+
+/**
+ * Nombre de segments remplis (0–6) à partir du score 0–100.
+ * 0 → vide ; >0 → au moins 1 ; 100 → 6.
+ */
+export function feasibilitySegments(score) {
+  const s = clamp(score);
+  if (s == null) return null;
+  if (s <= 0) return 0;
+  return Math.min(
+    FEASIBILITY_SEGMENT_COUNT,
+    Math.max(1, Math.round((s / 100) * FEASIBILITY_SEGMENT_COUNT))
+  );
+}
+
+export function feasibilitySegmentFillColor(score) {
+  const s = clamp(score);
+  if (s == null) return 'rgb(200 194 188)';
+  return mixColorCss(s / 100);
+}
+
 /** Moyenne des scores disponibles (ignore null). */
 export function averageFeasibility(items) {
   if (!Array.isArray(items) || !items.length) return null;

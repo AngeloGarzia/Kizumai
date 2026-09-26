@@ -77,7 +77,6 @@ export function normalizeProfitability(input) {
         : null;
   const label = input.profitabilityLabel || input.label || null;
   const note = input.profitabilityNote || input.note || null;
-  if (score == null && !label && !note) return null;
   return {
     score: Number.isFinite(score) ? Math.min(100, Math.max(0, Math.round(score))) : null,
     label: label ? String(label).slice(0, 40) : null,

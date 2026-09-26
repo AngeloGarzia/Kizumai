@@ -33,3 +33,29 @@
 .animate-progress-next {
   animation: progress-next-pulse 1.2s ease-in-out infinite;
 }
+
+/* Pastilles métriques : clignotement léger selon le score (durée via --pill-pulse-ms). */
+@keyframes metric-pill-blink {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  50% {
+    opacity: 0.78;
+    transform: scale(1.045);
+    filter: brightness(1.1);
+  }
+}
+
+.metric-pill-blink {
+  animation: metric-pill-blink var(--pill-pulse-ms, 2.4s) ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .metric-pill-blink {
+    animation: none;
+  }
+}

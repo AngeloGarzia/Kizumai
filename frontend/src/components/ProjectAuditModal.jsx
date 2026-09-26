@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { projectService } from '../services/projectService.js';
 import { assistantPhrases } from '../constants/assistant.js';
 import FabulousThinking from './FabulousThinking.jsx';
@@ -17,6 +17,8 @@ export default function ProjectAuditModal({
   const [selected, setSelected] = useState(() => new Set());
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const closeBtnRef = useRef(null);
+  const pollFailsRef = useRef(0);
 
   const status = payload?.audit?.status;
   const suggested = useMemo(
@@ -29,9 +31,25 @@ export default function ProjectAuditModal({
   }, [initialAuditId]);
 
   useEffect(() => {
+    closeBtnRef.current?.focus?.();
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape' && !busy) {
+        e.preventDefault();
+        onClose?.();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [busy, onClose]);
+
+  useEffect(() => {
     if (!projectId || !auditId) return undefined;
     let active = true;
     let timer;
+    pollFailsRef.current = 0;
 
     const poll = async () => {
       try {
@@ -39,18 +57,24 @@ export default function ProjectAuditModal({
         if (!active) return;
         setPayload(data);
         setError('');
+        pollFailsRef.current = 0;
         const st = data?.audit?.status;
         if (st === 'pending' || st === 'processing') {
           timer = setTimeout(poll, 1800);
           return;
         }
         if (st === 'ready') {
-          setSelected(new Set((data.items || []).filter((i) => i.status === 'suggested').map((i) => i.id)));
+          setSelected(
+            new Set((data.items || []).filter((i) => i.status === 'suggested').map((i) => i.id))
+          );
         }
       } catch (err) {
         if (!active) return;
         setError(err.message || 'Impossible de récupérer l’audit');
-        timer = setTimeout(poll, 2500);
+        pollFailsRef.current += 1;
+        if (pollFailsRef.current < 8) {
+          timer = setTimeout(poll, 2500);
+        }
       }
     };
 
@@ -68,6 +92,10 @@ export default function ProjectAuditModal({
       else next.add(id);
       return next;
     });
+  };
+
+  const softClose = () => {
+    if (!busy) onClose?.();
   };
 
   const apply = async () => {
@@ -90,7 +118,7 @@ export default function ProjectAuditModal({
     }
   };
 
-  const dismiss = async () => {
+  const rejectAllAndClose = async () => {
     if (!auditId) {
       onClose?.();
       return;
@@ -117,7 +145,7 @@ export default function ProjectAuditModal({
         type="button"
         className="absolute inset-0 bg-prune-900/50"
         aria-label="Fermer"
-        onClick={dismiss}
+        onClick={softClose}
       />
       <div className="relative w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-white shadow-xl p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3 mb-4">
@@ -135,9 +163,10 @@ export default function ProjectAuditModal({
             )}
           </div>
           <button
+            ref={closeBtnRef}
             type="button"
             className="text-prune-500 hover:text-prune-800 text-sm font-medium"
-            onClick={dismiss}
+            onClick={softClose}
             disabled={busy}
           >
             Plus tard
@@ -156,7 +185,7 @@ export default function ProjectAuditModal({
             <p className="text-sm text-prune-700 bg-prune-50 rounded-xl p-3">
               {payload?.audit?.errorMessage || 'Audit impossible pour le moment.'}
             </p>
-            <button type="button" className="btn-secondary" onClick={dismiss} disabled={busy}>
+            <button type="button" className="btn-secondary" onClick={softClose} disabled={busy}>
               Fermer
             </button>
           </div>
@@ -239,7 +268,12 @@ export default function ProjectAuditModal({
             {error && <p className="text-sm text-red-600">{error}</p>}
 
             <div className="flex flex-wrap gap-2 justify-end pt-1">
-              <button type="button" className="btn-secondary" onClick={dismiss} disabled={busy}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={suggested.length ? rejectAllAndClose : softClose}
+                disabled={busy}
+              >
                 {suggested.length ? 'Tout rejeter' : 'Fermer'}
               </button>
               {suggested.length > 0 && (
