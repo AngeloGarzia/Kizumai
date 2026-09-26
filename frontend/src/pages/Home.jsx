@@ -29,7 +29,7 @@ export default function Home() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAuthenticated, isPaid, loading } = useAuth();
-  const { currentProject: project, hasProject, refreshProjects } = useProject();
+  const { currentProject: project, hasProject, refreshProjects, canCreateProject } = useProject();
   const [learningRecords, setLearningRecords] = useState([]);
   const [guideOpen, setGuideOpen] = useState(false);
   const [activeGuide, setActiveGuide] = useState(null);
@@ -38,7 +38,13 @@ export default function Home() {
   const [auditBusy, setAuditBusy] = useState(false);
   const welcomeLockRef = useRef(false);
 
-  const goToCreateFuture = () => navigate('/creer-son-avenir');
+  const goToCreateFuture = () => {
+    if (isAuthenticated && isPaid && !canCreateProject) {
+      navigate('/projets');
+      return;
+    }
+    navigate('/creer-son-avenir');
+  };
 
   const showProgressOverlay =
     !isAuthenticated || (!loading && (!isPaid || !hasProject));

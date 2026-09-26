@@ -55,12 +55,21 @@ export function buildPageGuideContext(location) {
     };
   }
 
+  if (pathname === '/projets' || pathname.startsWith('/projets/')) {
+    return {
+      pathname,
+      pageLabel: 'Projets',
+      sectionLabel: 'Mes projets',
+      pageDetail: 'Liste des projets, création, suppression et choix du projet courant.',
+    };
+  }
+
   if (pathname === '/parcours') {
     return {
       pathname,
       pageLabel: 'Parcours',
-      sectionLabel: 'Mes projets',
-      pageDetail: 'Liste des projets, création, suppression et accès aux étapes.',
+      sectionLabel: 'Étapes',
+      pageDetail: 'Étapes du projet courant : idée, marché, BP, financement, immat, lancement.',
     };
   }
 

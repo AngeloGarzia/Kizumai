@@ -151,6 +151,14 @@ export const ProjectRepository = {
     return rows.map(mapProject);
   },
 
+  async countByUserId(userId) {
+    const { rows } = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM projects WHERE user_id = $1`,
+      [Number(userId)]
+    );
+    return Number(rows[0]?.n || 0);
+  },
+
   async findEligibleForAssistant({ withinDays = 30, limit = 500 } = {}) {
     const { rows } = await pool.query(
       `${SELECT_WITH_RELATIONS}

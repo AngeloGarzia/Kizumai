@@ -1,8 +1,9 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { publicAssetUrl } from '../config/appBase.js';
+import { useProject } from '../context/ProjectContext.jsx';
 import {
   IconHome,
+  IconProjects,
   IconPath,
   IconBook,
   IconUser,
@@ -42,35 +43,23 @@ function IconAgenda({ className = 'w-5 h-5' }) {
   );
 }
 
-function IconFabulous({ className = 'w-5 h-5' }) {
-  return (
-    <img
-      src={publicAssetUrl('fabulous.svg')}
-      alt=""
-      className={`${className} select-none`}
-      decoding="async"
-    />
-  );
-}
-
 const navItems = [
   { id: 'home', label: 'Accueil', icon: IconHome, path: '/' },
-  { id: 'path', label: 'Parcours', icon: IconPath, path: '/parcours' },
-  { id: 'timeline', label: 'Fil', icon: IconTimeline, path: '/fil-du-temps' },
-  { id: 'resources', label: 'Docs', icon: IconBook, path: '/ressources' },
-  { id: 'agenda', label: 'Agenda', icon: IconAgenda, path: '/planner' },
+  { id: 'projects', label: 'Projets', icon: IconProjects, path: '/projets' },
+  { id: 'path', label: 'Parcours', icon: IconPath, path: '/parcours', requiresProject: true },
+  { id: 'timeline', label: 'Fil', icon: IconTimeline, path: '/fil-du-temps', requiresProject: true },
+  { id: 'resources', label: 'Docs', icon: IconBook, path: '/ressources', requiresProject: true },
+  { id: 'agenda', label: 'Agenda', icon: IconAgenda, path: '/planner', requiresProject: true },
 ];
 
-const fabulousItem = {
-  id: 'fabulous',
-  type: 'fabulous',
-  label: 'Fabulous',
-  icon: IconFabulous,
-};
+const NO_PROJECT_HINT = 'Créez d’abord un projet pour accéder à cette section';
 
-export default function BottomNav({ fabulousOpen = false, onFabulousOpen }) {
+export default function BottomNav() {
   const location = useLocation();
   const { isAuthenticated, isAdmin, user } = useAuth();
+  const { hasProject, loading: projectsLoading } = useProject();
+  const projectMenusLocked =
+    Boolean(isAuthenticated) && !projectsLoading && !hasProject;
 
   // Setup : mobile uniquement (footer desktop). Admin : liste + mobile.
   const items = [
@@ -85,6 +74,7 @@ export default function BottomNav({ fabulousOpen = false, onFabulousOpen }) {
 
   const isItemActive = (item) => {
     if (item.id === 'home') return location.pathname === '/';
+    if (item.id === 'projects') return location.pathname.startsWith('/projets');
     if (item.id === 'path') {
       return (
         location.pathname === '/parcours' ||
@@ -110,75 +100,64 @@ export default function BottomNav({ fabulousOpen = false, onFabulousOpen }) {
     const isActive = isItemActive(item);
     const Icon = item.icon;
     const hideLabelMobile = item.id === 'admin';
+    const locked = Boolean(item.requiresProject && projectMenusLocked);
+
+    const content = (
+      <>
+        <span
+          className={`flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-2xl
+                      lg:w-9 lg:h-9 lg:rounded-xl transition-colors
+                      ${locked
+            ? 'text-prune-300'
+            : isActive
+              ? 'bg-prune-900 text-wasabi-400 lg:bg-transparent'
+              : 'text-prune-500'}`}
+        >
+          <Icon className={`w-5 h-5${locked ? ' opacity-50' : ''}`} />
+        </span>
+        <span
+          className={`text-xs sm:text-sm font-medium lg:text-sm
+                      ${hideLabelMobile ? 'hidden lg:inline' : ''}
+                      ${locked
+            ? 'text-prune-300'
+            : isActive
+              ? 'text-wasabi-500 lg:text-wasabi-400'
+              : 'text-prune-500'}`}
+        >
+          {item.label}
+        </span>
+      </>
+    );
 
     return (
       <li
         key={item.id}
         className={`flex-1 lg:flex-none min-w-[3.25rem]${item.mobileOnly ? ' lg:hidden' : ''}`}
       >
-        <Link
-          to={item.path}
-          className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-2 sm:py-2
-                      lg:flex-row lg:justify-start lg:gap-3 lg:px-4 lg:py-3 lg:rounded-xl lg:w-full
-                      transition-colors
-                      ${isActive
-            ? 'lg:bg-prune-900'
-            : 'hover:bg-prune-50 lg:hover:bg-prune-50'}`}
-        >
+        {locked ? (
           <span
-            className={`flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-2xl
-                        lg:w-9 lg:h-9 lg:rounded-xl transition-colors
+            role="link"
+            aria-disabled="true"
+            title={NO_PROJECT_HINT}
+            className="flex flex-col items-center justify-center gap-0.5 py-1.5 px-2 sm:py-2
+                       lg:flex-row lg:justify-start lg:gap-3 lg:px-4 lg:py-3 lg:rounded-xl lg:w-full
+                       cursor-not-allowed opacity-60 select-none"
+          >
+            {content}
+          </span>
+        ) : (
+          <Link
+            to={item.path}
+            className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-2 sm:py-2
+                        lg:flex-row lg:justify-start lg:gap-3 lg:px-4 lg:py-3 lg:rounded-xl lg:w-full
+                        transition-colors
                         ${isActive
-              ? 'bg-prune-900 text-wasabi-400 lg:bg-transparent'
-              : 'text-prune-500'}`}
+              ? 'lg:bg-prune-900'
+              : 'hover:bg-prune-50 lg:hover:bg-prune-50'}`}
           >
-            <Icon className="w-5 h-5" />
-          </span>
-          <span
-            className={`text-xs sm:text-sm font-medium lg:text-sm
-                        ${hideLabelMobile ? 'hidden lg:inline' : ''}
-                        ${isActive ? 'text-wasabi-500 lg:text-wasabi-400' : 'text-prune-500'}`}
-          >
-            {item.label}
-          </span>
-        </Link>
-      </li>
-    );
-  };
-
-  const renderFabulousButton = () => {
-    const Icon = fabulousItem.icon;
-    const isActive = fabulousOpen;
-
-    return (
-      <li key={fabulousItem.id} className="flex-1 lg:flex-none min-w-[3.25rem]">
-        <button
-          type="button"
-          onClick={() => onFabulousOpen?.()}
-          className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-2 sm:py-2 w-full
-                      lg:flex-row lg:justify-start lg:gap-3 lg:px-4 lg:py-3 lg:rounded-xl
-                      transition-colors
-                      ${isActive
-            ? 'lg:bg-prune-900'
-            : 'hover:bg-prune-50 lg:hover:bg-prune-50'}`}
-          aria-label="Ouvrir le guide Fabulous pour cette page"
-        >
-          <span
-            className={`flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-2xl
-                        lg:w-9 lg:h-9 lg:rounded-xl transition-colors
-                        ${isActive
-              ? 'bg-prune-900 lg:bg-transparent ring-2 ring-wasabi-400/80'
-              : 'text-prune-500 bg-wasabi-50/60'}`}
-          >
-            <Icon className="w-5 h-5" />
-          </span>
-          <span
-            className={`text-xs sm:text-sm font-medium lg:text-sm
-                        ${isActive ? 'text-wasabi-500 lg:text-wasabi-400' : 'text-prune-500'}`}
-          >
-            {fabulousItem.label}
-          </span>
-        </button>
+            {content}
+          </Link>
+        )}
       </li>
     );
   };
@@ -198,11 +177,7 @@ export default function BottomNav({ fabulousOpen = false, onFabulousOpen }) {
                      lg:flex lg:flex-col lg:flex-1 lg:min-h-0 lg:h-full"
         >
           <ul className="flex items-stretch justify-around py-2 px-1 sm:py-3 lg:flex-col lg:gap-1 lg:p-0 overflow-x-auto">
-            {items.flatMap((item, index) => {
-              const nodes = [renderNavLink(item)];
-              if (index === 0) nodes.push(renderFabulousButton());
-              return nodes;
-            })}
+            {items.map((item) => renderNavLink(item))}
 
             {!isAuthenticated && (
               <li className="flex-1 lg:hidden min-w-[3.25rem]">

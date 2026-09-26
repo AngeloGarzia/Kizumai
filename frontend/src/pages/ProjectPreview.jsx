@@ -23,7 +23,7 @@ import { ASSISTANT_NAME } from '../constants/assistant.js';
 export default function ProjectPreview() {
   const navigate = useNavigate();
   const { user, isAuthenticated, isPaid, loading, loadUser } = useAuth();
-  const { refreshProjects, setCurrentProjectId } = useProject();
+  const { refreshProjects, setCurrentProjectId, canCreateProject, maxProjects } = useProject();
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -115,6 +115,12 @@ export default function ProjectPreview() {
   const handleContinuePaid = async () => {
     if (!preview) return;
     setError('');
+    if (!canCreateProject) {
+      setError(
+        `Limite atteinte : ${maxProjects} projets maximum. Gérez vos projets existants depuis le menu Projets.`
+      );
+      return;
+    }
     setSubmitting(true);
 
     try {

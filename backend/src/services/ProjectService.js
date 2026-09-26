@@ -1,5 +1,5 @@
 import { AppError } from '../utils/AppError.js';
-import { hasPaidAccess } from '../constants/plans.js';
+import { hasPaidAccess, MAX_PROJECTS_PER_USER } from '../constants/plans.js';
 import { computeProjectProgress } from '../constants/projectStages.js';
 import { withAiUsageContext } from '../utils/aiUsage.js';
 import { createAdvancementCoachService } from './AdvancementCoachService.js';
@@ -547,6 +547,14 @@ export function createProjectService({
 
       if (!hasPaidAccess(user)) {
         throw new AppError('Un compte payant est requis pour poursuivre le parcours', 403);
+      }
+
+      const existingCount = await projectRepository.countByUserId(user.id);
+      if (existingCount >= MAX_PROJECTS_PER_USER) {
+        throw new AppError(
+          `Limite atteinte : ${MAX_PROJECTS_PER_USER} projets maximum par compte. Supprimez un projet existant ou basculez depuis le menu Projets.`,
+          403
+        );
       }
 
       await currencyService.getCurrencyData();

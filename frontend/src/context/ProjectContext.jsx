@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useAuth } from './AuthContext.jsx';
 import { projectService } from '../services/projectService.js';
+import { MAX_PROJECTS_PER_USER } from '../constants/projects.js';
 
 const STORAGE_KEY = 'kizumai_current_project_id';
 const ProjectContext = createContext(null);
@@ -83,6 +84,10 @@ export function ProjectProvider({ children }) {
     return projects.find((p) => Number(p.id) === Number(currentProjectId)) || projects[0] || null;
   }, [projects, currentProjectId]);
 
+  const projectCount = projects.length;
+  const canCreateProject = isAuthenticated && isPaid && projectCount < MAX_PROJECTS_PER_USER;
+  const hasProject = Boolean(currentProject?.id);
+
   const value = useMemo(
     () => ({
       projects,
@@ -92,7 +97,10 @@ export function ProjectProvider({ children }) {
       refreshProjects,
       loading,
       error,
-      hasProject: Boolean(currentProject?.id),
+      hasProject,
+      projectCount,
+      maxProjects: MAX_PROJECTS_PER_USER,
+      canCreateProject,
     }),
     [
       projects,
@@ -101,6 +109,9 @@ export function ProjectProvider({ children }) {
       refreshProjects,
       loading,
       error,
+      hasProject,
+      projectCount,
+      canCreateProject,
     ]
   );
 

@@ -11,6 +11,7 @@ import Planner from './pages/Planner.jsx';
 import AdminRoute from './components/AdminRoute.jsx';
 import AuthRoute from './components/AuthRoute.jsx';
 import Home from './pages/Home.jsx';
+import Projects from './pages/Projects.jsx';
 import Parcours from './pages/Parcours.jsx';
 import CreateFuture from './pages/CreateFuture.jsx';
 import Login from './pages/Login.jsx';
@@ -40,6 +41,7 @@ export default function App() {
         <ProjectProvider>
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/projets" element={<Projects />} />
             <Route path="/parcours" element={<Parcours />} />
             <Route path="/dashboard" element={<Navigate to="/" replace />} />
             <Route path="/creer-son-avenir" element={<CreateFuture />} />

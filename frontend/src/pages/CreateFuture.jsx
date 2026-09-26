@@ -17,6 +17,9 @@ import {
   saveSearchSeed,
 } from '../services/projectService.js';
 import { IconChevronRight } from '../components/icons.jsx';
+import { useProject } from '../context/ProjectContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
+import { MAX_PROJECTS_PER_USER } from '../constants/projects.js';
 
 function buildSeed({ quoi, ou, budget, currency, temperature }) {
   return {
@@ -41,6 +44,8 @@ function seedChanged(prev, next) {
 
 export default function CreateFuture() {
   const navigate = useNavigate();
+  const { isAuthenticated, isPaid } = useAuth();
+  const { canCreateProject, projectCount, maxProjects, loading: projectsLoading } = useProject();
 
   const [quoi, setQuoi] = useState('');
   const [ou, setOu] = useState('');
@@ -54,6 +59,7 @@ export default function CreateFuture() {
   const [locationError, setLocationError] = useState('');
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
   const [resumeStep, setResumeStep] = useState(null);
+  const [bootstrapped, setBootstrapped] = useState(false);
   const locationRequestRef = useRef(0);
 
   const hasQuoi = Boolean(quoi.trim());
@@ -76,7 +82,23 @@ export default function CreateFuture() {
     } else {
       setResumeStep(null);
     }
+    setBootstrapped(true);
   }, []);
+
+  useEffect(() => {
+    if (!bootstrapped || !isAuthenticated || !isPaid || projectsLoading) return;
+    if (!canCreateProject && !canResume) {
+      navigate('/projets', { replace: true });
+    }
+  }, [
+    bootstrapped,
+    isAuthenticated,
+    isPaid,
+    projectsLoading,
+    canCreateProject,
+    canResume,
+    navigate,
+  ]);
 
   useEffect(() => {
     const query = ou.trim();
@@ -145,6 +167,12 @@ export default function CreateFuture() {
 
   const startFreshSearch = () => {
     setError('');
+    if (isAuthenticated && isPaid && !canCreateProject) {
+      setError(
+        `Limite atteinte : ${maxProjects ?? MAX_PROJECTS_PER_USER} projets maximum (${projectCount} déjà créés).`
+      );
+      return;
+    }
     if (!canLaunch) {
       setError('Indiquez au moins une idée ou un lieu pour lancer la recherche.');
       return;
