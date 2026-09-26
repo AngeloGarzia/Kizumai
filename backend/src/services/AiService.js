@@ -182,6 +182,11 @@ function withMemoryContext(userContent, memoryContext, prefix = null) {
   ].join('\n\n');
 }
 
+const DEFAULT_FABULOUS_VOICE = [
+  'Tu es Fabulous : direct comme un associé de confiance, jamais condescendant, jamais alarmiste.',
+  "Chaque phrase difficile s'accompagne d'une porte de sortie concrète.",
+].join(' ');
+
 function resolveAiPrompt(value, fallback) {
   const v = String(value || '').trim();
   return v || fallback;
@@ -839,7 +844,15 @@ export function createAiService({ settingsService, currencyService }) {
 
   async function requestStepJson(
     userContent,
-    { systemExtra = '', maxOutputTokens, timeoutMs, thinkingBudget, responseSchema, temperature } = {}
+    {
+      systemExtra = '',
+      fabulousVoice = false,
+      maxOutputTokens,
+      timeoutMs,
+      thinkingBudget,
+      responseSchema,
+      temperature,
+    } = {}
   ) {
     const baseConfig = await settingsService.getAiConfig();
     const aiConfig =
@@ -857,6 +870,11 @@ export function createAiService({ settingsService, currencyService }) {
         503
       );
     }
+
+    const voiceExtra = fabulousVoice
+      ? resolveAiPrompt(aiConfig.fabulousVoicePrompt, DEFAULT_FABULOUS_VOICE)
+      : '';
+    const mergedExtra = [systemExtra, voiceExtra].filter(Boolean).join('\n\n');
 
     const buildSystem = (extra) =>
       [
@@ -884,7 +902,7 @@ export function createAiService({ settingsService, currencyService }) {
     try {
       try {
         return await callOnce({
-          extra: systemExtra,
+          extra: mergedExtra,
           think: thinkingBudget,
           schema: responseSchema,
         });
@@ -897,7 +915,7 @@ export function createAiService({ settingsService, currencyService }) {
         console.warn('[ai] JSON invalide — nouvel essai sans schema, consignes renforcées');
         return await callOnce({
           extra: [
-            systemExtra,
+            mergedExtra,
             resolveAiPrompt(aiConfig.jsonRetryPrompt, DEFAULT_JSON_RETRY),
           ]
             .filter(Boolean)
@@ -1573,7 +1591,7 @@ export function createAiService({ settingsService, currencyService }) {
         trigger: String(trigger || 'manual').slice(0, 80),
       });
 
-      const data = await requestStepJson(userContent);
+      const data = await requestStepJson(userContent, { fabulousVoice: true });
       const proposals = Array.isArray(data.proposals) ? data.proposals.slice(0, 12) : [];
       return {
         situation: clipAiOutput(String(data.situation || '').trim(), 2500),
@@ -1620,7 +1638,7 @@ export function createAiService({ settingsService, currencyService }) {
         documents: String(documents || '').trim().slice(0, 3000) || 'aucun',
       });
 
-      const data = await requestStepJson(userContent);
+      const data = await requestStepJson(userContent, { fabulousVoice: true });
       const insights = Array.isArray(data.insights) ? data.insights.slice(0, 12) : [];
       const reorientationSuggestions = Array.isArray(data.reorientationSuggestions)
         ? data.reorientationSuggestions.slice(0, 8)
@@ -1676,7 +1694,7 @@ export function createAiService({ settingsService, currencyService }) {
         rejected: String(rejected || '').trim().slice(0, 4000) || 'aucune',
       });
 
-      const data = await requestStepJson(userContent);
+      const data = await requestStepJson(userContent, { fabulousVoice: true });
       return {
         viabilitySummary: clipAiOutput(String(data.viabilitySummary || '').trim(), 3000),
         profitabilitySummary: clipAiOutput(
@@ -1869,7 +1887,7 @@ export function createAiService({ settingsService, currencyService }) {
         snapshot: String(snapshotText || '(aucun snapshot)').slice(0, 6000),
         nodes: String(nodesText || '(aucun souvenir)').slice(0, 8000),
       });
-      const data = await requestStepJson(userContent);
+      const data = await requestStepJson(userContent, { fabulousVoice: true });
       return {
         summary: clipAiOutput(
           String(data.summary || data.rappel || data.text || '').trim(),
@@ -1906,7 +1924,7 @@ export function createAiService({ settingsService, currencyService }) {
         project_title: String(context.projectTitle || '(aucun)').slice(0, 200),
         project_stage: String(context.projectStage || '(aucune)').slice(0, 120),
       });
-      const data = await requestStepJson(userContent, { temperature: 0.5 });
+      const data = await requestStepJson(userContent, { temperature: 0.5, fabulousVoice: true });
       const steps = (Array.isArray(data.steps) ? data.steps : [])
         .map((s) => String(s || '').trim().slice(0, 400))
         .filter(Boolean)
@@ -1942,7 +1960,7 @@ export function createAiService({ settingsService, currencyService }) {
         task_notes: String(context.taskNotes || '(aucune)').slice(0, 800),
         progress_percent: String(context.progressPercent ?? 0),
       });
-      const data = await requestStepJson(userContent, { temperature: 0.55 });
+      const data = await requestStepJson(userContent, { temperature: 0.55, fabulousVoice: true });
       const items = (Array.isArray(data.items) ? data.items : [])
         .map((item) => {
           if (typeof item === 'string') {
