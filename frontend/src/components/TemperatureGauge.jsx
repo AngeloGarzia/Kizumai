@@ -48,8 +48,8 @@ export default function TemperatureGauge({
         aria-label="Température de créativité IA"
       />
       <div className="mt-1.5 flex justify-between text-[11px] text-prune-500">
-        <span>Plus précis</span>
-        <span>Plus inventif</span>
+        <span>Idées plus conventionnelles</span>
+        <span>Idées plus originales</span>
       </div>
     </div>
   );

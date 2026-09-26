@@ -13,7 +13,7 @@ const WORKFLOW_STAGES = new Set(
 export default function ProjectStage() {
   const { id, stage } = useParams();
   if (!id || !WORKFLOW_STAGES.has(stage)) {
-    return <Navigate to="/parcours" replace />;
+    return <Navigate to="/login" replace />;
   }
   return <StageWorkspace projectId={id} stage={stage} />;
 }

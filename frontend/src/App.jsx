@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { ProjectProvider } from './context/ProjectContext.jsx';
 import PaidRoute from './components/PaidRoute.jsx';
@@ -26,6 +26,11 @@ import { routerBasename } from './config/appBase.js';
 function EtudeMarcheRedirect() {
   const { id } = useParams();
   return <Navigate to={`/projet/${id}/etape/etude_marche`} replace />;
+}
+
+function CatchAllRedirect() {
+  const location = useLocation();
+  return <Navigate to="/login" replace state={{ from: location }} />;
 }
 
 export default function App() {
@@ -60,7 +65,7 @@ export default function App() {
               <Route path="/admin" element={<Admin />} />
               <Route path="/admin/setup" element={<Navigate to="/admin" replace />} />
             </Route>
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<CatchAllRedirect />} />
           </Routes>
         </ProjectProvider>
       </BrowserRouter>

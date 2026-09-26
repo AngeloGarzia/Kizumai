@@ -1,3 +1,4 @@
+import { routerBasename } from '../config/appBase.js';
 import { publicConfig } from '../config/publicConfig.js';
 
 class ApiError extends Error {
@@ -8,6 +9,8 @@ class ApiError extends Error {
 }
 
 const CSRF_COOKIE = 'kizumai_csrf';
+
+export const AUTH_UNAUTHORIZED_EVENT = 'kizumai:unauthorized';
 
 // Endpoints d'authentification qui ne doivent jamais déclencher de refresh
 // automatique (sinon boucle infinie sur un 401).
@@ -20,10 +23,68 @@ const NO_REFRESH_ENDPOINTS = [
   '/auth/csrf',
 ];
 
+// Bootstrap auth : 401 géré par AuthContext (pas de redirect forcé ici).
+const NO_UNAUTHORIZED_REDIRECT = new Set([
+  ...NO_REFRESH_ENDPOINTS,
+  '/auth/me',
+  '/auth/logout',
+  '/auth/logout-all',
+]);
+
+// Pages publiques : ne pas rediriger vers /login si la session expire dessus.
+const PUBLIC_APP_PATHS = new Set([
+  '/',
+  '/parcours',
+  '/creer-son-avenir',
+  '/projet/recherche',
+  '/projet/apercu',
+  '/login',
+  '/register',
+  '/confirm-email',
+]);
+
 // Une seule tentative de refresh partagée à la fois, pour éviter que plusieurs
 // requêtes simultanées ne lancent chacune leur propre rafraîchissement.
 let refreshPromise = null;
 let csrfPromise = null;
+let unauthorizedHandled = false;
+/** True after a successful auth in this page lifetime — enables hard redirect on expiry. */
+let sessionActive = false;
+
+export function markSessionActive(active) {
+  sessionActive = !!active;
+  if (active) unauthorizedHandled = false;
+}
+
+function getAppPathname() {
+  if (typeof window === 'undefined') return '/';
+  const path = window.location.pathname;
+  const base = routerBasename || '';
+  if (base && (path === base || path.startsWith(`${base}/`))) {
+    return path.slice(base.length) || '/';
+  }
+  return path || '/';
+}
+
+function handleUnauthorized() {
+  if (unauthorizedHandled || typeof window === 'undefined') return;
+  unauthorizedHandled = true;
+
+  const appPath = getAppPathname();
+  const shouldHardRedirect = sessionActive && !PUBLIC_APP_PATHS.has(appPath);
+  sessionActive = false;
+
+  window.dispatchEvent(new CustomEvent(AUTH_UNAUTHORIZED_EVENT));
+
+  if (!shouldHardRedirect) return;
+
+  const base = routerBasename || '';
+  const loginUrl = `${base}/login`;
+  if (window.location.pathname === loginUrl || window.location.pathname === `${loginUrl}/`) {
+    return;
+  }
+  window.location.assign(loginUrl);
+}
 
 function readCookie(name) {
   if (typeof document === 'undefined') return null;
@@ -115,12 +176,20 @@ async function request(endpoint, options = {}) {
     }
   }
 
+  if (
+    response.status === 401 &&
+    !NO_UNAUTHORIZED_REDIRECT.has(endpoint)
+  ) {
+    handleUnauthorized();
+  }
+
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
     throw new ApiError(data.message || 'Erreur réseau', response.status);
   }
 
+  unauthorizedHandled = false;
   return data;
 }
 

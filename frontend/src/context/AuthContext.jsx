@@ -1,6 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { authService } from '../services/authService.js';
-import { ApiError, ensureCsrfToken } from '../services/api.js';
+import {
+  ApiError,
+  AUTH_UNAUTHORIZED_EVENT,
+  ensureCsrfToken,
+  markSessionActive,
+} from '../services/api.js';
 import {
   clearProjectDraft,
   clearSearchProgress,
@@ -13,35 +18,51 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const clearUser = useCallback(() => {
+    markSessionActive(false);
+    setUser(null);
+  }, []);
+
+  const applyUser = useCallback((nextUser) => {
+    markSessionActive(!!nextUser);
+    setUser(nextUser);
+  }, []);
+
   const loadUser = useCallback(async () => {
     try {
       await ensureCsrfToken();
       const currentUser = await authService.getMe();
-      setUser(currentUser);
+      applyUser(currentUser);
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         try {
           const refreshedUser = await authService.refreshSession();
-          setUser(refreshedUser);
+          applyUser(refreshedUser);
           return;
         } catch {
-          setUser(null);
+          clearUser();
         }
       } else {
-        setUser(null);
+        clearUser();
       }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [applyUser, clearUser]);
 
   useEffect(() => {
     loadUser();
   }, [loadUser]);
 
+  useEffect(() => {
+    const onUnauthorized = () => clearUser();
+    window.addEventListener(AUTH_UNAUTHORIZED_EVENT, onUnauthorized);
+    return () => window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, onUnauthorized);
+  }, [clearUser]);
+
   const login = async (email, password, options = {}) => {
     const loggedUser = await authService.login(email, password, options);
-    setUser(loggedUser);
+    applyUser(loggedUser);
     return loggedUser;
   };
 
@@ -51,24 +72,24 @@ export function AuthProvider({ children }) {
       return result;
     }
     if (result?.user) {
-      setUser(result.user);
+      applyUser(result.user);
       return result;
     }
     return result;
-  }, []);
+  }, [applyUser]);
 
   const confirmEmail = useCallback(async (token) => {
     const user = await authService.confirmEmail(token);
-    setUser(user);
+    applyUser(user);
     return user;
-  }, []);
+  }, [applyUser]);
 
   const logout = async () => {
     await authService.logout();
     clearProjectDraft();
     clearSearchSeed();
     clearSearchProgress();
-    setUser(null);
+    clearUser();
   };
 
   return (
