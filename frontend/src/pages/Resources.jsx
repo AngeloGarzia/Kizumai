@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import MainLayout from '../components/MainLayout.jsx';
 import BrandLogo from '../components/BrandLogo.jsx';
 import DocumentScanModal from '../components/DocumentScanModal.jsx';
+import ProjectReorientationModal from '../components/ProjectReorientationModal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useProject } from '../context/ProjectContext.jsx';
 import { projectService } from '../services/projectService.js';
@@ -389,7 +390,7 @@ function CategoryNav({ resources, selectedCategory, onSelect, flatCategories }) 
 export default function Resources() {
   const navigate = useNavigate();
   const { isAuthenticated, isPaid, loading: authLoading } = useAuth();
-  const { currentProject, currentProjectId } = useProject();
+  const { currentProject, currentProjectId, refreshProjects } = useProject();
   const fileRef = useRef(null);
 
   const [project, setProject] = useState(null);
@@ -404,6 +405,7 @@ export default function Resources() {
   const [uploadCategoryId, setUploadCategoryId] = useState('');
   const [linkContactId, setLinkContactId] = useState('');
   const [scanModal, setScanModal] = useState(null);
+  const [reviewModal, setReviewModal] = useState(null);
 
   const selected = useMemo(
     () => (resources?.documents || []).find((d) => d.id === selectedId) || null,
@@ -807,7 +809,23 @@ export default function Resources() {
           scanId={scanModal.scanId}
           documentId={scanModal.documentId}
           onClose={() => setScanModal(null)}
-          onApplied={() => load(project.id)}
+          onApplied={(result) => {
+            load(project.id);
+            if (result?.reorientationReviewId) {
+              setReviewModal({ reviewId: result.reorientationReviewId });
+            }
+          }}
+        />
+      )}
+      {reviewModal && project && (
+        <ProjectReorientationModal
+          projectId={project.id}
+          reviewId={reviewModal.reviewId}
+          onClose={() => setReviewModal(null)}
+          onApplied={async () => {
+            await load(project.id);
+            await refreshProjects?.();
+          }}
         />
       )}
     </MainLayout>

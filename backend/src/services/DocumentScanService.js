@@ -43,6 +43,7 @@ export function createDocumentScanService({
   aiService,
   projectMemoryUpdateService = null,
   projectMemoryRecallService = null,
+  projectReorientationService = null,
 }) {
   async function loadDocumentBuffer(doc) {
     const row = await documentRepository.findContentById(doc.id);
@@ -83,6 +84,7 @@ export function createDocumentScanService({
       document,
       items,
       summary: {
+        summaries: items.filter((i) => i.itemType === 'summary').length,
         contacts: items.filter((i) => i.itemType === 'contact').length,
         dates: items.filter((i) => i.itemType === 'date').length,
         addresses: items.filter((i) => i.itemType === 'address').length,
@@ -108,6 +110,22 @@ export function createDocumentScanService({
 
   function buildItemsFromAi(result) {
     const items = [];
+
+    const summaryText = clip(
+      result?.summary?.text ||
+        (typeof result?.summary === 'string' ? result.summary : null),
+      3500
+    );
+    if (summaryText) {
+      items.push({
+        itemType: 'summary',
+        confidence: normalizeConfidence(result?.summary?.confidence),
+        label: 'Résumé du document',
+        payload: {
+          text: summaryText,
+        },
+      });
+    }
 
     for (const c of (result.contacts || []).slice(0, 40)) {
       const displayName = clip(c.displayName || c.name, 200);
@@ -257,6 +275,20 @@ export function createDocumentScanService({
         );
 
         let items = buildItemsFromAi(result);
+        if (!items.some((i) => i.itemType === 'summary') && text.trim()) {
+          const fallback = clip(text.replace(/\s+/g, ' ').trim(), 1200);
+          if (fallback) {
+            items = [
+              {
+                itemType: 'summary',
+                confidence: 0.4,
+                label: 'Résumé du document',
+                payload: { text: fallback },
+              },
+              ...items,
+            ];
+          }
+        }
         for (const item of items) {
           if (item.itemType === 'contact') {
             const matched = await matchContact(scan.userId, item.payload);
@@ -278,47 +310,9 @@ export function createDocumentScanService({
           errorMessage: null,
         });
 
-        // Mettre à jour excerpt document si vide
+        // Excerpt UI seulement — la mémoire projet attend l'acceptation du résumé.
         if (!doc.excerpt && text.trim()) {
           await documentRepository.update(doc.id, { excerpt: text.slice(0, 2000) });
-        }
-
-        if (projectMemoryUpdateService) {
-          const itemSummary = items
-            .slice(0, 10)
-            .map((i) => `${i.itemType}: ${i.label || ''}`.trim())
-            .filter(Boolean)
-            .join(' · ');
-          projectMemoryUpdateService.recordEventSafe({
-            projectId: scan.projectId,
-            nodeType: 'insight',
-            content: [
-              `Analyse IA document « ${doc.title || doc.fileName} »`,
-              items.length ? `${items.length} élément(s) détecté(s)` : null,
-              itemSummary || null,
-              `extrait : ${text.slice(0, 1500)}`,
-            ]
-              .filter(Boolean)
-              .join(' — '),
-            sourceEntityType: 'document_scan',
-            sourceEntityId: scan.id,
-            importance: 0.72,
-          });
-          // Enrichit aussi le nœud document avec l'extrait
-          projectMemoryUpdateService.recordEventSafe({
-            projectId: scan.projectId,
-            nodeType: 'fact',
-            content: [
-              `Document : ${doc.title || doc.fileName}`,
-              doc.type ? `type ${doc.type}` : null,
-              `extrait : ${text.slice(0, 1800)}`,
-            ]
-              .filter(Boolean)
-              .join(' — '),
-            sourceEntityType: 'document',
-            sourceEntityId: doc.id,
-            importance: 0.68,
-          });
         }
 
         return hydrateScan(await documentScanRepository.findById(scanId));
@@ -378,6 +372,42 @@ export function createDocumentScanService({
         if (item.status !== 'suggested') continue;
         const edit = edits[String(item.id)] || edits[item.id] || {};
         const payload = { ...item.payload, ...edit };
+
+        if (item.itemType === 'summary') {
+          const summaryText = clip(payload.text || item.label, 3500);
+          if (!summaryText) continue;
+          await documentScanRepository.updateItem(item.id, {
+            status: 'accepted',
+            payload: { ...payload, text: summaryText },
+          });
+          if (projectMemoryUpdateService) {
+            const doc = await documentRepository.findById(scan.documentId);
+            const docLabel = doc?.title || doc?.fileName || `document #${scan.documentId}`;
+            projectMemoryUpdateService.recordEventSafe({
+              projectId,
+              nodeType: 'insight',
+              content: `Résumé accepté — ${docLabel} : ${summaryText}`,
+              sourceEntityType: 'document_scan',
+              sourceEntityId: scanId,
+              importance: 0.8,
+            });
+            projectMemoryUpdateService.recordEventSafe({
+              projectId,
+              nodeType: 'fact',
+              content: [
+                `Document : ${docLabel}`,
+                doc?.type ? `type ${doc.type}` : null,
+                `résumé validé : ${summaryText}`,
+              ]
+                .filter(Boolean)
+                .join(' — '),
+              sourceEntityType: 'document',
+              sourceEntityId: scan.documentId,
+              importance: 0.78,
+            });
+          }
+          continue;
+        }
 
         if (item.itemType === 'contact') {
           let contactId = item.matchedEntityId;
@@ -515,7 +545,25 @@ export function createDocumentScanService({
         });
       }
 
-      return hydrateScan(await documentScanRepository.findById(scanId));
+      let reorientationReviewId = null;
+      if (projectReorientationService && toAccept.length) {
+        try {
+          const reviewPayload = await projectReorientationService.enqueueReview({
+            userId,
+            projectId,
+            triggerSource: 'document_scan',
+            triggerRefId: scanId,
+          });
+          reorientationReviewId = reviewPayload?.review?.id ?? null;
+        } catch (err) {
+          console.warn('[document-scan] reorientation:', err.message);
+        }
+      }
+
+      return {
+        ...(await hydrateScan(await documentScanRepository.findById(scanId))),
+        reorientationReviewId,
+      };
     },
 
     async dismissScan(userId, projectId, scanId) {

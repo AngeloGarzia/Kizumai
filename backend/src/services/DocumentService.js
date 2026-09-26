@@ -153,10 +153,9 @@ export function createDocumentService({
         console.warn('[documents] enqueue extract :', err.message);
       });
 
+      // Scan IA systématique : propose un résumé (et STI) à valider avant mémoire.
       let scan = null;
-      const shouldScan =
-        Boolean(forceScan) || process.env.DOCUMENT_AUTO_SCAN === 'true';
-      if (documentScanService && shouldScan) {
+      if (documentScanService) {
         try {
           scan = await documentScanService.startScan({
             userId,

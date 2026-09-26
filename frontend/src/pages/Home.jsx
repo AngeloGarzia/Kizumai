@@ -7,6 +7,8 @@ import MainLayout from '../components/MainLayout.jsx';
 import ProgressCard from '../components/ProgressCard.jsx';
 import ModulesSection from '../components/ModulesSection.jsx';
 import NextStepGuide from '../components/NextStepGuide.jsx';
+import AssistantInsightsPanel from '../components/AssistantInsightsPanel.jsx';
+import ProjectReorientationModal from '../components/ProjectReorientationModal.jsx';
 import { IconRocket, IconBulb, IconPin, IconUser } from '../components/icons.jsx';
 import { stageHref } from '../constants/projectStages.js';
 import { competencesPercent, learningService } from '../services/learningService.js';
@@ -26,10 +28,11 @@ export default function Home() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAuthenticated, isPaid, loading } = useAuth();
-  const { currentProject: project, hasProject } = useProject();
+  const { currentProject: project, hasProject, refreshProjects } = useProject();
   const [learningRecords, setLearningRecords] = useState([]);
   const [guideOpen, setGuideOpen] = useState(false);
   const [activeGuide, setActiveGuide] = useState(null);
+  const [reviewModal, setReviewModal] = useState(null);
   const welcomeLockRef = useRef(false);
 
   const goToCreateFuture = () => navigate('/creer-son-avenir');
@@ -285,6 +288,31 @@ export default function Home() {
             }
           />
 
+          {isAuthenticated && isPaid && project?.id && (
+            <AssistantInsightsPanel
+              projectId={project.id}
+              onOpenReorientation={async (reviewId) => {
+                if (reviewId) {
+                  setReviewModal({ reviewId });
+                  return;
+                }
+                try {
+                  const latest = await projectService.getLatestProjectReview(project.id);
+                  if (latest?.review?.id && ['pending', 'processing', 'ready'].includes(latest.review.status)) {
+                    setReviewModal({ reviewId: latest.review.id });
+                    return;
+                  }
+                  const created = await projectService.requestProjectReview(project.id);
+                  if (created?.review?.id) {
+                    setReviewModal({ reviewId: created.review.id });
+                  }
+                } catch {
+                  // ignore
+                }
+              }}
+            />
+          )}
+
           <ModulesSection
             locked={!isAuthenticated || !isPaid}
             modules={modules}
@@ -301,6 +329,17 @@ export default function Home() {
         onDismiss={dismissGuide}
         onContinue={continueGuide}
       />
+
+      {reviewModal && project?.id && (
+        <ProjectReorientationModal
+          projectId={project.id}
+          reviewId={reviewModal.reviewId}
+          onClose={() => setReviewModal(null)}
+          onApplied={async () => {
+            await refreshProjects?.();
+          }}
+        />
+      )}
     </MainLayout>
   );
 }

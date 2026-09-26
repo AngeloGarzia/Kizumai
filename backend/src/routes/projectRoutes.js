@@ -41,6 +41,8 @@ export function createProjectRoutes({
   projectController,
   documentController,
   documentScanController,
+  projectReorientationController,
+  projectAssistantController,
   projectStageController,
   authenticate,
   optionalAuth,
@@ -154,6 +156,21 @@ export function createProjectRoutes({
   router.get('/:id/scans/:scanId', authenticate, requirePaid, documentScanController.getOne);
   router.post('/:id/scans/:scanId/apply', authenticate, requirePaid, documentScanController.apply);
   router.post('/:id/scans/:scanId/dismiss', authenticate, requirePaid, documentScanController.dismiss);
+
+  router.get('/:id/reviews/latest', authenticate, requirePaid, projectReorientationController.getLatest);
+  router.post('/:id/reviews', ...paidAi, projectReorientationController.request);
+  router.get('/:id/reviews/:reviewId', authenticate, requirePaid, projectReorientationController.getOne);
+  router.post('/:id/reviews/:reviewId/apply', authenticate, requirePaid, projectReorientationController.apply);
+  router.post('/:id/reviews/:reviewId/dismiss', authenticate, requirePaid, projectReorientationController.dismiss);
+
+  router.get('/:id/assistant/insights', authenticate, requirePaid, projectAssistantController.listInsights);
+  router.patch(
+    '/:id/assistant/insights/:insightId',
+    authenticate,
+    requirePaid,
+    projectAssistantController.updateInsight
+  );
+  router.post('/:id/assistant/checkup', ...paidAi, projectAssistantController.requestCheckup);
 
   return router;
 }

@@ -146,16 +146,15 @@ export function createProjectMemoryScanService({
     for (const doc of docs) {
       const label = doc.title || doc.fileName || `Document #${doc.id}`;
       const cat = doc.category?.title || doc.categoryTitle || doc.categorySlug;
-      const excerpt = trimContent(doc.excerpt || doc.description || '', 1800);
+      // Pas d'extrait brut ici : le résumé validé par l'utilisateur passe via document_scan.
       const content = [
         `Document : ${label}`,
         doc.type ? `type ${doc.type}` : null,
         cat ? `catégorie ${cat}` : null,
         doc.mimeType ? `mime ${doc.mimeType}` : null,
-        doc.description && doc.description !== doc.excerpt
+        doc.description
           ? `description : ${trimContent(doc.description, 500)}`
           : null,
-        excerpt ? `extrait : ${excerpt}` : null,
         Array.isArray(doc.attributes?.tags) && doc.attributes.tags.length
           ? `tags : ${doc.attributes.tags.slice(0, 8).join(', ')}`
           : null,
@@ -169,7 +168,7 @@ export function createProjectMemoryScanService({
         content,
         sourceEntityType: 'document',
         sourceEntityId: doc.id,
-        importance: excerpt ? 0.65 : 0.55,
+        importance: 0.55,
       });
       if (node) {
         counts.nodes += 1;
@@ -188,21 +187,28 @@ export function createProjectMemoryScanService({
       const items = documentScanRepository.listItems
         ? await documentScanRepository.listItems(scan.id)
         : [];
+      // Uniquement ce que l'utilisateur a accepté (pas le texte brut ni les suggestions).
       const accepted = items.filter((i) =>
-        ['accepted', 'merged', 'suggested'].includes(i.status)
+        ['accepted', 'merged'].includes(i.status)
       );
-      const labels = accepted
+      if (!accepted.length) continue;
+
+      const acceptedSummary = accepted.find((i) => i.itemType === 'summary');
+      const summaryText = trimContent(
+        acceptedSummary?.payload?.text || acceptedSummary?.label || '',
+        3500
+      );
+      const otherLabels = accepted
+        .filter((i) => i.itemType !== 'summary')
         .slice(0, 12)
         .map((i) => `${i.itemType}: ${i.label || JSON.stringify(i.payload || {}).slice(0, 80)}`)
         .filter(Boolean);
-      const excerpt = trimContent(scan.rawTextExcerpt || '', 1200);
-      if (!labels.length && !excerpt) continue;
 
       const content = [
         `Analyse IA document #${scan.documentId}`,
-        `scan #${scan.id} (${scan.status})`,
-        labels.length ? `éléments : ${labels.join(' · ')}` : null,
-        excerpt ? `texte : ${excerpt}` : null,
+        `scan #${scan.id} (validée)`,
+        summaryText ? `résumé : ${summaryText}` : null,
+        otherLabels.length ? `éléments : ${otherLabels.join(' · ')}` : null,
       ]
         .filter(Boolean)
         .join(' — ');
@@ -213,7 +219,7 @@ export function createProjectMemoryScanService({
         content,
         sourceEntityType: 'document_scan',
         sourceEntityId: scan.id,
-        importance: 0.7,
+        importance: summaryText ? 0.8 : 0.7,
       });
       if (node) {
         counts.nodes += 1;

@@ -12,7 +12,7 @@
     "db:migrate:prod": "node --env-file=.env.production src/database/run-migrate.js",
     "db:seed:camille": "node --env-file=.env.development src/database/seedCamilleDemo.js",
     "test": "node --test --test-force-exit tests/**/*.test.js",
-    "test:mail": "node --env-file=.env.development scripts/testMail.js"
+    "test:mail": "node scripts/testMail.js"
   },
   "keywords": [],
   "author": "",

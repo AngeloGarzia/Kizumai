@@ -8,6 +8,7 @@ import MainLayout from './MainLayout.jsx';
 import BrandLogo from './BrandLogo.jsx';
 import Button from './Button.jsx';
 import DocumentScanModal from './DocumentScanModal.jsx';
+import ProjectReorientationModal from './ProjectReorientationModal.jsx';
 import FabulousThinking from './FabulousThinking.jsx';
 import { IconChevronRight } from './icons.jsx';
 import { projectService } from '../services/projectService.js';
@@ -226,7 +227,7 @@ function TaskPanel({
 export default function StageWorkspace({ projectId, stage }) {
   const id = projectId;
   const navigate = useNavigate();
-  const { setCurrentProjectId } = useProject();
+  const { setCurrentProjectId, refreshProjects } = useProject();
   const fileRef = useRef(null);
   const stageLabel = PROJECT_STAGE_LABELS[stage] || stage;
   const defaultRole = DEFAULT_CONTACT_ROLE[stage] || 'contact';
@@ -245,6 +246,7 @@ export default function StageWorkspace({ projectId, stage }) {
   });
   const [projectDocs, setProjectDocs] = useState([]);
   const [scanModal, setScanModal] = useState(null);
+  const [reviewModal, setReviewModal] = useState(null);
   const [confirmMilestone, setConfirmMilestone] = useState(null);
   const [expandedTaskId, setExpandedTaskId] = useState(null);
   const [checklistBusyId, setChecklistBusyId] = useState(null);
@@ -826,6 +828,25 @@ export default function StageWorkspace({ projectId, stage }) {
           scanId={scanModal.scanId}
           documentId={scanModal.documentId}
           onClose={() => setScanModal(null)}
+          onApplied={async (result) => {
+            try {
+              const payload = await projectService.getStage(id, stage);
+              applyPayload(payload);
+            } catch {
+              // ignore
+            }
+            if (result?.reorientationReviewId) {
+              setReviewModal({ reviewId: result.reorientationReviewId });
+            }
+          }}
+        />
+      )}
+
+      {reviewModal && (
+        <ProjectReorientationModal
+          projectId={Number(id)}
+          reviewId={reviewModal.reviewId}
+          onClose={() => setReviewModal(null)}
           onApplied={async () => {
             try {
               const payload = await projectService.getStage(id, stage);
@@ -833,6 +854,7 @@ export default function StageWorkspace({ projectId, stage }) {
             } catch {
               // ignore
             }
+            await refreshProjects?.();
           }}
         />
       )}

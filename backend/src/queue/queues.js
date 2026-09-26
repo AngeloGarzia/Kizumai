@@ -6,12 +6,14 @@ import { getRedisConnection } from './connection.js';
 export const QUEUE_NAMES = {
   NOTIFICATIONS: 'notifications',
   DOCUMENTS: 'documents',
+  ASSISTANT: 'assistant',
 };
 
 export const JOB_TYPES = {
   PLANNER_REMINDER: 'planner-reminder',
   DOCUMENT_EXTRACT: 'document-extract',
   DOCUMENT_SCAN: 'document-scan',
+  ASSISTANT_CHECKUP: 'assistant-checkup',
 };
 
 const queues = new Map();

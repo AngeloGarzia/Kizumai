@@ -71,6 +71,12 @@ import { createProjectMemoryRecallService } from '../services/ProjectMemoryRecal
 import { createProjectMemoryScanService } from '../services/ProjectMemoryScanService.js';
 import { createProjectMemoryLoginEvalService } from '../services/ProjectMemoryLoginEvalService.js';
 import { createProjectTimelineService } from '../services/ProjectTimelineService.js';
+import { ProjectReviewRepository } from '../repositories/ProjectReviewRepository.js';
+import { createProjectReorientationService } from '../services/ProjectReorientationService.js';
+import { createProjectReorientationController } from '../controllers/ProjectReorientationController.js';
+import { ProjectAssistantRepository } from '../repositories/ProjectAssistantRepository.js';
+import { createProjectAssistantService } from '../services/ProjectAssistantService.js';
+import { createProjectAssistantController } from '../controllers/ProjectAssistantController.js';
 
 export function createContainer() {
   // ── Infrastructure (repositories) ─────────────────────────────
@@ -100,6 +106,8 @@ export function createContainer() {
   const projectMemoryNodeRepository = ProjectMemoryNodeRepository;
   const projectMemoryEdgeRepository = ProjectMemoryEdgeRepository;
   const projectMemorySnapshotRepository = ProjectMemorySnapshotRepository;
+  const projectReviewRepository = ProjectReviewRepository;
+  const projectAssistantRepository = ProjectAssistantRepository;
 
   const tokenService = TokenService;
   const storageService = StorageService;
@@ -218,6 +226,23 @@ export function createContainer() {
     storageService,
   });
 
+  const projectReorientationService = createProjectReorientationService({
+    projectReviewRepository,
+    projectRepository,
+    documentRepository,
+    documentScanRepository,
+    companyRepository,
+    activityRepository,
+    locationRepository,
+    currencyService,
+    aiService,
+    projectMemoryScanService,
+    projectMemorySnapshotRepository,
+    projectMemoryRecallService,
+    projectMemoryUpdateService,
+  });
+  projectMemoryUpdateService.setReorientationService(projectReorientationService);
+
   const documentScanService = createDocumentScanService({
     documentScanRepository,
     documentRepository,
@@ -228,9 +253,9 @@ export function createContainer() {
     locationRepository,
     storageService,
     aiService,
-    settingsService,
     projectMemoryUpdateService,
     projectMemoryRecallService,
+    projectReorientationService,
   });
 
   const documentService = createDocumentService({
@@ -275,6 +300,20 @@ export function createContainer() {
     userRepository,
     pushSubscriptionRepository,
     pushService,
+  });
+
+  const projectAssistantService = createProjectAssistantService({
+    projectAssistantRepository,
+    projectRepository,
+    plannerEventRepository,
+    documentRepository,
+    documentScanRepository,
+    projectStageRepository,
+    projectMemorySnapshotRepository,
+    aiService,
+    settingsService,
+    notificationService,
+    projectReorientationService,
   });
 
   const adminService = createAdminService({
@@ -333,6 +372,12 @@ export function createContainer() {
   const documentScanController = createDocumentScanController({
     documentScanService,
   });
+  const projectReorientationController = createProjectReorientationController({
+    projectReorientationService,
+  });
+  const projectAssistantController = createProjectAssistantController({
+    projectAssistantService,
+  });
   const projectStageController = createProjectStageController({
     projectStageService,
   });
@@ -381,6 +426,8 @@ export function createContainer() {
       projectMemorySnapshotService,
       projectMemoryRecallService,
       projectMemoryScanService,
+      projectReorientationService,
+      projectAssistantService,
     },
     middleware: {
       authenticate,
@@ -392,6 +439,8 @@ export function createContainer() {
       projectController,
       documentController,
       documentScanController,
+      projectReorientationController,
+      projectAssistantController,
       projectStageController,
       learningRecordController,
       plannerController,

@@ -4,10 +4,13 @@ import { assistantPhrases } from '../constants/assistant.js';
 import FabulousThinking from './FabulousThinking.jsx';
 
 const TYPE_LABEL = {
+  summary: 'Résumé',
   contact: 'Contact',
   date: 'Date',
   address: 'Adresse',
 };
+
+const TYPE_ORDER = { summary: 0, contact: 1, date: 2, address: 3 };
 
 function formatConfidence(value) {
   if (value == null) return null;
@@ -29,6 +32,9 @@ function formatDateLabel(iso) {
 
 function itemSubtitle(item) {
   const p = item.payload || {};
+  if (item.itemType === 'summary') {
+    return p.text || '';
+  }
   if (item.itemType === 'contact') {
     return [p.email, p.phone, p.organization].filter(Boolean).join(' · ') || p.snippet || '';
   }
@@ -44,6 +50,7 @@ function itemSubtitle(item) {
 /**
  * Modal de revue après scan Fabulous d'un document.
  * Poll jusqu'à status ready|failed|dismissed, puis propose d'accepter / ignorer.
+ * Le résumé n'entre en mémoire projet qu'après acceptation.
  */
 export default function DocumentScanModal({
   projectId,
@@ -59,10 +66,12 @@ export default function DocumentScanModal({
   const [busy, setBusy] = useState(false);
 
   const status = payload?.scan?.status;
-  const suggested = useMemo(
-    () => (payload?.items || []).filter((i) => i.status === 'suggested'),
-    [payload]
-  );
+  const suggested = useMemo(() => {
+    const list = (payload?.items || []).filter((i) => i.status === 'suggested');
+    return [...list].sort(
+      (a, b) => (TYPE_ORDER[a.itemType] ?? 9) - (TYPE_ORDER[b.itemType] ?? 9)
+    );
+  }, [payload]);
 
   useEffect(() => {
     setScanId(initialScanId);
@@ -120,11 +129,11 @@ export default function DocumentScanModal({
     try {
       const acceptItemIds = suggested.filter((i) => selected.has(i.id)).map((i) => i.id);
       const rejectItemIds = suggested.filter((i) => !selected.has(i.id)).map((i) => i.id);
-      await projectService.applyDocumentScan(projectId, scanId, {
+      const result = await projectService.applyDocumentScan(projectId, scanId, {
         acceptItemIds,
         rejectItemIds,
       });
-      onApplied?.();
+      onApplied?.(result);
       onClose?.();
     } catch (err) {
       setError(err.message || 'Application impossible');
@@ -190,6 +199,11 @@ export default function DocumentScanModal({
             <h2 id="doc-scan-title" className="text-lg font-bold text-prune-900 mt-0.5">
               {title}
             </h2>
+            {status === 'ready' && (
+              <p className="text-sm text-prune-600 mt-1">
+                Validez le résumé pour l’ajouter à la mémoire du projet.
+              </p>
+            )}
           </div>
           <button
             type="button"
@@ -230,47 +244,63 @@ export default function DocumentScanModal({
           <div className="space-y-4">
             {suggested.length === 0 ? (
               <p className="text-sm text-prune-600 py-4">
-                Aucune suggestion à ajouter (contacts, dates ou adresses).
+                Aucune suggestion à ajouter (résumé, contacts, dates ou adresses).
               </p>
             ) : (
               <ul className="space-y-2">
-                {suggested.map((item) => (
-                  <li key={item.id}>
-                    <label className="flex gap-3 items-start rounded-xl border border-prune-100 p-3 cursor-pointer hover:border-prune-300">
-                      <input
-                        type="checkbox"
-                        className="mt-1"
-                        checked={selected.has(item.id)}
-                        onChange={() => toggle(item.id)}
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs font-semibold uppercase text-prune-500">
-                            {TYPE_LABEL[item.itemType] || item.itemType}
+                {suggested.map((item) => {
+                  const isSummary = item.itemType === 'summary';
+                  const subtitle = itemSubtitle(item);
+                  return (
+                    <li key={item.id}>
+                      <label
+                        className={`flex gap-3 items-start rounded-xl border p-3 cursor-pointer hover:border-prune-300 ${
+                          isSummary
+                            ? 'border-topaz-200 bg-topaz-50/40'
+                            : 'border-prune-100'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="mt-1"
+                          checked={selected.has(item.id)}
+                          onChange={() => toggle(item.id)}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-semibold uppercase text-prune-500">
+                              {TYPE_LABEL[item.itemType] || item.itemType}
+                            </span>
+                            {item.matchedEntityId && (
+                              <span className="text-xs text-topaz-700 font-medium">
+                                déjà connu
+                              </span>
+                            )}
+                            {formatConfidence(item.confidence) && (
+                              <span className="text-xs text-prune-400">
+                                {formatConfidence(item.confidence)}
+                              </span>
+                            )}
                           </span>
-                          {item.matchedEntityId && (
-                            <span className="text-xs text-topaz-700 font-medium">
-                              déjà connu
+                          {!isSummary && (
+                            <span className="block font-semibold text-prune-900 mt-0.5">
+                              {item.label}
                             </span>
                           )}
-                          {formatConfidence(item.confidence) && (
-                            <span className="text-xs text-prune-400">
-                              {formatConfidence(item.confidence)}
+                          {subtitle && (
+                            <span
+                              className={`block text-sm text-prune-700 mt-0.5 ${
+                                isSummary ? 'whitespace-pre-wrap leading-relaxed' : ''
+                              }`}
+                            >
+                              {subtitle}
                             </span>
                           )}
                         </span>
-                        <span className="block font-semibold text-prune-900 mt-0.5">
-                          {item.label}
-                        </span>
-                        {itemSubtitle(item) && (
-                          <span className="block text-sm text-prune-600 mt-0.5">
-                            {itemSubtitle(item)}
-                          </span>
-                        )}
-                      </span>
-                    </label>
-                  </li>
-                ))}
+                      </label>
+                    </li>
+                  );
+                })}
               </ul>
             )}
 

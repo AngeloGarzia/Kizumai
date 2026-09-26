@@ -1,9 +1,12 @@
 /**
- * Test manuel d’envoi email en dev.
+ * Test manuel d’envoi email.
  *
- * Usage :
- *   node --env-file=.env.development scripts/testMail.js vous@exemple.com
+ * Usage (env déjà chargées — Docker LAN / process) :
  *   npm run test:mail -- vous@exemple.com
+ *   node scripts/testMail.js vous@exemple.com
+ *
+ * En local sans Docker :
+ *   node --env-file=.env.development scripts/testMail.js vous@exemple.com
  *
  * Sans SMTP_HOST : l’email est seulement loggé (mode dev).
  */

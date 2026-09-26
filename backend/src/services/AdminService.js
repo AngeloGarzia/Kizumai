@@ -5,6 +5,7 @@ import { ROLES } from '../constants/roles.js';
 import { PLANS } from '../constants/plans.js';
 import { config } from '../config/index.js';
 import pool from '../database/pool.js';
+import { TransactionalMail } from './TransactionalMail.js';
 import {
   getProviderById,
   isModelValidForProvider,
@@ -434,6 +435,33 @@ export function createAdminService({
       const user = await userRepository.markEmailVerified(targetId);
       if (!user) throw new AppError('Utilisateur introuvable', 404);
       return UserResponseDto.from(user);
+    },
+
+    async sendWelcomeEmail(userId) {
+      const targetId = Number(userId);
+      const target = await userRepository.findById(targetId);
+      if (!target) throw new AppError('Utilisateur introuvable', 404);
+      if (!target.email) throw new AppError('Cet utilisateur n’a pas d’email', 400);
+
+      const result = await TransactionalMail.sendWelcomeEmail({
+        to: target.email,
+        name: target.name,
+        url: `${config.publicAppUrl}/`,
+      });
+
+      if (!result.ok && !result.skipped) {
+        throw new AppError(
+          result.error || 'Échec d’envoi de l’email de bienvenue',
+          502
+        );
+      }
+
+      return {
+        sent: Boolean(result.ok && !result.skipped),
+        skipped: Boolean(result.skipped),
+        email: target.email,
+        userId: target.id,
+      };
     },
 
     async getConnections(limit = 100) {

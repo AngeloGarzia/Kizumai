@@ -1473,7 +1473,108 @@ export function createAiService({ settingsService, currencyService }) {
     },
 
     /**
-     * Extraction contacts / dates / adresses depuis un texte de document.
+     * Réanalyse l'état projet (données DB + mémoire) et propose des réorientations.
+     * Prompt : ai_prompts.project_reorientation.
+     */
+    async analyzeProjectReorientation({
+      title,
+      business,
+      location,
+      budget,
+      currency,
+      status,
+      stage,
+      description,
+      company,
+      memorySnapshot,
+      documents,
+      extras,
+      trigger = 'manual',
+    }) {
+      const aiConfig = await settingsService.getAiConfig();
+      if (!aiConfig.projectReorientationPrompt) {
+        throw new AppError('Le prompt « project_reorientation » est introuvable en base.', 500);
+      }
+
+      const userContent = interpolate(aiConfig.projectReorientationPrompt, {
+        title: String(title || '').trim().slice(0, 200) || 'sans titre',
+        business: String(business || '').trim().slice(0, 300) || 'non défini',
+        location: String(location || '').trim().slice(0, 300) || 'non défini',
+        budget: budget != null && String(budget).trim() !== '' ? String(budget) : 'non défini',
+        currency: String(currency || 'EUR').slice(0, 8),
+        status: String(status || '').slice(0, 40),
+        stage: String(stage || '').slice(0, 40),
+        description: String(description || '').trim().slice(0, 4000) || 'aucune',
+        company: String(company || '').trim().slice(0, 500) || 'aucune',
+        memory_snapshot: String(memorySnapshot || '').trim().slice(0, 8000) || 'aucune',
+        documents: String(documents || '').trim().slice(0, 8000) || 'aucun',
+        extras: String(extras || '').trim().slice(0, 2000) || '—',
+        trigger: String(trigger || 'manual').slice(0, 80),
+      });
+
+      const data = await requestStepJson(userContent);
+      const proposals = Array.isArray(data.proposals) ? data.proposals.slice(0, 12) : [];
+      return {
+        situation: clipAiOutput(String(data.situation || '').trim(), 2500),
+        proposals,
+        raw: data,
+        provider: aiConfig.provider,
+      };
+    },
+
+    /**
+     * Checkup assistant fond de tâche (prompt project_assistant).
+     */
+    async analyzeProjectAssistant({
+      title,
+      business,
+      location,
+      budget,
+      currency,
+      stage,
+      status,
+      description,
+      memorySnapshot,
+      signals,
+      planner,
+      documents,
+    }) {
+      const aiConfig = await settingsService.getAiConfig();
+      if (!aiConfig.projectAssistantPrompt) {
+        throw new AppError('Le prompt « project_assistant » est introuvable en base.', 500);
+      }
+
+      const userContent = interpolate(aiConfig.projectAssistantPrompt, {
+        title: String(title || '').trim().slice(0, 200) || 'sans titre',
+        business: String(business || '').trim().slice(0, 300) || 'non défini',
+        location: String(location || '').trim().slice(0, 300) || 'non défini',
+        budget: budget != null && String(budget).trim() !== '' ? String(budget) : 'non défini',
+        currency: String(currency || 'EUR').slice(0, 8),
+        stage: String(stage || '').slice(0, 40),
+        status: String(status || '').slice(0, 40),
+        description: String(description || '').trim().slice(0, 4000) || 'aucune',
+        memory_snapshot: String(memorySnapshot || '').trim().slice(0, 8000) || 'aucune',
+        signals: String(signals || '').trim().slice(0, 4000) || 'aucun',
+        planner: String(planner || '').trim().slice(0, 3000) || 'aucune',
+        documents: String(documents || '').trim().slice(0, 3000) || 'aucun',
+      });
+
+      const data = await requestStepJson(userContent);
+      const insights = Array.isArray(data.insights) ? data.insights.slice(0, 12) : [];
+      const reorientationSuggestions = Array.isArray(data.reorientationSuggestions)
+        ? data.reorientationSuggestions.slice(0, 8)
+        : [];
+      return {
+        reflection: clipAiOutput(String(data.reflection || '').trim(), 2500),
+        insights,
+        reorientationSuggestions,
+        raw: data,
+        provider: aiConfig.provider,
+      };
+    },
+
+    /**
+     * Extraction résumé + contacts / dates / adresses depuis un texte de document.
      * Le prompt vient exclusivement de ai_prompts.document_scan.
      */
     async analyzeDocumentExtract({
@@ -1495,7 +1596,21 @@ export function createAiService({ settingsService, currencyService }) {
         }), memoryContext, aiConfig);
 
       const data = await requestStepJson(userContent);
+      const summaryRaw = data.summary;
+      const summaryText =
+        typeof summaryRaw === 'string'
+          ? summaryRaw
+          : summaryRaw && typeof summaryRaw === 'object'
+            ? summaryRaw.text || summaryRaw.content || ''
+            : '';
       return {
+        summary: {
+          text: clipAiOutput(String(summaryText || '').trim(), 3500),
+          confidence:
+            summaryRaw && typeof summaryRaw === 'object'
+              ? summaryRaw.confidence
+              : null,
+        },
         contacts: Array.isArray(data.contacts) ? data.contacts.slice(0, 40) : [],
         dates: Array.isArray(data.dates) ? data.dates.slice(0, 40) : [],
         addresses: Array.isArray(data.addresses) ? data.addresses.slice(0, 40) : [],

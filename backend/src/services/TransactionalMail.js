@@ -4,6 +4,7 @@ import { renderPlannerReminder } from '../templates/emails/planner-reminder.js';
 import { renderProjectProgress } from '../templates/emails/project-progress.js';
 import { renderGenericNotification } from '../templates/emails/generic-notification.js';
 import { renderAccountConfirmation } from '../templates/emails/account-confirmation.js';
+import { renderWelcomeEmail } from '../templates/emails/welcome.js';
 
 /**
  * Point d’entrée des emails transactionnels Kizumai.
@@ -57,6 +58,19 @@ export const TransactionalMail = {
       name: input.name,
       confirmUrl: input.confirmUrl,
       expiresHours: input.expiresHours,
+    });
+    return EmailService.send({ to: input.to, subject, text, html });
+  },
+
+  /**
+   * Bienvenue / test admin.
+   * @param {{ to: string, name?: string, url?: string }} input
+   */
+  async sendWelcomeEmail(input = {}) {
+    const url = input.url || `${config.publicAppUrl}/`;
+    const { subject, text, html } = renderWelcomeEmail({
+      name: input.name,
+      url,
     });
     return EmailService.send({ to: input.to, subject, text, html });
   },

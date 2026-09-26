@@ -40,9 +40,15 @@ export function createSettingsService({ settingsRepository, aiPromptRepository }
       const projectPreviewAnalysisPrompt = await aiPromptRepository.findByKey(
         'project_preview_analysis'
       );
+      const projectReorientationPrompt = await aiPromptRepository.findByKey(
+        'project_reorientation'
+      );
       const fabulousPageGuidePrompt = await aiPromptRepository.findByKey('fabulous_page_guide');
       const fabulousTaskChecklistPrompt = await aiPromptRepository.findByKey(
         'fabulous_task_checklist'
+      );
+      const projectAssistantPrompt = await aiPromptRepository.findByKey(
+        'project_assistant'
       );
 
       const provider = settings.ai_provider || config.ai.defaultProvider;
@@ -71,8 +77,24 @@ export function createSettingsService({ settingsRepository, aiPromptRepository }
         franceSystemExtraPrompt: franceSystemExtraPrompt?.content || null,
         memoryContextPrefixPrompt: memoryContextPrefixPrompt?.content || null,
         projectPreviewAnalysisPrompt: projectPreviewAnalysisPrompt?.content || null,
+        projectReorientationPrompt: projectReorientationPrompt?.content || null,
         fabulousPageGuidePrompt: fabulousPageGuidePrompt?.content || null,
         fabulousTaskChecklistPrompt: fabulousTaskChecklistPrompt?.content || null,
+        projectAssistantPrompt: projectAssistantPrompt?.content || null,
+      };
+    },
+
+    async getAssistantConfig() {
+      const s = await settingsObject();
+      const memory = await this.getMemoryConfig();
+      return {
+        enabled: bool(s.assistant_enabled, true),
+        checkupCron: String(s.assistant_checkup_cron || '0 */2 * * *'),
+        aiMinIntervalHours: num(s.assistant_ai_min_interval_hours, 24),
+        stagnationDays: num(s.assistant_stagnation_days, 7),
+        activeWithinDays: num(s.assistant_active_within_days, 30),
+        eventThreshold: memory.snapshotEventThreshold,
+        maxAgeHours: memory.snapshotMaxAgeHours,
       };
     },
 

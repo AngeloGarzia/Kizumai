@@ -28,6 +28,7 @@ export function createAdminRoutes({
   router.patch('/users/:id/role', adminController.updateUserRole);
   router.patch('/users/:id/plan', adminController.updateUserPlan);
   router.patch('/users/:id/verify-email', adminController.verifyUserEmail);
+  router.post('/users/:id/welcome-email', adminController.sendWelcomeEmail);
   router.get('/connections', adminController.getConnections);
   router.get('/ai-usage', adminController.getAiUsage);
   router.post('/notifications/broadcast', adminController.broadcastNotification);

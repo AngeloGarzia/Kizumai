@@ -45,6 +45,10 @@ export const adminService = {
     return api.patch(`/admin/users/${id}/verify-email`).then((r) => r.data);
   },
 
+  sendWelcomeEmail(id) {
+    return api.post(`/admin/users/${id}/welcome-email`).then((r) => r.data);
+  },
+
   getConnections() {
     return api.get('/admin/connections').then((r) => r.data);
   },

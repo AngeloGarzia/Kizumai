@@ -92,6 +92,12 @@ export function createAdminController({ adminService, notificationService }) {
       successResponse(res, AdminUserResponseDto.from(user));
     }),
 
+    sendWelcomeEmail: asyncHandler(async (req, res) => {
+      const dto = UserIdParamDto.from(req.params);
+      const result = await adminService.sendWelcomeEmail(dto.id);
+      successResponse(res, result);
+    }),
+
     getConnections: asyncHandler(async (req, res) => {
       const connections = await adminService.getConnections();
       successResponse(res, connections);

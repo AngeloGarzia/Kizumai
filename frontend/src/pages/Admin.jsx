@@ -106,6 +106,38 @@ const SETUP_SECTIONS = [
     ],
   },
   {
+    id: 'assistant',
+    title: 'Assistant Fabulous (fond de tâche)',
+    description:
+      'Checkup périodique des projets : échéances, docs manquants, réflexions IA. Le cron nécessite un redémarrage.',
+    keys: [
+      {
+        key: 'assistant_enabled',
+        label: 'Activer l’assistant',
+        hint: 'true / false',
+      },
+      {
+        key: 'assistant_checkup_cron',
+        label: 'Cron checkup',
+        hint: 'Ex. 0 */2 * * * — toutes les 2 heures',
+      },
+      {
+        key: 'assistant_ai_min_interval_hours',
+        label: 'Intervalle mini IA (h)',
+        hint: 'Évite un appel IA trop fréquent sans signal urgent',
+      },
+      {
+        key: 'assistant_stagnation_days',
+        label: 'Jours avant alerte stagnation',
+      },
+      {
+        key: 'assistant_active_within_days',
+        label: 'Projets actifs (jours)',
+        hint: 'Ne check que les projets mis à jour récemment',
+      },
+    ],
+  },
+  {
     id: 'business',
     title: 'Règles métier',
     description: 'Bornes budget et règles communes à tous les utilisateurs.',
@@ -164,14 +196,14 @@ const PROMPT_GROUPS = [
     keys: ['document_scan'],
   },
   {
-    id: 'memory',
-    title: 'Mémoire',
-    keys: ['memory_snapshot', 'memory_recall'],
-  },
-  {
     id: 'fabulous',
     title: 'Fabulous',
-    keys: ['fabulous_page_guide', 'fabulous_task_checklist'],
+    keys: ['fabulous_page_guide', 'fabulous_task_checklist', 'project_assistant'],
+  },
+  {
+    id: 'memory',
+    title: 'Mémoire',
+    keys: ['memory_snapshot', 'memory_recall', 'project_reorientation'],
   },
   {
     id: 'systeme',
@@ -561,6 +593,19 @@ export default function Admin() {
       setMessage(`Compte ${user.email} validé`);
     } catch (err) {
       setError(err.message);
+    }
+  };
+
+  const sendWelcomeEmail = async (user) => {
+    try {
+      const result = await adminService.sendWelcomeEmail(user.id);
+      if (result?.skipped) {
+        setMessage(`SMTP non configuré — email non envoyé à ${user.email}`);
+      } else {
+        setMessage(`Email de bienvenue envoyé à ${user.email}`);
+      }
+    } catch (err) {
+      setError(err.message || 'Envoi impossible');
     }
   };
 
@@ -1272,6 +1317,13 @@ export default function Admin() {
                                   )}
                                   <button
                                     type="button"
+                                    onClick={() => sendWelcomeEmail(user)}
+                                    className="text-xs font-semibold text-topaz-700 hover:underline"
+                                  >
+                                    Mail bienvenue
+                                  </button>
+                                  <button
+                                    type="button"
                                     onClick={() => togglePlan(user)}
                                     className="text-xs font-semibold text-wasabi-700 hover:underline"
                                   >
@@ -1472,6 +1524,13 @@ export default function Admin() {
                         Valider le compte
                       </Button>
                     )}
+                    <Button
+                      type="button"
+                      className="w-auto text-sm"
+                      onClick={() => sendWelcomeEmail(userDetails.user)}
+                    >
+                      Mail bienvenue
+                    </Button>
                     <Button
                       type="button"
                       className="w-auto text-sm"

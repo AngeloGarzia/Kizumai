@@ -351,6 +351,52 @@ export const projectService = {
     return data;
   },
 
+  async getProjectReview(projectId, reviewId) {
+    const { data } = await api.get(`/projects/${projectId}/reviews/${reviewId}`);
+    return data;
+  },
+
+  async getLatestProjectReview(projectId) {
+    const { data } = await api.get(`/projects/${projectId}/reviews/latest`);
+    return data;
+  },
+
+  async requestProjectReview(projectId, { force = false } = {}) {
+    const { data } = await api.post(`/projects/${projectId}/reviews`, { force });
+    return data;
+  },
+
+  async applyProjectReview(projectId, reviewId, payload) {
+    const { data } = await api.post(
+      `/projects/${projectId}/reviews/${reviewId}/apply`,
+      payload
+    );
+    return data;
+  },
+
+  async dismissProjectReview(projectId, reviewId) {
+    const { data } = await api.post(`/projects/${projectId}/reviews/${reviewId}/dismiss`);
+    return data;
+  },
+
+  async listAssistantInsights(projectId) {
+    const { data } = await api.get(`/projects/${projectId}/assistant/insights`);
+    return data;
+  },
+
+  async updateAssistantInsight(projectId, insightId, status) {
+    const { data } = await api.patch(
+      `/projects/${projectId}/assistant/insights/${insightId}`,
+      { status }
+    );
+    return data.insight;
+  },
+
+  async requestAssistantCheckup(projectId) {
+    const { data } = await api.post(`/projects/${projectId}/assistant/checkup`);
+    return data;
+  },
+
   async getStage(projectId, stage = 'etude_marche') {
     const { data } = await api.get(`/projects/${projectId}/stages/${stage}`);
     return data;

@@ -134,6 +134,18 @@ export const ProjectRepository = {
     return rows.map(mapProject);
   },
 
+  async findEligibleForAssistant({ withinDays = 30, limit = 500 } = {}) {
+    const { rows } = await pool.query(
+      `${SELECT_WITH_RELATIONS}
+       WHERE p.status IN ('draft', 'active', 'paused')
+         AND p.updated_at > NOW() - make_interval(days => $1)
+       ORDER BY p.updated_at DESC
+       LIMIT $2`,
+      [Math.max(1, Number(withinDays) || 30), Number(limit)]
+    );
+    return rows.map(mapProject);
+  },
+
   async touchMemoryLoginEvalAt(projectId) {
     const { rows } = await pool.query(
       `UPDATE projects
@@ -174,6 +186,36 @@ export const ProjectRepository = {
        WHERE id = $1
        RETURNING id`,
       [Number(id), locationId == null ? null : Number(locationId)]
+    );
+    if (!rows[0]) return null;
+    return this.findById(rows[0].id);
+  },
+
+  async setActivityId(id, activityId) {
+    const { rows } = await pool.query(
+      `UPDATE projects
+       SET activity_id = $2, updated_at = NOW()
+       WHERE id = $1
+       RETURNING id`,
+      [Number(id), activityId == null ? null : Number(activityId)]
+    );
+    if (!rows[0]) return null;
+    return this.findById(rows[0].id);
+  },
+
+  async setBudget(id, budget, currency = null) {
+    const { rows } = await pool.query(
+      `UPDATE projects
+       SET budget = $2,
+           currency = COALESCE($3, currency),
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING id`,
+      [
+        Number(id),
+        budget == null ? null : Number(budget),
+        currency == null ? null : String(currency),
+      ]
     );
     if (!rows[0]) return null;
     return this.findById(rows[0].id);

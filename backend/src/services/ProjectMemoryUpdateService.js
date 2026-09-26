@@ -28,6 +28,8 @@ export function createProjectMemoryUpdateService({
   projectMemorySnapshotService = null,
   settingsService = null,
 }) {
+  let projectReorientationService = null;
+
   async function eventThreshold() {
     if (settingsService) {
       const memory = await settingsService.getMemoryConfig();
@@ -55,6 +57,10 @@ export function createProjectMemoryUpdateService({
   }
 
   return {
+    setReorientationService(service) {
+      projectReorientationService = service || null;
+    },
+
     isKeyContactCategory(category) {
       return KEY_CONTACT_CATEGORIES.has(String(category || '').toLowerCase());
     },
@@ -127,6 +133,18 @@ export function createProjectMemoryUpdateService({
       );
       if (triggerSnapshot) {
         scheduleSnapshotIfNeeded(projectId, needsSnapshot);
+      }
+
+      // Nouveaux faits significatifs → réanalyse projet (debounce).
+      if (
+        projectReorientationService?.scheduleReview &&
+        Number(importance) >= 0.62
+      ) {
+        projectReorientationService.scheduleReview(projectId, {
+          triggerSource: sourceEntityType
+            ? `memory_${sourceEntityType}`
+            : 'memory_event',
+        });
       }
 
       return { node, needsSnapshot };
