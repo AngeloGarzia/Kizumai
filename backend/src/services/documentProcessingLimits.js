@@ -3,9 +3,11 @@
  */
 export const DOCUMENT_LIMITS = {
   /** Timeout global par job d'extraction (ms). */
-  jobTimeoutMs: Number(process.env.DOCUMENT_JOB_TIMEOUT_MS) || 120_000,
-  /** Pages PDF max. */
+  jobTimeoutMs: Number(process.env.DOCUMENT_JOB_TIMEOUT_MS) || 180_000,
+  /** Pages PDF max (texte natif). */
   pdfMaxPages: Number(process.env.DOCUMENT_PDF_MAX_PAGES) || 80,
+  /** Pages max pour OCR PDF (scans image) — plus coûteux. */
+  pdfOcrMaxPages: Number(process.env.DOCUMENT_PDF_OCR_MAX_PAGES) || 12,
   /** Taille max lue pour PDF (octets). */
   pdfMaxBytes: Number(process.env.DOCUMENT_PDF_MAX_BYTES) || 25 * 1024 * 1024,
   /** Entrées max dans une archive Office (ZIP). */
@@ -22,8 +24,8 @@ export const DOCUMENT_LIMITS = {
   ocrMaxPixels: Number(process.env.DOCUMENT_OCR_MAX_PIXELS) || 24_000_000,
   /** Taille max image pour OCR (octets). */
   ocrMaxBytes: Number(process.env.DOCUMENT_OCR_MAX_BYTES) || 12 * 1024 * 1024,
-  /** Texte extrait max (caractères). */
-  maxTextChars: Number(process.env.DOCUMENT_MAX_TEXT_CHARS) || 45_000,
+  /** Texte extrait max (caractères) — alimente aussi le scan IA. */
+  maxTextChars: Number(process.env.DOCUMENT_MAX_TEXT_CHARS) || 80_000,
   /** Concurrence worker documents. */
   workerConcurrency: Number(process.env.DOCUMENT_QUEUE_CONCURRENCY) || 2,
   /** Tentatives BullMQ. */

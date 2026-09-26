@@ -46,7 +46,7 @@ export function createDocumentJobProcessor({
         })
       );
 
-      const excerpt = text.trim() ? text.slice(0, 2000) : null;
+      const excerpt = text.trim() ? text.slice(0, 4000) : null;
       const fresh = await documentRepository.findById(documentId);
       await documentRepository.update(documentId, {
         excerpt,

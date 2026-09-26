@@ -1710,7 +1710,7 @@ export function createAiService({ settingsService, currencyService }) {
         throw new AppError('Le prompt « document_scan » est introuvable en base.', 500);
       }
 
-      const clipped = String(text || '').slice(0, 45_000);
+      const clipped = String(text || '').slice(0, 80_000);
       const userContent = memCtx(interpolate(aiConfig.documentScanPrompt, {
           document_title: documentTitle || 'Document',
           mime_type: mimeType || 'unknown',

@@ -75,11 +75,15 @@ export function createDocumentScanService({
   async function hydrateScan(scan) {
     const items = await documentScanRepository.listItems(scan.id);
     const document = await documentRepository.findById(scan.documentId);
+    const realError =
+      scan.status === 'failed'
+        ? String(scan.errorMessage || '').trim() || 'Analyse indisponible'
+        : undefined;
     return {
       scan: {
         ...scan,
         rawResponse: undefined,
-        errorMessage: scan.status === 'failed' ? 'Analyse indisponible' : undefined,
+        errorMessage: realError,
       },
       document,
       items,
@@ -226,8 +230,10 @@ export function createDocumentScanService({
         const doc = await documentRepository.findById(scan.documentId);
         if (!doc) throw new AppError('Document introuvable', 404);
 
-        let text = String(doc.excerpt || '').trim();
-        if (!text) {
+        // Toujours ré-extraire le texte complet pour l'IA (l'excerpt UI est tronqué ~2k).
+        let text = '';
+        let extractError = null;
+        try {
           const buffer = await loadDocumentBuffer(doc);
           text = await withTempFile(buffer, doc.fileName || 'file.bin', async (abs) =>
             extractDocumentText(abs, {
@@ -235,16 +241,20 @@ export function createDocumentScanService({
               fileName: doc.fileName || doc.title,
             })
           );
+        } catch (err) {
+          extractError = err;
+          text = String(doc.excerpt || '').trim();
         }
 
-        if (!text.trim()) {
+        if (!String(text || '').trim()) {
           await documentScanRepository.deleteSuggestedItems(scanId);
           await documentScanRepository.update(scanId, {
             status: 'failed',
             finishedAt: new Date().toISOString(),
             rawTextExcerpt: null,
             errorMessage:
-              `Aucun texte extractible. ${SUPPORTED_EXTRACT_HINT}`,
+              extractError?.message ||
+              `Aucun texte extractible de ce PDF/fichier (souvent un scan image sans couche texte). ${SUPPORTED_EXTRACT_HINT}`,
           });
           return hydrateScan(await documentScanRepository.findById(scanId));
         }
@@ -312,7 +322,7 @@ export function createDocumentScanService({
 
         // Excerpt UI seulement — la mémoire projet attend l'acceptation du résumé.
         if (!doc.excerpt && text.trim()) {
-          await documentRepository.update(doc.id, { excerpt: text.slice(0, 2000) });
+          await documentRepository.update(doc.id, { excerpt: text.slice(0, 4000) });
         }
 
         return hydrateScan(await documentScanRepository.findById(scanId));

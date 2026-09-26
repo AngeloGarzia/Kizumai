@@ -6,6 +6,7 @@ import WordExtractor from 'word-extractor';
 import { assertSafeZipBuffer } from '../utils/archiveGuard.js';
 import { assertImageWithinOcrLimits, isZipBasedOfficeExt } from '../utils/imageLimits.js';
 import { withProcessingTimeout } from '../utils/withProcessingTimeout.js';
+import { withTempFile } from '../utils/tempFile.js';
 import {
   DOCUMENT_LIMITS,
   DocumentProcessingError,
@@ -31,6 +32,9 @@ const DOCUMENT_EXTS = new Set([
   'docx', 'doc', 'odt', 'rtf', 'md', 'markdown', 'txt', 'html', 'htm', 'epub',
 ]);
 
+/** Texte trop court = probablement PDF scanné / couche texte absente. */
+const MIN_MEANINGFUL_CHARS = 40;
+
 function extensionOf(fileName = '', absPath = '') {
   const base = fileName || absPath || '';
   return path.extname(base).replace(/^\./, '').toLowerCase();
@@ -54,6 +58,10 @@ function isOfficeMime(mime = '') {
     m === 'text/html' ||
     m === 'application/epub+zip'
   );
+}
+
+function meaningfulLength(text) {
+  return String(text || '').replace(/\s+/g, '').length;
 }
 
 export function detectDocumentType(mimeType, fileName) {
@@ -88,22 +96,117 @@ export function detectDocumentType(mimeType, fileName) {
   return 'other';
 }
 
-async function extractPdf(absPath, limits) {
+async function loadPdfParser() {
   const { createRequire } = await import('module');
   const require = createRequire(import.meta.url);
-  const pdfParse = require('pdf-parse');
+  const mod = require('pdf-parse');
+  // v2 : { PDFParse } — v1 : fonction default (rétrocompat).
+  if (mod?.PDFParse) return { kind: 'v2', PDFParse: mod.PDFParse };
+  const fn = typeof mod === 'function' ? mod : mod?.default;
+  if (typeof fn === 'function') return { kind: 'v1', parse: fn };
+  throw new DocumentProcessingError(
+    'Module pdf-parse incompatible (API inconnue)',
+    'pdf_module_unsupported'
+  );
+}
+
+async function ocrImageBuffer(imgBuffer, limits, label = 'page.png') {
+  if (!imgBuffer?.length) return '';
+  return withTempFile(Buffer.from(imgBuffer), label, async (imgPath) => {
+    assertImageWithinOcrLimits(await readFile(imgPath), limits);
+    const result = await Tesseract.recognize(imgPath, 'fra+eng', {
+      logger: () => {},
+    });
+    return String(result?.data?.text || '').trim();
+  });
+}
+
+/**
+ * PDF via pdf-parse v2 (PDFParse) + OCR des pages si peu/pas de texte.
+ */
+async function extractPdf(absPath, limits) {
   const buffer = await readFile(absPath);
   if (buffer.length > limits.pdfMaxBytes) {
-    throw new DocumentProcessingError('PDF trop volumineux pour l\'extraction', 'pdf_too_large');
-  }
-  const parsed = await pdfParse(buffer, { max: limits.pdfMaxPages });
-  if (parsed.numpages > limits.pdfMaxPages) {
     throw new DocumentProcessingError(
-      `PDF : trop de pages (${parsed.numpages} > ${limits.pdfMaxPages})`,
-      'pdf_too_many_pages'
+      'PDF trop volumineux pour l\'extraction',
+      'pdf_too_large'
     );
   }
-  return String(parsed?.text || '').slice(0, limits.maxTextChars);
+
+  const api = await loadPdfParser();
+
+  if (api.kind === 'v1') {
+    const parsed = await api.parse(buffer, { max: limits.pdfMaxPages });
+    if (parsed.numpages > limits.pdfMaxPages) {
+      throw new DocumentProcessingError(
+        `PDF : trop de pages (${parsed.numpages} > ${limits.pdfMaxPages})`,
+        'pdf_too_many_pages'
+      );
+    }
+    return String(parsed?.text || '').slice(0, limits.maxTextChars);
+  }
+
+  const parser = new api.PDFParse({ data: buffer });
+  try {
+    let totalPages = null;
+    try {
+      const info = await parser.getInfo();
+      totalPages = Number(info?.total) || Number(info?.totalPages) || null;
+    } catch {
+      totalPages = null;
+    }
+
+    if (totalPages != null && totalPages > limits.pdfMaxPages) {
+      throw new DocumentProcessingError(
+        `PDF : trop de pages (${totalPages} > ${limits.pdfMaxPages})`,
+        'pdf_too_many_pages'
+      );
+    }
+
+    const textOpts =
+      totalPages != null && totalPages > limits.pdfMaxPages
+        ? { first: limits.pdfMaxPages }
+        : {};
+    const result = await parser.getText(textOpts);
+    let text = String(result?.text || '').trim();
+
+    if (meaningfulLength(text) < MIN_MEANINGFUL_CHARS) {
+      const ocrCap = Math.min(
+        Number(limits.pdfOcrMaxPages) || 12,
+        Number(limits.pdfMaxPages) || 80,
+        totalPages || Number(limits.pdfOcrMaxPages) || 12
+      );
+      const shots = await parser.getScreenshot({
+        first: ocrCap,
+        scale: 1.6,
+        imageBuffer: true,
+        imageDataUrl: false,
+      });
+      const parts = [];
+      for (const page of shots?.pages || []) {
+        const img = page?.data || page?.buffer;
+        if (!img?.length) continue;
+        const pageNo = page.pageNumber || page.num || parts.length + 1;
+        try {
+          const pageText = await ocrImageBuffer(img, limits, `pdf-p${pageNo}.png`);
+          if (pageText) parts.push(pageText);
+        } catch (err) {
+          console.warn(`[text-extract] OCR page ${pageNo}:`, err.message);
+        }
+      }
+      if (parts.length) {
+        text = parts.join('\n\n');
+      }
+    }
+
+    return text.slice(0, limits.maxTextChars);
+  } finally {
+    try {
+      await parser.destroy();
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 async function extractPlainText(absPath, limits) {
@@ -184,6 +287,16 @@ export async function extractDocumentText(
       return extractPlainText(absPath, limits);
     }
 
+    // Dernier recours : tenter Office puis texte brut.
+    try {
+      const officeText = await extractWithOfficeParser(absPath, ext, limits);
+      if (meaningfulLength(officeText) >= MIN_MEANINGFUL_CHARS) {
+        return officeText;
+      }
+    } catch {
+      /* ignore */
+    }
+
     try {
       const text = await extractPlainText(absPath, limits);
       if (text && /[\p{L}\p{N}]/u.test(text.slice(0, 500))) {
@@ -200,4 +313,4 @@ export async function extractDocumentText(
 }
 
 export const SUPPORTED_EXTRACT_HINT =
-  'Formats lus : PDF, Word (.doc/.docx), Excel, PowerPoint, OpenDocument, Markdown, HTML, CSV, RTF, images (OCR).';
+  'Formats lus : PDF (texte + OCR si scanné), Word (.doc/.docx), Excel, PowerPoint, OpenDocument, Markdown, HTML, CSV, RTF, images (OCR).';
