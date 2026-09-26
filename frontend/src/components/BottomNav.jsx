@@ -91,7 +91,7 @@ export default function BottomNav() {
   };
 
   const setupLinkClass = [
-    'flex flex-col items-center justify-center gap-0.5 py-1.5 px-2 sm:py-2 flex-1 lg:flex-none',
+    'flex flex-col items-center justify-center gap-0.5 py-1.5 px-1.5 sm:py-2 flex-1 lg:flex-none',
     'lg:flex-row lg:justify-start lg:gap-3 lg:px-4 lg:py-3 lg:rounded-xl lg:w-full',
     'transition-colors text-prune-500 hover:bg-prune-50 lg:hover:bg-prune-50',
   ].join(' ');
@@ -99,8 +99,8 @@ export default function BottomNav() {
   const renderNavLink = (item) => {
     const isActive = isItemActive(item);
     const Icon = item.icon;
-    const hideLabelMobile = item.id === 'admin';
     const locked = Boolean(item.requiresProject && projectMenusLocked);
+    const tip = locked ? NO_PROJECT_HINT : item.label;
 
     const content = (
       <>
@@ -116,12 +116,11 @@ export default function BottomNav() {
           <Icon className={`w-5 h-5${locked ? ' opacity-50' : ''}`} />
         </span>
         <span
-          className={`text-xs sm:text-sm font-medium lg:text-sm
-                      ${hideLabelMobile ? 'hidden lg:inline' : ''}
+          className={`hidden lg:inline text-sm font-medium
                       ${locked
             ? 'text-prune-300'
             : isActive
-              ? 'text-wasabi-500 lg:text-wasabi-400'
+              ? 'text-wasabi-400'
               : 'text-prune-500'}`}
         >
           {item.label}
@@ -132,14 +131,15 @@ export default function BottomNav() {
     return (
       <li
         key={item.id}
-        className={`flex-1 lg:flex-none min-w-[3.25rem]${item.mobileOnly ? ' lg:hidden' : ''}`}
+        className={`flex-1 lg:flex-none min-w-0${item.mobileOnly ? ' lg:hidden' : ''}`}
       >
         {locked ? (
           <span
             role="link"
             aria-disabled="true"
-            title={NO_PROJECT_HINT}
-            className="flex flex-col items-center justify-center gap-0.5 py-1.5 px-2 sm:py-2
+            aria-label={tip}
+            title={tip}
+            className="flex flex-col items-center justify-center gap-0.5 py-1.5 px-1 sm:py-2
                        lg:flex-row lg:justify-start lg:gap-3 lg:px-4 lg:py-3 lg:rounded-xl lg:w-full
                        cursor-not-allowed opacity-60 select-none"
           >
@@ -148,7 +148,9 @@ export default function BottomNav() {
         ) : (
           <Link
             to={item.path}
-            className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-2 sm:py-2
+            aria-label={item.label}
+            title={item.label}
+            className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-1 sm:py-2
                         lg:flex-row lg:justify-start lg:gap-3 lg:px-4 lg:py-3 lg:rounded-xl lg:w-full
                         transition-colors
                         ${isActive
@@ -180,12 +182,19 @@ export default function BottomNav() {
             {items.map((item) => renderNavLink(item))}
 
             {!isAuthenticated && (
-              <li className="flex-1 lg:hidden min-w-[3.25rem]">
-                <Link to="/login" className={setupLinkClass}>
+              <li className="flex-1 lg:hidden min-w-0">
+                <Link
+                  to="/login"
+                  aria-label="Compte"
+                  title="Compte"
+                  className={setupLinkClass}
+                >
                   <span className="flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-2xl text-prune-500">
                     <IconUser className="w-5 h-5" />
                   </span>
-                  <span className="text-xs sm:text-sm font-medium text-prune-500">Compte</span>
+                  <span className="hidden lg:inline text-sm font-medium text-prune-500">
+                    Compte
+                  </span>
                 </Link>
               </li>
             )}
