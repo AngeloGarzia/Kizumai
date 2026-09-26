@@ -1,3 +1,4 @@
+import { access } from 'fs/promises';
 import { readFile } from 'fs/promises';
 import path from 'path';
 import officeParser from 'officeparser';
@@ -11,6 +12,24 @@ import {
   DOCUMENT_LIMITS,
   DocumentProcessingError,
 } from './documentProcessingLimits.js';
+
+/** Dossier tessdata (Docker : /app/tessdata ; local : ./tessdata si présent). */
+const TESSDATA_DIR =
+  process.env.TESSDATA_PATH || path.join(process.cwd(), 'tessdata');
+
+let tessdataReady = null;
+
+async function resolveOcrOptions() {
+  if (tessdataReady == null) {
+    tessdataReady = access(path.join(TESSDATA_DIR, 'eng.traineddata'))
+      .then(() => true)
+      .catch(() => false);
+  }
+  const local = await tessdataReady;
+  return local
+    ? { langPath: TESSDATA_DIR, logger: () => {} }
+    : { logger: () => {} };
+}
 
 const IMAGE_EXTS = new Set([
   'png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'tif', 'tiff', 'heic', 'heif',
@@ -114,9 +133,7 @@ async function ocrImageBuffer(imgBuffer, limits, label = 'page.png') {
   if (!imgBuffer?.length) return '';
   return withTempFile(Buffer.from(imgBuffer), label, async (imgPath) => {
     assertImageWithinOcrLimits(await readFile(imgPath), limits);
-    const result = await Tesseract.recognize(imgPath, 'fra+eng', {
-      logger: () => {},
-    });
+    const result = await Tesseract.recognize(imgPath, 'fra+eng', await resolveOcrOptions());
     return String(result?.data?.text || '').trim();
   });
 }
@@ -234,9 +251,7 @@ async function extractWithOfficeParser(absPath, ext, limits) {
 async function extractImageOcr(absPath, limits) {
   const buffer = await readFile(absPath);
   assertImageWithinOcrLimits(buffer, limits);
-  const result = await Tesseract.recognize(absPath, 'fra+eng', {
-    logger: () => {},
-  });
+  const result = await Tesseract.recognize(absPath, 'fra+eng', await resolveOcrOptions());
   return String(result?.data?.text || '').slice(0, limits.maxTextChars);
 }
 

@@ -13,6 +13,8 @@ dist/
 backend/uploads/
 *.pem
 *.key
+*.zip
+*.traineddata
 !.env.docker.example
 !**/.env.*.example
 !backend/.env.production.lan.example
