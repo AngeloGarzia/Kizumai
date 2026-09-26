@@ -3,6 +3,11 @@
 Ce document est la représentation versionnée du schéma PostgreSQL.
 La **source de vérité** reste les migrations : `backend/src/database/migrations/*.sql`.
 
+> **Note** : le numéro de migration **011** est volontairement absent
+> (migration annulée avant merge). Voir
+> `backend/src/database/migrations/README.md`. Ne pas renuméroter les
+> fichiers existants.
+
 ## Comment l'éditer
 
 - **GitHub / VS Code** : le diagramme Mermaid ci-dessous se rend automatiquement sur

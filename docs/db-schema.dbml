@@ -1,6 +1,8 @@
 // Schéma de la base de données Kizumai
 // Éditable gratuitement sur https://dbdiagram.io (Import > coller ce fichier).
 // Source de vérité : backend/src/database/migrations/*.sql
+// Note : le numéro de migration 011 est volontairement absent (annulé avant merge) —
+// voir backend/src/database/migrations/README.md. Ne pas renuméroter.
 
 Table users {
   id integer [pk, increment]
