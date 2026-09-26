@@ -915,53 +915,58 @@ export default function ProjectSearch() {
                       <div
                         key={index}
                         className={[
-                          'rounded-2xl border p-5 hover:shadow-sm transition-all',
+                          'rounded-2xl border p-4 sm:p-5 hover:shadow-sm transition-all min-w-0 w-full max-w-full overflow-hidden',
                           fabulousPreferenceTileClass(pickRank),
                         ].join(' ')}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0 flex-1">
-                            {pickLabel && (
-                              <span
-                                className={[
-                                  'mb-1.5 inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide',
-                                  pickRank === 1
-                                    ? 'bg-wasabi-600 text-white fabulous-pick-blink'
-                                    : pickRank === 2
-                                      ? 'bg-topaz-500 text-white'
-                                      : 'bg-amber-500 text-white',
-                                ].join(' ')}
-                                title={business.fabulousPickNote || pickLabel}
-                              >
-                                {pickLabel}
-                              </span>
-                            )}
-                            <h3 className="font-semibold text-prune-900 pr-2">{business.title}</h3>
-                          </div>
-                          <BusinessMetricPills
-                            business={business}
-                            onOpenDetail={setMetricDetail}
-                          />
-                        </div>
+                        <BusinessMetricPills
+                          business={business}
+                          size="sm"
+                          className="w-full justify-start sm:justify-end"
+                          onOpenDetail={setMetricDetail}
+                        />
+                        {pickLabel && (
+                          <span
+                            className={[
+                              'mt-3 inline-flex max-w-full items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide truncate',
+                              pickRank === 1
+                                ? 'bg-wasabi-600 text-white fabulous-pick-blink'
+                                : pickRank === 2
+                                  ? 'bg-topaz-500 text-white'
+                                  : 'bg-amber-500 text-white',
+                            ].join(' ')}
+                            title={business.fabulousPickNote || pickLabel}
+                          >
+                            {pickLabel}
+                          </span>
+                        )}
+                        <h3
+                          className={[
+                            'font-semibold text-prune-900 break-words',
+                            pickLabel ? 'mt-1.5' : 'mt-3',
+                          ].join(' ')}
+                        >
+                          {business.title}
+                        </h3>
                         {business.activity && (
-                          <p className="text-xs font-medium uppercase tracking-wide text-topaz-600 mt-0.5">
+                          <p className="text-xs font-medium uppercase tracking-wide text-topaz-600 mt-0.5 break-words">
                             {business.activity}
                           </p>
                         )}
                         {business.pitch && (
-                          <p className="text-sm text-prune-700 mt-2">{business.pitch}</p>
+                          <p className="text-sm text-prune-700 mt-2 break-words">{business.pitch}</p>
                         )}
                         {business.rationale && (
-                          <p className="text-sm text-prune-500 mt-1">{business.rationale}</p>
+                          <p className="text-sm text-prune-500 mt-1 break-words">{business.rationale}</p>
                         )}
                         {hasSaved && (
-                          <p className="mt-2 text-xs font-medium text-wasabi-700">
+                          <p className="mt-2 text-xs font-medium text-wasabi-700 break-words">
                             Formation mise de côté : {savedTraining.title}
                           </p>
                         )}
                         <div
                           className={[
-                            'mt-4 grid gap-2',
+                            'mt-4 grid gap-2 min-w-0',
                             modes.length >= 3
                               ? 'grid-cols-3'
                               : modes.length === 2
@@ -979,19 +984,19 @@ export default function ProjectSearch() {
                                 onClick={() => handleSelectBusinessMode(business, mode)}
                                 title={mode.angle || meta.shortLabel}
                                 className={[
-                                  'flex flex-col items-center gap-2 rounded-xl border px-2 py-3.5 text-center transition-all hover:shadow-sm hover:ring-2',
+                                  'flex flex-col items-center gap-2 rounded-xl border px-2 py-3 text-center transition-all hover:shadow-sm hover:ring-2 min-w-0',
                                   meta.tileClass,
                                 ].join(' ')}
                               >
                                 <span
                                   className={[
-                                    'inline-flex h-12 w-12 items-center justify-center rounded-full',
+                                    'inline-flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-full',
                                     meta.iconWrapClass,
                                   ].join(' ')}
                                 >
-                                  <ModeIcon className="w-7 h-7" />
+                                  <ModeIcon className="w-6 h-6 sm:w-7 sm:h-7" />
                                 </span>
-                                <span className="text-sm font-semibold leading-tight">
+                                <span className="text-xs sm:text-sm font-semibold leading-tight break-words">
                                   {mode.label || meta.shortLabel}
                                 </span>
                                 {mode.feasibility != null && (

@@ -41,9 +41,10 @@ export default function BusinessMetricPills({
 
   return (
     <div
-      className={['shrink-0 flex flex-nowrap items-center justify-end gap-2', className].join(
-        ' '
-      )}
+      className={[
+        'flex flex-nowrap items-center gap-1.5 sm:gap-2 min-w-0 max-w-full',
+        className || 'justify-start',
+      ].join(' ')}
     >
       <CompetitionSegmentsPill
         competition={competition}
