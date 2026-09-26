@@ -11,6 +11,7 @@ import {
   FabulousPageGuideRequestDto,
   SearchBusinessesRequestDto,
   SearchLocationsRequestDto,
+  SearchMobilityCircuitsRequestDto,
   SearchTrainingsRequestDto,
   UpdateProjectLocationRequestDto,
   UpdateProjectRequestDto,
@@ -56,6 +57,12 @@ export function createProjectController({ projectService }) {
       const dto = SearchLocationsRequestDto.from(req.body);
       const locations = await projectService.searchLocations(withUserContext(dto, req));
       successResponse(res, { locations });
+    }),
+
+    searchMobilityCircuits: asyncHandler(async (req, res) => {
+      const dto = SearchMobilityCircuitsRequestDto.from(req.body);
+      const circuits = await projectService.searchMobilityCircuits(withUserContext(dto, req));
+      successResponse(res, { circuits });
     }),
 
     evaluateFranceImplantation: asyncHandler(async (req, res) => {

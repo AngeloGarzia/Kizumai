@@ -208,7 +208,54 @@ const INTERPOLATION_MAX = {
   stage: 40,
   status: 40,
   trigger: 80,
+  creativity_directive: 900,
 };
+
+/**
+ * La température API seule change peu le fond des idées en JSON contraint.
+ * On ajoute une consigne métier explicite pour que la jauge « Créativité » oriente vraiment les concepts.
+ */
+function creativityDirectiveFromTemperature(temperature) {
+  const t = Number(temperature);
+  if (!Number.isFinite(t)) {
+    return [
+      'NIVEAU CRÉATIVITÉ : équilibré.',
+      'Mélange idées réalistes et quelques angles différenciants.',
+      'Au moins 1 idée parmi {{count}} doit sortir du « catalogue » trop classique.',
+    ].join(' ');
+  }
+  const rounded = Math.min(1.3, Math.max(0.3, Math.round(t * 10) / 10));
+  if (rounded <= 0.5) {
+    return [
+      `NIVEAU CRÉATIVITÉ : BAS (${rounded}) — priorite à la sûreté.`,
+      'Privilégie des concepts classiques, éprouvés, compréhensibles immédiatement.',
+      'Évite niches exotiques, hybrides audacieux et modèles très atypiques.',
+      'La différenciation doit rester légère (positionnement, cible, service) sans changer de famille métier.',
+    ].join(' ');
+  }
+  if (rounded >= 1.0) {
+    return [
+      `NIVEAU CRÉATIVITÉ : HAUT (${rounded}) — priorite à l'originalité utile.`,
+      'Privilégie angles atypiques, niches, hybrides, modèles peu courants mais réalistes avec le budget.',
+      'Interdit les idées « catalogue » trop génériques (dépôt-vente vague, coaching générique, e-commerce sans angle) sauf twist très net.',
+      'Maximise la diversité entre les idées : secteurs et modèles économiques clairement distincts.',
+      'Au moins la moitié des idées doivent surprendre positivement tout en restant lançables.',
+    ].join(' ');
+  }
+  return [
+    `NIVEAU CRÉATIVITÉ : MOYEN (${rounded}) — équilibre.`,
+    'Mix réalisme et différenciation.',
+    'Au moins 1 idée parmi la liste doit sortir franchement du classique, les autres restent solides et crédibles.',
+  ].join(' ');
+}
+
+function samplingTopPFromTemperature(temperature) {
+  const t = Number(temperature);
+  if (!Number.isFinite(t)) return 0.92;
+  if (t <= 0.5) return 0.8;
+  if (t >= 1.05) return 0.98;
+  return 0.92;
+}
 
 function interpolate(template, vars) {
   if (!template) return '';
@@ -476,6 +523,7 @@ async function rawChatText({
           contents: [{ role: 'user', parts: [{ text: safeUser }] }],
           generationConfig: {
             temperature: aiConfig.temperature,
+            ...(Number.isFinite(Number(aiConfig.topP)) ? { topP: Number(aiConfig.topP) } : {}),
             maxOutputTokens: outTokens,
             // Grounding Google Search : responseMimeType/json entre souvent en conflit.
             ...(useGoogleSearch ? {} : { responseMimeType: 'application/json' }),
@@ -583,6 +631,7 @@ async function rawChatText({
           body: JSON.stringify({
             model: aiConfig.model,
             temperature: aiConfig.temperature,
+            ...(Number.isFinite(Number(aiConfig.topP)) ? { top_p: Number(aiConfig.topP) } : {}),
             max_tokens: outTokens,
             response_format: { type: 'json_object' },
             messages,
@@ -1059,6 +1108,46 @@ function ensureLocationFabulousRanks(locations) {
   }));
 }
 
+function slugifyCircuitId(raw, fallback = 'circuit') {
+  const base = String(raw || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 60);
+  return base || fallback;
+}
+
+function normalizeMobilityCircuits(raw, count = 10) {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const item of raw.slice(0, Math.max(count, 12))) {
+    if (!item || typeof item !== 'object') continue;
+    const label = String(item.label || item.title || item.name || '')
+      .trim()
+      .slice(0, 80);
+    if (!label) continue;
+    let id = slugifyCircuitId(item.id || item.value || item.slug || label);
+    if (seen.has(id)) {
+      let n = 2;
+      while (seen.has(`${id}_${n}`)) n += 1;
+      id = `${id}_${n}`;
+    }
+    seen.add(id);
+    out.push({
+      id,
+      label,
+      angle: String(item.angle || item.rationale || item.why || '')
+        .trim()
+        .slice(0, 280) || null,
+    });
+    if (out.length >= count) break;
+  }
+  return out;
+}
+
 const TRAINING_FORMATS = new Set(['en_ligne', 'presentiel', 'mixte']);
 
 function normalizeTrainingLevel(value) {
@@ -1190,6 +1279,7 @@ export function createAiService({ settingsService, currencyService }) {
         ? {
             ...baseConfig,
             temperature: Math.min(1.3, Math.max(0.3, Math.round(Number(temperature) * 10) / 10)),
+            topP: samplingTopPFromTemperature(temperature),
           }
         : baseConfig;
     const providerId = aiConfig.provider;
@@ -1613,24 +1703,32 @@ export function createAiService({ settingsService, currencyService }) {
     }) {
       const limits = await currencyService.getBudgetLimits(currency);
       const aiConfig = await settingsService.getAiConfig();
-      const userContent = memCtx(
-        interpolate(aiConfig.userPromptTemplate, {
-          quoi: String(quoi || '').trim().slice(0, 300),
-          ou: String(ou || '').trim().slice(0, 200),
-          budget,
-          currency: String(currency || 'EUR').slice(0, 8),
-          budget_min: limits.min,
-          budget_max: limits.max,
-          refine: String(refine || '').trim().slice(0, 400) || 'aucune',
-          avoid: joinAvoid(avoid),
-          count: Math.min(8, Math.max(1, Number(count) || 3)),
-        }),
-        memoryContext,
-        aiConfig
+      const safeCount = Math.min(8, Math.max(1, Number(count) || 3));
+      const creativityDirective = creativityDirectiveFromTemperature(temperature).replaceAll(
+        '{{count}}',
+        String(safeCount)
       );
+      const template = aiConfig.userPromptTemplate || '';
+      const interpolated = interpolate(template, {
+        quoi: String(quoi || '').trim().slice(0, 300),
+        ou: String(ou || '').trim().slice(0, 200),
+        budget,
+        currency: String(currency || 'EUR').slice(0, 8),
+        budget_min: limits.min,
+        budget_max: limits.max,
+        refine: String(refine || '').trim().slice(0, 400) || 'aucune',
+        avoid: joinAvoid(avoid),
+        count: safeCount,
+        creativity_directive: creativityDirective,
+      });
+      const withCreativity =
+        template.includes('{{creativity_directive}}')
+          ? interpolated
+          : `${interpolated}\n\n${creativityDirective}`;
+      const userContent = memCtx(withCreativity, memoryContext, aiConfig);
       const data = await requestStepJson(userContent, { temperature });
       // Concurrence + faisabilité + rentabilité + rang Fabulous dans la même passe.
-      return ensureFabulousRanks(normalizeBusinesses(data.businesses)).slice(0, count);
+      return ensureFabulousRanks(normalizeBusinesses(data.businesses)).slice(0, safeCount);
     },
 
     /**
@@ -1733,6 +1831,45 @@ export function createAiService({ settingsService, currencyService }) {
         }), memoryContext, aiConfig);
       const data = await requestStepJson(userContent, { temperature });
       return ensureLocationFabulousRanks(normalizeLocations(data.locations)).slice(0, count);
+    },
+
+    async searchMobilityCircuits({
+      business,
+      businessActivity = '',
+      businessPitch = '',
+      businessRationale = '',
+      ou = '',
+      budget,
+      currency = 'EUR',
+      count = 10,
+      memoryContext = '',
+      temperature = null,
+    }) {
+      const aiConfig = await settingsService.getAiConfig();
+      if (!aiConfig.mobilityCircuitsPrompt) {
+        throw new AppError('Le prompt « Circuits mobilité » est introuvable en base.', 500);
+      }
+      const safeCount = Math.min(12, Math.max(6, Number(count) || 10));
+      const userContent = memCtx(
+        interpolate(aiConfig.mobilityCircuitsPrompt, {
+          business: String(business || '').trim().slice(0, 200),
+          business_activity: String(businessActivity || '').trim().slice(0, 200) || 'non précisé',
+          business_pitch: String(businessPitch || '').trim().slice(0, 500) || 'non précisé',
+          business_rationale: String(businessRationale || '').trim().slice(0, 500) || 'non précisé',
+          ou: String(ou || '').trim().slice(0, 200) || 'non précisée',
+          budget,
+          currency: String(currency || 'EUR').slice(0, 8),
+          count: safeCount,
+        }),
+        memoryContext,
+        aiConfig
+      );
+      const data = await requestStepJson(userContent, { temperature });
+      const circuits = normalizeMobilityCircuits(
+        data.circuits || data.circuitTypes || data.options,
+        safeCount
+      );
+      return circuits;
     },
 
     async evaluateFranceImplantation({

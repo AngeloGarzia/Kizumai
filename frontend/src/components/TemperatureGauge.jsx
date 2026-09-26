@@ -10,8 +10,16 @@ export function clampSearchTemperature(value, fallback = TEMP_DEFAULT) {
   return Math.round(clamped * 10) / 10;
 }
 
+export function creativityZoneLabel(value) {
+  const temp = clampSearchTemperature(value);
+  if (temp <= 0.5) return 'Conventionnel';
+  if (temp >= 1.0) return 'Audacieux';
+  return 'Équilibré';
+}
+
 /**
  * Jauge créativité / température IA (0.3 → 1.3).
+ * Oriente le type d’idées (consigne métier) en plus du sampling API.
  */
 export default function TemperatureGauge({
   value = TEMP_DEFAULT,
@@ -21,6 +29,7 @@ export default function TemperatureGauge({
 }) {
   const temp = clampSearchTemperature(value);
   const pct = ((temp - TEMP_MIN) / (TEMP_MAX - TEMP_MIN)) * 100;
+  const zone = creativityZoneLabel(temp);
 
   return (
     <div className={`rounded-xl border border-prune-200 bg-prune-50 px-4 py-3 ${className}`}>
@@ -28,7 +37,9 @@ export default function TemperatureGauge({
         <label htmlFor={id} className="text-sm font-medium text-prune-800">
           Créativité
         </label>
-        <span className="text-sm font-semibold tabular-nums text-prune-900">{temp.toFixed(1)}</span>
+        <span className="text-sm font-semibold tabular-nums text-prune-900">
+          {temp.toFixed(1)} · {zone}
+        </span>
       </div>
       <input
         id={id}
@@ -45,12 +56,16 @@ export default function TemperatureGauge({
         aria-valuemin={TEMP_MIN}
         aria-valuemax={TEMP_MAX}
         aria-valuenow={temp}
-        aria-label="Température de créativité IA"
+        aria-label="Créativité des idées business"
       />
       <div className="mt-1.5 flex justify-between text-[11px] text-prune-500">
-        <span>Idées plus conventionnelles</span>
-        <span>Idées plus originales</span>
+        <span>Conventionnel</span>
+        <span>Équilibré</span>
+        <span>Audacieux</span>
       </div>
+      <p className="mt-2 text-[11px] leading-snug text-prune-500">
+        Oriente le style des idées (sûres ↔ originales), pas seulement le hasard du modèle.
+      </p>
     </div>
   );
 }

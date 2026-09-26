@@ -55,6 +55,9 @@ export function createSettingsService({ settingsRepository, aiPromptRepository }
       const businessCompetitionPrompt = await aiPromptRepository.findByKey(
         'business_competition'
       );
+      const mobilityCircuitsPrompt = await aiPromptRepository.findByKey(
+        'mobility_circuits'
+      );
 
       const provider = settings.ai_provider || config.ai.defaultProvider;
       const providerDef = getProviderById(provider);
@@ -89,6 +92,7 @@ export function createSettingsService({ settingsRepository, aiPromptRepository }
         projectAssistantPrompt: projectAssistantPrompt?.content || null,
         projectAuditPrompt: projectAuditPrompt?.content || null,
         businessCompetitionPrompt: businessCompetitionPrompt?.content || null,
+        mobilityCircuitsPrompt: mobilityCircuitsPrompt?.content || null,
       };
     },
 

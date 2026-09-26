@@ -4,7 +4,7 @@
 > En production, la source de vérité est la table `ai_prompts` (éditable via Admin).
 > Pour régénérer : `node scripts/export-ai-prompts.mjs`
 
-Généré le 2026-09-26 — **23 prompts**.
+Généré le 2026-09-26 — **24 prompts**.
 
 ## Sommaire
 
@@ -25,6 +25,7 @@ Généré le 2026-09-26 — **23 prompts**.
 - [`lieux`](#lieux) — Prompt Lieux — Créer son avenir — propositions de lieux (mode fixe)
 - [`memory_recall`](#memory_recall) — Mémoire projet — rappel sécurisé — Mémoire projet — rappel de situation
 - [`memory_snapshot`](#memory_snapshot) — Mémoire projet — résumé consolidé sécurisé — Mémoire projet — synthèse snapshot
+- [`mobility_circuits`](#mobility_circuits) — Prompt Circuits mobilité — Créer son avenir — types de circuit nomade par business
 - [`project_assistant`](#project_assistant) — Assistant Fabulous — checkup fond de tâche — Assistant Fabulous en arrière-plan (checkup)
 - [`project_audit`](#project_audit) — Audit expert Fabulous — viabilité & rentabilité — Audit expert viabilité / rentabilité
 - [`project_preview_analysis`](#project_preview_analysis) — Analyse aperçu projet (Fabulous) — Aperçu projet — analyse Fabulous neutre
@@ -524,6 +525,40 @@ Réponds UNIQUEMENT avec un JSON valide, en français, sans texte autour :
 
 ---
 
+## `mobility_circuits`
+
+| | |
+|---|---|
+| **Nom** | Prompt Circuits mobilité |
+| **Rôle** | `user` |
+| **Dernière migration** | `077_mobility_circuits_prompt.sql` |
+| **Usage** | Créer son avenir — types de circuit nomade adaptés au business |
+
+```text
+Tu es Fabulous, expert terrain en business itinérant / mobile pour Kizumai.
+Ta mission : proposer EXACTEMENT {{count}} types de circuits (modes de tournée / d'opération nomade) en forte adéquation avec CE business précis.
+
+RÈGLES IMPÉRATIVES :
+1) Chaque circuit doit être pensé pour CE business (clientèle, flux, matériel, saisonnalité, réglementaire).
+2) Varie les formats : pas dix variantes du même marché ; mélange canaux et contextes réalistes (ex. selon le métier : marchés de producteurs, parkings d'entreprise, festivals, tournées B2B, livraisons à domicile, campus, zones artisanales, événements sportifs, etc. — UNIQUEMENT s'ils collent au business).
+3) Interdiction de proposer des circuits génériques hors sujet pour ce métier.
+4) Les libellés doivent être concrets et actionnables (pas « autre », pas « divers », pas « général »).
+5) Chaque « angle » explique en 1 phrase pourquoi ce circuit augmente les chances de réussite de CE business.
+6) Les « id » sont des identifiants techniques uniques en snake_case (ascii), stables et distincts.
+
+Business choisi : {{business}}
+Secteur / activité : {{business_activity}}
+Pitch du business : {{business_pitch}}
+Pourquoi ce business : {{business_rationale}}
+Zone / indication éventuelle : {{ou}}
+Budget disponible : {{budget}} {{currency}}
+
+Réponds UNIQUEMENT avec un JSON valide, en français, sans texte autour :
+{"circuits":[{"id":"snake_case_unique","label":"libellé court du circuit","angle":"pourquoi ce circuit pour ce business"}]}
+```
+
+---
+
 ## `memory_recall`
 
 | | |
@@ -866,7 +901,7 @@ Réponds UNIQUEMENT avec un JSON valide :
 |---|---|
 | **Nom** | Prompt projet |
 | **Rôle** | `user` |
-| **Dernière migration** | `074_metric_notes_business_explanations.sql` |
+| **Dernière migration** | `078_business_creativity_directive.sql` |
 | **Usage** | Créer son avenir — propositions de business (+ modes ancrage) |
 
 ```text
@@ -919,6 +954,9 @@ IMPORTANT : feasibility, competitionScore et profitabilityScore mesurent des cho
 - ProfitabilityScore = rentabilité future crédible (haut = solide).
 Une idée facile à lancer peut être peu rentable (feasibility haut, profitabilityScore bas). Un gros budget sans modèle économique solide ne donne PAS des scores hauts. Varie les trois scores d'une idée à l'autre.
 Les fabulousRank doivent être cohérents avec ces trois scores (pas de rang 1 avec rentabilité fragile et concurrence saturée sauf angle exceptionnel justifié dans fabulousPickNote).
+
+CONSIGNE CRÉATIVITÉ (obligatoire) :
+{{creativity_directive}}
 
 Idée / envie de départ (peut être vide) : {{quoi}}
 Zone envisagée (peut être vide) : {{ou}}

@@ -95,6 +95,21 @@ export const SearchLocationsRequestDto = {
   },
 };
 
+export const SearchMobilityCircuitsRequestDto = {
+  from(body = {}) {
+    return {
+      business: optionalString(body.business, { max: 200 }),
+      businessActivity: optionalString(body.businessActivity, { max: 200 }) || '',
+      businessPitch: optionalString(body.businessPitch, { max: 500 }) || '',
+      businessRationale: optionalString(body.businessRationale, { max: 500 }) || '',
+      ou: optionalString(body.ou, { max: 200 }) || '',
+      ...normalizeBudgetCurrency(body),
+      temperature: optionalSearchTemperature(body),
+      projectId: optionalProjectId(body),
+    };
+  },
+};
+
 export const FranceImplantationRequestDto = {
   from(body = {}) {
     return {

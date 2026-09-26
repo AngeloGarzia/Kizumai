@@ -66,13 +66,10 @@ export function formatMobilityLabel(mobility) {
   } else if (mobility.perimeterType === 'admin' && mobility.adminLabel) {
     parts.push(mobility.adminLabel);
   }
-  if (mobility.circuitType && mobility.circuitType !== 'other') {
-    const circuitLabels = {
-      markets: 'marchés',
-      events: 'événements',
-      door_to_door: 'porte-à-porte',
-    };
-    parts.push(circuitLabels[mobility.circuitType] || mobility.circuitType);
+  if (mobility.circuitLabel) {
+    parts.push(mobility.circuitLabel);
+  } else if (mobility.circuitType && mobility.circuitType !== 'other') {
+    parts.push(String(mobility.circuitType).replace(/_/g, ' '));
   }
   return parts.join(' · ');
 }

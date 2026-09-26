@@ -1047,6 +1047,8 @@ export default function ProjectSearch() {
               {step === 'locations' && selectedMode?.type === LOCATION_MODE.NOMADIC && (
                 <MobilitySetupPanel
                   businessTitle={selectedBusiness?.title}
+                  business={selectedBusiness}
+                  seed={seed}
                   initial={mobilitySetup}
                   onSubmit={handleMobilitySubmit}
                   disabled={loading}

@@ -394,6 +394,49 @@ export function createProjectService({
       return locations;
     },
 
+    async searchMobilityCircuits({
+      business,
+      businessActivity,
+      businessPitch,
+      businessRationale,
+      ou,
+      budget,
+      currency = 'EUR',
+      userId = null,
+      projectId = null,
+      temperature = null,
+    }) {
+      if (!business?.trim()) {
+        throw new AppError('Sélectionnez un business avant de définir le circuit.', 400);
+      }
+      await currencyService.getCurrencyData();
+      const memoryContext = await resolveMemoryContext({
+        userId,
+        projectId,
+        intent: `Circuits mobilité pour ${business}`,
+      });
+      const circuits = await withAiUsageContext(
+        { userId, projectId, purpose: 'mobility_circuits' },
+        async () =>
+          aiService.searchMobilityCircuits({
+            business: business.trim(),
+            businessActivity: businessActivity || '',
+            businessPitch: businessPitch || '',
+            businessRationale: businessRationale || '',
+            ou: ou?.trim() || '',
+            budget: await currencyService.clampBudget(budget, currency),
+            currency,
+            count: 10,
+            memoryContext,
+            temperature,
+          })
+      );
+      if (!circuits.length) {
+        throw new AppError('Aucun type de circuit généré. Réessayez.', 422);
+      }
+      return circuits;
+    },
+
     async evaluateFranceImplantation({
       business,
       businessActivity,

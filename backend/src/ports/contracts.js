@@ -47,6 +47,7 @@
  * @property {(dto: object) => Promise<object[]>} searchBusinesses
  * @property {(dto: object) => Promise<object[]>} searchTrainings
  * @property {(dto: object) => Promise<object[]>} searchLocations
+ * @property {(dto: object) => Promise<object[]>} searchMobilityCircuits
  * @property {(dto: object) => Promise<{proposals: object[], assessment: object}>} buildProposals
  * @property {(args: object) => Promise<object>} startProject
  * @property {(userId: number) => Promise<object[]>} getUserProjects

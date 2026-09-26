@@ -1,12 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { projectService } from '../services/projectService.js';
-
-const CIRCUIT_OPTIONS = [
-  { value: 'markets', label: 'Marchés' },
-  { value: 'events', label: 'Événements / foires' },
-  { value: 'door_to_door', label: 'Porte-à-porte / tournées' },
-  { value: 'other', label: 'Autre' },
-];
+import FabulousThinking from './FabulousThinking.jsx';
+import { assistantPhrases } from '../constants/assistant.js';
 
 const PERIMETER_OPTIONS = [
   { value: 'distance', label: 'Distance (km)' },
@@ -15,10 +10,12 @@ const PERIMETER_OPTIONS = [
 ];
 
 /**
- * Panel mobilité : point de référence + périmètre (km, temps ou découpage admin).
+ * Panel mobilité : point de référence + périmètre + type de circuit (proposé par Fabulous).
  */
 export default function MobilitySetupPanel({
   businessTitle,
+  business = null,
+  seed = null,
   initial = null,
   onSubmit,
   disabled = false,
@@ -28,12 +25,88 @@ export default function MobilitySetupPanel({
   const [radiusKm, setRadiusKm] = useState(initial?.radiusKm ?? 50);
   const [maxTravelMinutes, setMaxTravelMinutes] = useState(initial?.maxTravelMinutes ?? 45);
   const [adminLabel, setAdminLabel] = useState(initial?.adminLabel || '');
-  const [circuitType, setCircuitType] = useState(initial?.circuitType || 'markets');
+  const [circuitType, setCircuitType] = useState(initial?.circuitType || '');
+  const [circuitLabel, setCircuitLabel] = useState(initial?.circuitLabel || '');
+  const [circuits, setCircuits] = useState(
+    Array.isArray(initial?.circuitOptions) ? initial.circuitOptions : []
+  );
+  const [circuitsLoading, setCircuitsLoading] = useState(false);
+  const [circuitsError, setCircuitsError] = useState('');
   const [error, setError] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [loadingSuggest, setLoadingSuggest] = useState(false);
   const [showSuggest, setShowSuggest] = useState(false);
   const requestRef = useRef(0);
+  const circuitsRequestRef = useRef(0);
+  const businessKey = [
+    business?.title || businessTitle || '',
+    business?.activity || '',
+  ].join('|');
+
+  const loadCircuits = useCallback(async () => {
+    const title = String(business?.title || businessTitle || '').trim();
+    if (!title) {
+      setCircuits([]);
+      setCircuitsError('Business manquant pour proposer des circuits.');
+      return;
+    }
+    const requestId = circuitsRequestRef.current + 1;
+    circuitsRequestRef.current = requestId;
+    setCircuitsLoading(true);
+    setCircuitsError('');
+    try {
+      const list = await projectService.searchMobilityCircuits({
+        business: title,
+        businessActivity: business?.activity || '',
+        businessPitch: business?.pitch || '',
+        businessRationale: business?.rationale || '',
+        ou: seed?.ou || '',
+        budget: seed?.budget,
+        currency: seed?.currency || 'EUR',
+        temperature: seed?.temperature,
+      });
+      if (circuitsRequestRef.current !== requestId) return;
+      setCircuits(Array.isArray(list) ? list : []);
+      if (!Array.isArray(list) || !list.length) {
+        setCircuitsError('Aucun circuit proposé. Réessayez.');
+        return;
+      }
+      setCircuitType((prevId) => {
+        const match = list.find((c) => c.id === prevId);
+        if (match) {
+          setCircuitLabel(match.label);
+          return prevId;
+        }
+        setCircuitLabel(list[0].label);
+        return list[0].id;
+      });
+    } catch (err) {
+      if (circuitsRequestRef.current !== requestId) return;
+      setCircuits([]);
+      setCircuitsError(err.message || 'Impossible de charger les types de circuit.');
+    } finally {
+      if (circuitsRequestRef.current === requestId) setCircuitsLoading(false);
+    }
+  }, [
+    business?.activity,
+    business?.pitch,
+    business?.rationale,
+    business?.title,
+    businessTitle,
+    seed?.budget,
+    seed?.currency,
+    seed?.ou,
+    seed?.temperature,
+  ]);
+
+  useEffect(() => {
+    if (Array.isArray(initial?.circuitOptions) && initial.circuitOptions.length) {
+      setCircuits(initial.circuitOptions);
+      return;
+    }
+    loadCircuits();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [businessKey]);
 
   useEffect(() => {
     const query = referenceLabel.trim();
@@ -77,6 +150,10 @@ export default function MobilitySetupPanel({
       setError('Précisez la ou les zones (région, département, ville…).');
       return;
     }
+    if (!circuitType || !circuitLabel) {
+      setError('Choisissez un type de circuit proposé par Fabulous.');
+      return;
+    }
     setError('');
     onSubmit({
       referenceLabel: ref,
@@ -85,6 +162,8 @@ export default function MobilitySetupPanel({
       maxTravelMinutes: perimeterType === 'travel_time' ? Number(maxTravelMinutes) : null,
       adminLabel: perimeterType === 'admin' ? adminLabel.trim() : null,
       circuitType,
+      circuitLabel,
+      circuitOptions: circuits,
     });
   };
 
@@ -141,25 +220,58 @@ export default function MobilitySetupPanel({
       </div>
 
       <fieldset>
-        <legend className="text-sm font-medium text-prune-800 mb-2">Type de circuit</legend>
-        <div className="flex flex-wrap gap-2">
-          {CIRCUIT_OPTIONS.map((opt) => (
+        <legend className="text-sm font-medium text-prune-800 mb-1">Type de circuit</legend>
+        <p className="text-xs text-prune-500 mb-2">
+          Propositions Fabulous adaptées à « {businessTitle} » (~10 options).
+        </p>
+        {circuitsLoading && (
+          <FabulousThinking message={assistantPhrases.thinking} size="sm" compact />
+        )}
+        {!circuitsLoading && circuitsError && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 space-y-2">
+            <p className="text-sm text-amber-900">{circuitsError}</p>
             <button
-              key={opt.value}
               type="button"
               disabled={disabled}
-              onClick={() => setCircuitType(opt.value)}
-              className={[
-                'rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
-                circuitType === opt.value
-                  ? 'border-wasabi-500 bg-wasabi-100 text-wasabi-900'
-                  : 'border-prune-100 text-prune-600 hover:border-prune-300',
-              ].join(' ')}
+              onClick={loadCircuits}
+              className="text-sm font-semibold text-wasabi-700 hover:text-wasabi-600"
             >
-              {opt.label}
+              Réessayer
             </button>
-          ))}
-        </div>
+          </div>
+        )}
+        {!circuitsLoading && !circuitsError && circuits.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {circuits.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                disabled={disabled}
+                title={opt.angle || opt.label}
+                onClick={() => {
+                  setCircuitType(opt.id);
+                  setCircuitLabel(opt.label);
+                }}
+                className={[
+                  'rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors text-left max-w-full',
+                  circuitType === opt.id
+                    ? 'border-wasabi-500 bg-wasabi-100 text-wasabi-900'
+                    : 'border-prune-100 text-prune-600 hover:border-prune-300',
+                ].join(' ')}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
+        {circuitType && circuitLabel && (
+          <p className="mt-2 text-xs text-prune-500">
+            Sélection : <span className="font-medium text-prune-700">{circuitLabel}</span>
+            {circuits.find((c) => c.id === circuitType)?.angle
+              ? ` — ${circuits.find((c) => c.id === circuitType).angle}`
+              : ''}
+          </p>
+        )}
       </fieldset>
 
       <fieldset>
@@ -235,7 +347,11 @@ export default function MobilitySetupPanel({
         )}
       </fieldset>
 
-      <button type="submit" disabled={disabled} className="btn-primary w-full sm:w-auto disabled:opacity-50">
+      <button
+        type="submit"
+        disabled={disabled || circuitsLoading || !circuits.length}
+        className="btn-primary w-full sm:w-auto disabled:opacity-50"
+      >
         Continuer vers le budget
       </button>
     </form>

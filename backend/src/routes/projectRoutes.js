@@ -79,6 +79,7 @@ export function createProjectRoutes({
   router.post('/search/businesses', ...publicAi, projectController.searchBusinesses);
   router.post('/search/trainings', ...publicAi, projectController.searchTrainings);
   router.post('/search/locations', ...publicAi, projectController.searchLocations);
+  router.post('/search/mobility-circuits', ...publicAi, projectController.searchMobilityCircuits);
   router.post('/search/france-map', ...publicAi, projectController.evaluateFranceImplantation);
   router.post('/search/city-eval', ...publicAi, projectController.evaluateCityImplantation);
   router.post('/search/proposals', ...publicAi, projectController.buildProposals);

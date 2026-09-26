@@ -131,6 +131,31 @@ export const projectService = {
     return data.locations;
   },
 
+  async searchMobilityCircuits({
+    business,
+    businessActivity,
+    businessPitch,
+    businessRationale,
+    ou,
+    budget,
+    currency,
+    projectId,
+    temperature,
+  }) {
+    const { data } = await api.post('/projects/search/mobility-circuits', {
+      business,
+      businessActivity,
+      businessPitch,
+      businessRationale,
+      ou,
+      budget,
+      currency,
+      projectId,
+      temperature,
+    });
+    return data.circuits || [];
+  },
+
   async evaluateFranceImplantation({
     business,
     businessActivity,
