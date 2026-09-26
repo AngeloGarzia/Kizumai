@@ -140,6 +140,81 @@ function DocumentRow({ doc, selected, onSelect }) {
   );
 }
 
+function AuthenticatedMediaPreview({ projectId, documentId, kind, title }) {
+  const [objectUrl, setObjectUrl] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    let createdUrl = null;
+    setLoading(true);
+    setError('');
+    setObjectUrl(null);
+
+    projectService
+      .fetchDocumentObjectUrl(projectId, documentId)
+      .then((url) => {
+        if (cancelled) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        createdUrl = url;
+        setObjectUrl(url);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message || 'Aperçu impossible');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      if (createdUrl) URL.revokeObjectURL(createdUrl);
+    };
+  }, [projectId, documentId]);
+
+  if (loading) {
+    return (
+      <p className="p-8 text-center text-sm text-prune-500">Chargement de l&apos;aperçu…</p>
+    );
+  }
+  if (error || !objectUrl) {
+    return (
+      <div className="p-8 text-center space-y-3">
+        <p className="text-sm text-prune-600">{error || 'Aperçu indisponible.'}</p>
+        <a
+          href={projectService.documentDownloadUrl(projectId, documentId)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="link-accent inline-block"
+        >
+          Ouvrir / télécharger
+        </a>
+      </div>
+    );
+  }
+
+  if (kind === 'image') {
+    return (
+      <img
+        src={objectUrl}
+        alt={title || 'Aperçu'}
+        className="max-h-[28rem] w-full object-contain bg-white"
+      />
+    );
+  }
+
+  return (
+    <iframe
+      title={title || 'Aperçu PDF'}
+      src={objectUrl}
+      className="w-full h-[28rem] bg-white border-0"
+    />
+  );
+}
+
 function PreviewPane({ projectId, doc, textPreview, loadingPreview }) {
   if (!doc) {
     return (
@@ -196,19 +271,19 @@ function PreviewPane({ projectId, doc, textPreview, loadingPreview }) {
 
       <div className="rounded-2xl overflow-hidden bg-prune-950/[0.03] border border-prune-100/80 min-h-[16rem]">
         {safeImage && (
-          <img
-            src={url}
-            alt={doc.title || doc.fileName}
-            className="max-h-[28rem] w-full object-contain bg-white"
+          <AuthenticatedMediaPreview
+            projectId={projectId}
+            documentId={doc.id}
+            kind="image"
+            title={doc.title || doc.fileName}
           />
         )}
         {isPdf && (
-          <iframe
-            title="Aperçu PDF"
-            src={url}
-            sandbox=""
-            referrerPolicy="no-referrer"
-            className="w-full h-[28rem] bg-white"
+          <AuthenticatedMediaPreview
+            projectId={projectId}
+            documentId={doc.id}
+            kind="pdf"
+            title={doc.title || doc.fileName}
           />
         )}
         {!safeImage && !isPdf && isText && (

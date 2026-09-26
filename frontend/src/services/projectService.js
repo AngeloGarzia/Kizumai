@@ -285,6 +285,23 @@ export const projectService = {
     return `${publicConfig.apiUrl}/projects/${projectId}/documents/${documentId}/download`;
   },
 
+  /**
+   * Charge un document authentifié en blob URL (aperçu iframe/img sans framing API).
+   * Appeler URL.revokeObjectURL après usage.
+   */
+  async fetchDocumentObjectUrl(projectId, documentId) {
+    const response = await fetch(this.documentDownloadUrl(projectId, documentId), {
+      method: 'GET',
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.message || 'Impossible de charger le document');
+    }
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
+  },
+
   async getResources(projectId) {
     const { data } = await api.get(`/projects/${projectId}/resources`);
     return data;
