@@ -691,7 +691,7 @@ export default function StageWorkspace({ projectId, stage }) {
                             title={competitionSnap.note || undefined}
                           >
                             {competitionDisplayLabel(competitionSnap)}
-                            {competitionSnap.score != null ? ` (${competitionSnap.score})` : ''}
+                            {competitionSnap.score != null ? ` (${competitionSnap.score}%)` : ''}
                           </span>
                         )}
                       </span>

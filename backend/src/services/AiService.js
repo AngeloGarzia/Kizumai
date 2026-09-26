@@ -737,6 +737,23 @@ function normalizeBusinesses(raw) {
     .slice(0, 12)
     .map((item) => {
       const feasibility = normalizeFeasibility(item?.feasibility);
+      const competitionScore = normalizeFeasibility(
+        item?.competitionScore ?? item?.competition_score
+      );
+      const competitionLabel =
+        String(item?.competitionLabel || item?.competition_label || '')
+          .trim()
+          .slice(0, 40) || competitionLabelFromScore(competitionScore);
+      const competitionNote =
+        String(item?.competitionNote || item?.competition_note || '')
+          .trim()
+          .slice(0, 200) || null;
+      const rawSource = item?.competitionSource || item?.competition_source;
+      const competitionSource = ['web', 'estimated'].includes(rawSource)
+        ? rawSource
+        : competitionScore != null
+          ? 'estimated'
+          : null;
       return {
         title: String(item?.title || '').trim().slice(0, 200),
         activity: String(item?.activity || '').trim().slice(0, 200),
@@ -744,16 +761,10 @@ function normalizeBusinesses(raw) {
         rationale: String(item?.rationale || '').trim().slice(0, 800),
         feasibility,
         modes: normalizeBusinessModes(item?.modes, feasibility),
-        competitionScore: normalizeFeasibility(item?.competitionScore ?? item?.competition_score),
-        competitionLabel: String(item?.competitionLabel || item?.competition_label || '')
-          .trim()
-          .slice(0, 40) || null,
-        competitionNote: String(item?.competitionNote || item?.competition_note || '')
-          .trim()
-          .slice(0, 200) || null,
-        competitionSource: ['web', 'estimated'].includes(item?.competitionSource)
-          ? item.competitionSource
-          : null,
+        competitionScore,
+        competitionLabel,
+        competitionNote,
+        competitionSource,
       };
     })
     .filter((item) => item.title);
@@ -1426,23 +1437,13 @@ export function createAiService({ settingsService, currencyService }) {
         aiConfig
       );
       const data = await requestStepJson(userContent, { temperature });
-      const businesses = normalizeBusinesses(data.businesses).slice(0, count);
-      try {
-        return await this.estimateBusinessCompetition({
-          businesses,
-          ou,
-          budget,
-          currency,
-          temperature,
-        });
-      } catch (err) {
-        console.warn('[ai] concurrence business :', err.message);
-        return businesses;
-      }
+      // Concurrence + faisabilité dans la même passe (comme feasibility).
+      return normalizeBusinesses(data.businesses).slice(0, count);
     },
 
     /**
-     * 2ᵉ passe : score de concurrence (Gemini + Google Search si dispo).
+     * Estimation concurrence dédiée (optionnelle / legacy).
+     * Préférer les champs competition* renvoyés avec searchBusinesses.
      */
     async estimateBusinessCompetition({
       businesses = [],
@@ -1452,6 +1453,9 @@ export function createAiService({ settingsService, currencyService }) {
       temperature = null,
     }) {
       if (!Array.isArray(businesses) || !businesses.length) return businesses;
+
+      const alreadyScored = businesses.every((b) => b.competitionScore != null);
+      if (alreadyScored) return businesses;
 
       const aiConfig = await settingsService.getAiConfig();
       if (!aiConfig.businessCompetitionPrompt) {
@@ -1464,7 +1468,8 @@ export function createAiService({ settingsService, currencyService }) {
         }));
       }
 
-      const payload = businesses.map((b) => ({
+      const missing = businesses.filter((b) => b.competitionScore == null);
+      const payload = (missing.length ? missing : businesses).map((b) => ({
         title: b.title,
         activity: b.activity || '',
         pitch: b.pitch || '',
@@ -1478,65 +1483,29 @@ export function createAiService({ settingsService, currencyService }) {
         currency: String(currency || 'EUR').slice(0, 8),
       });
 
-      // Google Search ne renvoie souvent qu'1 item pour N business → pastilles vides.
-      // On score d'abord tout le lot sans web ; web uniquement si 1 seule idée.
-      const useWeb = aiConfig.provider === 'gemini' && businesses.length === 1;
-      const strictCount = `\n\nIMPORTANT : renvoie EXACTEMENT ${payload.length} objet(s) dans "items", un par titre fourni, dans le MÊME ordre, avec les titres EXACTS.`;
+      const useWeb = aiConfig.provider === 'gemini' && payload.length === 1;
+      const strictCount = `\n\nIMPORTANT : renvoie EXACTEMENT ${payload.length} objet(s) dans "items", un par titre fourni, dans le MÊME ordre, avec les titres EXACTS. Varie fortement les competitionScore d'un item à l'autre.`;
 
-      const data = await requestStepJson(`${userContent}${strictCount}`, {
-        temperature: temperature != null ? temperature : 0.4,
-        googleSearch: useWeb,
-        thinkingBudget: 0,
-        maxOutputTokens: 8192,
-      });
-      let items = alignCompetitionItemsToBusinesses(
-        businesses,
-        normalizeCompetitionItems(data.items || data.businesses || [])
-      );
-      let merged = mergeCompetitionIntoBusinesses(
-        businesses,
-        items,
-        useWeb ? 'web' : 'estimated'
-      );
-
-      const missing = merged.filter((b) => b.competitionScore == null);
-      if (missing.length) {
-        console.warn(
-          `[ai] concurrence : ${items.length}/${businesses.length} item(s) — complément pour ${missing.length}`
-        );
-        const fillPayload = missing.map((b) => ({
-          title: b.title,
-          activity: b.activity || '',
-          pitch: b.pitch || '',
-          modes: (b.modes || []).map((m) => m.type).filter(Boolean),
-        }));
-        const fillContent = interpolate(aiConfig.businessCompetitionPrompt, {
-          businesses_json: JSON.stringify(fillPayload).slice(0, 12_000),
-          ou: String(ou || '').trim().slice(0, 200) || 'non précisée',
-          budget,
-          currency: String(currency || 'EUR').slice(0, 8),
+      try {
+        const data = await requestStepJson(`${userContent}${strictCount}`, {
+          temperature: temperature != null ? temperature : 0.4,
+          googleSearch: useWeb,
+          thinkingBudget: 0,
+          maxOutputTokens: 8192,
         });
-        try {
-          const fillData = await requestStepJson(
-            `${fillContent}\n\nIMPORTANT : renvoie EXACTEMENT ${fillPayload.length} objet(s) dans "items", un par titre, MÊME ordre, titres EXACTS.`,
-            {
-              temperature: temperature != null ? temperature : 0.4,
-              googleSearch: false,
-              thinkingBudget: 0,
-              maxOutputTokens: 8192,
-            }
-          );
-          const fillItems = alignCompetitionItemsToBusinesses(
-            missing,
-            normalizeCompetitionItems(fillData.items || fillData.businesses || [])
-          );
-          merged = mergeCompetitionIntoBusinesses(merged, fillItems, 'estimated');
-        } catch (fillErr) {
-          console.warn('[ai] concurrence complément :', fillErr.message);
-        }
+        const items = alignCompetitionItemsToBusinesses(
+          payload.map((p) => ({ title: p.title })),
+          normalizeCompetitionItems(data.items || data.businesses || [])
+        );
+        return mergeCompetitionIntoBusinesses(
+          businesses,
+          items,
+          useWeb ? 'web' : 'estimated'
+        );
+      } catch (err) {
+        console.warn('[ai] concurrence business :', err.message);
+        return businesses;
       }
-
-      return merged;
     },
 
     async searchLocations({

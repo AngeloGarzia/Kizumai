@@ -861,10 +861,10 @@ export default function ProjectSearch() {
                               style={competitionRoundPillStyle(competition?.score)}
                               title={competitionTitle}
                               aria-label={`Concurrence : ${competitionDisplayLabel(competition)}${
-                                competition?.score != null ? ` ${competition.score}` : ''
+                                competition?.score != null ? ` ${competition.score} %` : ''
                               }`}
                             >
-                              {competition?.score != null ? competition.score : '—'}
+                              {competition?.score != null ? `${competition.score}%` : '—'}
                             </span>
                             <span
                               className="inline-flex h-14 w-14 items-center justify-center rounded-full border text-[18px] font-bold tabular-nums leading-none"
