@@ -2,7 +2,7 @@ import { feasibilityRoundPillStyle } from './FeasibilityGauge.jsx';
 import { IconFeasibility } from './icons.jsx';
 
 /**
- * Pastille réussite : icône cible + pourcentage.
+ * Pastille réussite : icône coupe + pourcentage.
  */
 export default function FeasibilityRoundPill({ score, className = '', size = 'md' }) {
   const isSm = size === 'sm';

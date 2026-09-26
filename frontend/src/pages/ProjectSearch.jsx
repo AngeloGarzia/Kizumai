@@ -33,7 +33,12 @@ import {
   competitionDisplayLabel,
   normalizeCompetition,
 } from '../utils/competitionPill.js';
+import {
+  normalizeProfitability,
+  profitabilityDisplayLabel,
+} from '../utils/profitabilityPill.js';
 import CompetitionSegmentsPill from '../components/CompetitionSegmentsPill.jsx';
+import ProfitabilitySegmentsPill from '../components/ProfitabilitySegmentsPill.jsx';
 
 const BASE_STEPS = [
   { key: 'businesses', label: 'Business' },
@@ -691,6 +696,20 @@ export default function ProjectSearch() {
                 source: selectedBusiness.competitionSource || null,
               }
             : null,
+        profitability:
+          selectedBusiness.profitabilityScore != null ||
+          selectedBusiness.profitabilityLabel ||
+          selectedBusiness.profitabilityNote ||
+          proposal.profitabilityScore != null
+            ? {
+                score:
+                  proposal.profitabilityScore ?? selectedBusiness.profitabilityScore ?? null,
+                label:
+                  proposal.profitabilityLabel || selectedBusiness.profitabilityLabel || null,
+                note:
+                  proposal.profitabilityNote || selectedBusiness.profitabilityNote || null,
+              }
+            : null,
         budgetPlan: {
           kind: proposal.kind || 'budget_utilisateur',
           label: proposalKindLabel(proposal.kind),
@@ -878,6 +897,11 @@ export default function ProjectSearch() {
                       ]
                         .filter(Boolean)
                         .join(' — ') || 'Concurrence estimée';
+                    const profitability = normalizeProfitability(business);
+                    const profitabilityTitle =
+                      [profitability?.note, profitabilityDisplayLabel(profitability)]
+                        .filter(Boolean)
+                        .join(' — ') || 'Rentabilité estimée';
                     return (
                       <div
                         key={index}
@@ -888,10 +912,14 @@ export default function ProjectSearch() {
                           <div className="min-w-0 flex-1">
                             <h3 className="font-semibold text-prune-900 pr-2">{business.title}</h3>
                           </div>
-                          <div className="shrink-0 flex items-center gap-2">
+                          <div className="shrink-0 flex flex-wrap items-center justify-end gap-2">
                             <CompetitionSegmentsPill
                               competition={competition}
                               title={competitionTitle}
+                            />
+                            <ProfitabilitySegmentsPill
+                              profitability={profitability}
+                              title={profitabilityTitle}
                             />
                             <FeasibilityRoundPill score={business.feasibility} />
                           </div>
@@ -1052,11 +1080,26 @@ export default function ProjectSearch() {
                           >
                             {proposalKindLabel(proposal.kind)}
                           </span>
-                          {proposal.feasibility != null && (
-                            <span className="shrink-0 text-xs font-bold tabular-nums text-prune-600">
-                              {proposal.feasibility}%
-                            </span>
-                          )}
+                          <div className="shrink-0 flex items-center gap-1.5">
+                            {(proposal.profitabilityScore != null ||
+                              proposal.profitabilityLabel) && (
+                              <ProfitabilitySegmentsPill
+                                profitability={proposal}
+                                size="sm"
+                                title={
+                                  [
+                                    proposal.profitabilityNote,
+                                    profitabilityDisplayLabel(proposal),
+                                  ]
+                                    .filter(Boolean)
+                                    .join(' — ') || 'Rentabilité'
+                                }
+                              />
+                            )}
+                            {proposal.feasibility != null && (
+                              <FeasibilityRoundPill score={proposal.feasibility} size="sm" />
+                            )}
+                          </div>
                         </div>
                         <h3 className="font-semibold text-prune-900">{proposal.title}</h3>
                         <p className="text-lg font-bold text-wasabi-700 mt-1">

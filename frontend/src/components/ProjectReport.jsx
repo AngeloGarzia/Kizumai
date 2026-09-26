@@ -2,10 +2,15 @@ import { sanitizeDisplayText } from '../utils/safeDisplay.js';
 import { ASSISTANT_NAME, assistantPhrases } from '../constants/assistant.js';
 import FabulousThinking from './FabulousThinking.jsx';
 import CompetitionSegmentsPill from './CompetitionSegmentsPill.jsx';
+import ProfitabilitySegmentsPill from './ProfitabilitySegmentsPill.jsx';
 import {
   competitionDisplayLabel,
   normalizeCompetition,
 } from '../utils/competitionPill.js';
+import {
+  normalizeProfitability,
+  profitabilityDisplayLabel,
+} from '../utils/profitabilityPill.js';
 
 function formatBudget(amount, currency) {
   if (amount == null) return '—';
@@ -93,10 +98,27 @@ function CompetitionBlock({ competition, analysis }) {
           if (!c || typeof c !== 'object') return null;
           const name = asText(c.name || c.title).trim();
           if (!name) return null;
+          const rawUrl = String(c.url || c.website || c.link || '').trim();
+          let url = null;
+          if (rawUrl && !/^null$/i.test(rawUrl)) {
+            try {
+              const withProto = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
+              const u = new URL(withProto);
+              if (
+                (u.protocol === 'http:' || u.protocol === 'https:') &&
+                u.hostname.includes('.')
+              ) {
+                url = u.toString();
+              }
+            } catch {
+              url = null;
+            }
+          }
           return {
             name: name.slice(0, 120),
             kind: asText(c.kind || c.type || '').trim().slice(0, 40) || null,
             impact: asText(c.impact || c.effect || '').trim().slice(0, 500) || null,
+            url,
           };
         })
         .filter(Boolean)
@@ -115,6 +137,14 @@ function CompetitionBlock({ competition, analysis }) {
         ? 'estimation'
         : null,
   ].filter(Boolean);
+
+  const linkHost = (href) => {
+    try {
+      return new URL(href).hostname.replace(/^www\./, '');
+    } catch {
+      return href;
+    }
+  };
 
   return (
     <section className="px-5 sm:px-8 py-5 sm:py-6 border-b border-prune-100">
@@ -163,10 +193,56 @@ function CompetitionBlock({ competition, analysis }) {
               {c.impact && (
                 <p className="mt-1.5 text-sm text-prune-700 leading-relaxed">{c.impact}</p>
               )}
+              {c.url && (
+                <a
+                  href={c.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-topaz-700 hover:text-topaz-900 underline-offset-2 hover:underline break-all"
+                >
+                  {linkHost(c.url)}
+                  <span aria-hidden="true" className="text-xs">
+                    ↗
+                  </span>
+                </a>
+              )}
             </li>
           ))}
         </ul>
       )}
+    </section>
+  );
+}
+
+function ProfitabilityBlock({ profitability }) {
+  const normalized = normalizeProfitability(profitability);
+  if (!normalized) return null;
+
+  return (
+    <section className="px-5 sm:px-8 py-5 sm:py-6 border-b border-prune-100">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+        <div>
+          <p className="text-xs font-semibold tracking-widest text-prune-500 uppercase">
+            Rentabilité
+          </p>
+          <p className="mt-1 text-xs text-prune-400">
+            Probable rentabilité réelle et sérieuse du business
+          </p>
+        </div>
+        <ProfitabilitySegmentsPill
+          profitability={normalized}
+          title={[normalized.note, profitabilityDisplayLabel(normalized)]
+            .filter(Boolean)
+            .join(' — ')}
+        />
+      </div>
+      {normalized.note && (
+        <p className="text-sm text-prune-700 leading-relaxed">{asText(normalized.note)}</p>
+      )}
+      <p className="mt-2 text-xs text-prune-400 leading-relaxed">
+        Un budget trop élevé pour le besoin du projet n’améliore pas ce score : il mesure le
+        retour crédible, pas le confort de trésorerie.
+      </p>
     </section>
   );
 }
@@ -270,6 +346,7 @@ export default function ProjectReport({
   const training = project.training || project.metadata?.training;
   const analysis = fabulousAnalysis || project.fabulousAnalysis || null;
   const competition = project.metadata?.competition || project.competition || null;
+  const profitability = project.metadata?.profitability || project.profitability || null;
   const locationMode =
     project.locationMode ||
     project.metadata?.locationMode ||
@@ -305,6 +382,7 @@ export default function ProjectReport({
 
       <CompetitionBlock competition={competition} analysis={analysis} />
 
+      <ProfitabilityBlock profitability={profitability} />
       {sections.length > 0 ? (
         <div className="divide-y divide-prune-100">
           {sections.map((section, index) => (

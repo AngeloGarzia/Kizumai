@@ -754,6 +754,17 @@ function normalizeBusinesses(raw) {
         : competitionScore != null
           ? 'estimated'
           : null;
+      const profitabilityScore = normalizeFeasibility(
+        item?.profitabilityScore ?? item?.profitability_score
+      );
+      const profitabilityLabel =
+        String(item?.profitabilityLabel || item?.profitability_label || '')
+          .trim()
+          .slice(0, 40) || profitabilityLabelFromScore(profitabilityScore);
+      const profitabilityNote =
+        String(item?.profitabilityNote || item?.profitability_note || '')
+          .trim()
+          .slice(0, 200) || null;
       return {
         title: String(item?.title || '').trim().slice(0, 200),
         activity: String(item?.activity || '').trim().slice(0, 200),
@@ -765,6 +776,9 @@ function normalizeBusinesses(raw) {
         competitionLabel,
         competitionNote,
         competitionSource,
+        profitabilityScore,
+        profitabilityLabel,
+        profitabilityNote,
       };
     })
     .filter((item) => item.title);
@@ -776,6 +790,14 @@ function competitionLabelFromScore(score) {
   if (score <= 49) return 'Modérée';
   if (score <= 74) return 'Forte';
   return 'Très forte';
+}
+
+function profitabilityLabelFromScore(score) {
+  if (score == null) return null;
+  if (score <= 24) return 'Fragile';
+  if (score <= 49) return 'Limitée';
+  if (score <= 74) return 'Plausible';
+  return 'Solide';
 }
 
 /** Clé de rapprochement titres (casse / accents / ponctuation). */
@@ -1114,6 +1136,20 @@ export function createAiService({ settingsService, currencyService }) {
         budget: await currencyService.clampBudget(item?.budget, currency),
         currency: currency || 'EUR',
         feasibility: normalizeFeasibility(item?.feasibility),
+        profitabilityScore: normalizeFeasibility(
+          item?.profitabilityScore ?? item?.profitability_score
+        ),
+        profitabilityLabel:
+          String(item?.profitabilityLabel || item?.profitability_label || '')
+            .trim()
+            .slice(0, 40) ||
+          profitabilityLabelFromScore(
+            normalizeFeasibility(item?.profitabilityScore ?? item?.profitability_score)
+          ),
+        profitabilityNote:
+          String(item?.profitabilityNote || item?.profitability_note || '')
+            .trim()
+            .slice(0, 200) || null,
         report,
         sections,
       });
@@ -1803,13 +1839,30 @@ export function createAiService({ settingsService, currencyService }) {
         aiConfig
       );
 
-      const data = await requestStepJson(userContent, { temperature });
+      const data = await requestStepJson(userContent, {
+        temperature,
+        googleSearch: true,
+      });
       const strengths = Array.isArray(data.strengths)
         ? data.strengths.map((s) => clipAiOutput(String(s || '').trim(), 400)).filter(Boolean).slice(0, 6)
         : [];
       const risks = Array.isArray(data.risks)
         ? data.risks.map((s) => clipAiOutput(String(s || '').trim(), 400)).filter(Boolean).slice(0, 6)
         : [];
+
+      const sanitizeCompetitorUrl = (raw) => {
+        const s = String(raw || '').trim();
+        if (!s || /^null$/i.test(s) || s === '-') return null;
+        try {
+          const withProto = /^https?:\/\//i.test(s) ? s : `https://${s}`;
+          const u = new URL(withProto);
+          if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+          if (!u.hostname || !u.hostname.includes('.')) return null;
+          return u.toString().slice(0, 500);
+        } catch {
+          return null;
+        }
+      };
 
       const competitors = Array.isArray(data.competitors)
         ? data.competitors
@@ -1821,6 +1874,7 @@ export function createAiService({ settingsService, currencyService }) {
                 name,
                 kind: clipAiOutput(String(c.kind || c.type || '').trim(), 40) || null,
                 impact: clipAiOutput(String(c.impact || c.effect || '').trim(), 500) || null,
+                url: sanitizeCompetitorUrl(c.url || c.website || c.link || ''),
               };
             })
             .filter(Boolean)

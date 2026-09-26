@@ -621,6 +621,31 @@ export function createProjectService({
         }
       }
 
+      const profitabilityRaw = metaIn.profitability;
+      let profitability = null;
+      if (
+        profitabilityRaw &&
+        typeof profitabilityRaw === 'object' &&
+        !Array.isArray(profitabilityRaw)
+      ) {
+        const score =
+          profitabilityRaw.score != null
+            ? Number(profitabilityRaw.score)
+            : profitabilityRaw.profitabilityScore != null
+              ? Number(profitabilityRaw.profitabilityScore)
+              : null;
+        const label =
+          profitabilityRaw.label || profitabilityRaw.profitabilityLabel || null;
+        const note = profitabilityRaw.note || profitabilityRaw.profitabilityNote || null;
+        if (score != null || label || note) {
+          profitability = {
+            score: Number.isFinite(score) ? Math.min(100, Math.max(0, Math.round(score))) : null,
+            label: label ? String(label).slice(0, 40) : null,
+            note: note ? String(note).slice(0, 280) : null,
+          };
+        }
+      }
+
       const BUDGET_PLAN_KINDS = new Set([
         'budget_utilisateur',
         'budget_flexible',
@@ -657,6 +682,7 @@ export function createProjectService({
         ...metaIn,
         locationMode: mode,
         ...(competition ? { competition } : {}),
+        ...(profitability ? { profitability } : {}),
         ...(budgetPlan ? { budgetPlan } : {}),
       };
 

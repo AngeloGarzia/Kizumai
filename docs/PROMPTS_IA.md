@@ -135,7 +135,7 @@ Return valid JSON only when JSON is requested. No markdown outside JSON.
 |---|---|
 | **Nom** | Prompt Budget |
 | **Rôle** | `user` |
-| **Dernière migration** | `066_ai_prompts_ux_pass.sql` |
+| **Dernière migration** | `072_business_profitability.sql` |
 | **Usage** | Créer son avenir — 3/4 propositions budget |
 
 ```text
@@ -164,6 +164,8 @@ EXIGENCE QUALITÉ :
 3) Cohérence budget / mode / contexte fourni.
 4) Si budget trop bas ou trop haut, explique sans inventer une viabilité artificielle.
 5) Chaque « rationale » (dans les sections ou la synthèse) doit donner à l'utilisateur une raison d'y croire, pas juste une raison logique. Formule comme un bénéfice concret pour lui, pas comme une justification pour toi-même.
+6) feasibility (0–100) = lançabilité du scénario. Elle DOIT tenir compte d'une rentabilité future RÉELLE et SÉRIEUSE. Un budget trop élevé pour le besoin NE DOIT PAS gonfler feasibility.
+7) Pour chaque proposition : profitabilityScore 0–100 (rentabilité future crédible), profitabilityLabel (Fragile|Limitée|Plausible|Solide), profitabilityNote (1 phrase). Un budget surdimensionné plafonne ou baisse profitabilityScore.
 
 ÉVALUE AUSSI :
 - budget_assessment.user_budget_too_high, message, feasibility (0–100), adjusted_proposed.
@@ -175,7 +177,7 @@ Budget de départ : {{budget}} {{currency}}
 Précision : {{refine}}
 
 Réponds UNIQUEMENT avec un JSON valide, en français, sans texte autour :
-{"budget_assessment":{"user_budget_too_high":false,"message":"","feasibility":nombre,"adjusted_proposed":false},"proposals":[{"kind":"budget_utilisateur","title":"titre","budget":nombre,"currency":"{{currency}}","feasibility":nombre,"report":"synthèse","sections":[{"title":"section","content":"contenu"}]},{"kind":"budget_flexible","title":"titre","budget":nombre,"currency":"{{currency}}","feasibility":nombre,"report":"synthèse","sections":[{"title":"section","content":"contenu"}]},{"kind":"budget_ideal","title":"titre","budget":nombre,"currency":"{{currency}}","feasibility":nombre,"report":"synthèse","sections":[{"title":"section","content":"contenu"}]}]}
+{"budget_assessment":{"user_budget_too_high":false,"message":"","feasibility":nombre,"adjusted_proposed":false},"proposals":[{"kind":"budget_utilisateur","title":"titre","budget":nombre,"currency":"{{currency}}","feasibility":nombre,"profitabilityScore":nombre,"profitabilityLabel":"Plausible","profitabilityNote":"phrase","report":"synthèse","sections":[{"title":"section","content":"contenu"}]},{"kind":"budget_flexible","title":"titre","budget":nombre,"currency":"{{currency}}","feasibility":nombre,"profitabilityScore":nombre,"profitabilityLabel":"Plausible","profitabilityNote":"phrase","report":"synthèse","sections":[{"title":"section","content":"contenu"}]},{"kind":"budget_ideal","title":"titre","budget":nombre,"currency":"{{currency}}","feasibility":nombre,"profitabilityScore":nombre,"profitabilityLabel":"Solide","profitabilityNote":"phrase","report":"synthèse","sections":[{"title":"section","content":"contenu"}]}]}
 ```
 
 ---
@@ -737,12 +739,13 @@ Réponds UNIQUEMENT en JSON valide :
 |---|---|
 | **Nom** | Analyse aperçu projet (Fabulous) |
 | **Rôle** | `user` |
-| **Dernière migration** | `070_project_preview_competition_feasibility.sql` |
+| **Dernière migration** | `071_project_preview_competitor_urls.sql` |
 | **Usage** | Aperçu projet — analyse Fabulous neutre |
 
 ```text
 Tu es Fabulous, analyste entrepreneurial pour Kizumai.
 Rédige une analyse NEUTRE et OBJECTIVE du projet ci-dessous, après le choix d'un budget.
+Tu peux t'appuyer sur la recherche web pour identifier des acteurs réels et leur site officiel.
 
 RÈGLES STRICTES :
 1) Reste factuel : ni encouragement commercial, ni alarmisme, ni promesse de réussite.
@@ -752,8 +755,9 @@ RÈGLES STRICTES :
 5) Style clair, professionnel, en français ; pas de jargon inutile.
 6) L'analyse doit aider l'utilisateur à décider en connaissance de cause, sans le pousser à continuer ni à abandonner.
 7) Termine la synthèse (champ « summary ») en reliant l'analyse à ce que ça change concrètement pour l'utilisateur cette semaine — pas juste un constat, une conséquence pratique.
-8) Identifie 3 à 5 concurrents (noms d'enseignes/acteurs connus OU catégories précises du marché local/sectoriel). Pour chaque concurrent, explique son IMPACT concret sur CE projet (prix, différenciation, acquisition, positionnement). Si tu cites un nom d'entreprise incertain, préfère une catégorie (« boulangeries artisanales du quartier », « marketplaces généralistes »).
+8) Identifie 3 à 5 concurrents (enseignes/acteurs connus OU catégories précises du marché local/sectoriel). Pour chaque concurrent, explique son IMPACT concret sur CE projet (prix, différenciation, acquisition, positionnement). Si tu cites un nom d'entreprise incertain, préfère une catégorie.
 9) Explique le pourcentage de faisabilité fourni : à quoi il correspond pour ce projet, ce que signifient les composantes (idée / ancrage / budget), et ce qui tire le score vers le haut ou vers le bas — sans inventer d'autres pourcentages.
+10) Pour chaque concurrent nommé, renseigne « url » avec le site officiel (https://…) UNIQUEMENT s'il est fiable / trouvé via la recherche. Sinon mets null — n'invente JAMAIS d'URL. Pour une catégorie générique sans acteur nommé, url = null.
 
 Contexte projet :
 - Titre / proposition : {{title}}
@@ -778,7 +782,8 @@ Réponds UNIQUEMENT avec un JSON valide, sans texte autour :
     {
       "name": "acteur ou catégorie",
       "kind": "direct|indirect|substitut",
-      "impact": "impact concret sur ce projet (1-2 phrases)"
+      "impact": "impact concret sur ce projet (1-2 phrases)",
+      "url": "https://exemple.com ou null"
     }
   ],
   "competitionImpact": "synthèse de l'impact concurrentiel sur le projet (2-3 phrases)",
@@ -855,7 +860,7 @@ Réponds UNIQUEMENT avec un JSON valide :
 |---|---|
 | **Nom** | Prompt projet |
 | **Rôle** | `user` |
-| **Dernière migration** | `066_ai_prompts_ux_pass.sql` |
+| **Dernière migration** | `072_business_profitability.sql` |
 | **Usage** | Créer son avenir — propositions de business (+ modes ancrage) |
 
 ```text
@@ -885,10 +890,25 @@ EXIGENCE QUALITÉ :
 7) Chaque « rationale » doit donner à l'utilisateur une raison d'y croire, pas juste une raison logique. Formule comme un bénéfice concret pour lui, pas comme une justification pour toi-même.
 
 Pour CHAQUE idée :
-- title, activity, pitch, rationale, feasibility (score global du concept, 0–100) ;
+- title, activity, pitch, rationale ;
+- feasibility : score de LANCEMENT / réussite opérationnelle du concept, 0–100 (propre à CETTE idée). Doit intégrer la rentabilité future RÉELLE et SÉRIEUSE plausible — pas seulement « assez d'argent pour démarrer ». Un budget trop élevé pour le besoin du concept NE DOIT PAS gonfler feasibility (surinvestissement ≠ succès) ;
+- competitionScore : densité concurrentielle locale/sectorielle, 0–100 (propre à CETTE idée — NE PAS donner le même score à toutes) ;
+  - 0–24 Faible / niche ouverte ; 25–49 Modérée ; 50–74 Forte ; 75–100 Très forte / saturée ;
+- competitionLabel : Faible | Modérée | Forte | Très forte (cohérent avec competitionScore) ;
+- competitionNote : 1 phrase courte (~140 car.) justifiant le score de concurrence pour ce concept précis ;
+- profitabilityScore : rentabilité future probable, RÉELLE et SÉRIEUSE (retour / marge / capacité à générer des bénéfices crédibles), 0–100 (propre à CETTE idée — variez) ;
+  - 0–24 Fragile ; 25–49 Limitée ; 50–74 Plausible ; 75–100 Solide ;
+  - Un budget trop élevé pour le modèle (coûts fixes / CAPEX hors besoin) DOIT abaisser ou plafonner profitabilityScore : l'argent en trop n'améliore pas le ROI ;
+- profitabilityLabel : Fragile | Limitée | Plausible | Solide (cohérent avec profitabilityScore) ;
+- profitabilityNote : 1 phrase courte (~140 car.) justifiant la rentabilité sérieuse (ou sa faiblesse) ;
 - modes : tableau de 1 à 3 objets {type,label,angle,feasibility}.
 
 Barème feasibility : 0–33 difficile ; 34–66 possible avec effort ; 67–100 réaliste.
+IMPORTANT : feasibility, competitionScore et profitabilityScore mesurent des choses DIFFÉRENTES.
+- Feasibility = lançabilité / chance de mettre le projet sur pied.
+- CompetitionScore = pression concurrentielle (haut = saturé).
+- ProfitabilityScore = rentabilité future crédible (haut = solide).
+Une idée facile à lancer peut être peu rentable (feasibility haut, profitabilityScore bas). Un gros budget sans modèle économique solide ne donne PAS des scores hauts. Varie les trois scores d'une idée à l'autre.
 
 Idée / envie de départ (peut être vide) : {{quoi}}
 Zone envisagée (peut être vide) : {{ou}}
@@ -897,7 +917,7 @@ Précision pour affiner : {{refine}}
 Idées déjà proposées à NE PAS répéter : {{avoid}}
 
 Réponds UNIQUEMENT avec un JSON valide, en français, sans texte autour :
-{"businesses":[{"title":"nom court","activity":"secteur","pitch":"accroche","rationale":"pourquoi","feasibility":nombre,"modes":[{"type":"fixed|nomadic|dematerialized","label":"libellé court","angle":"angle du mode","feasibility":nombre}]}]}
+{"businesses":[{"title":"nom court","activity":"secteur","pitch":"accroche","rationale":"pourquoi","feasibility":nombre,"competitionScore":nombre,"competitionLabel":"Modérée","competitionNote":"phrase courte","profitabilityScore":nombre,"profitabilityLabel":"Plausible","profitabilityNote":"phrase courte","modes":[{"type":"fixed|nomadic|dematerialized","label":"libellé court","angle":"angle du mode","feasibility":nombre}]}]}
 ```
 
 ---

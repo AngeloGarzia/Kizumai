@@ -159,13 +159,34 @@ export function IconCompetition({ className = 'w-5 h-5' }) {
   );
 }
 
-/** Faisabilité / réussite : cible. */
+/** Faisabilité / réussite : coupe de vainqueur. */
 export function IconFeasibility({ className = 'w-5 h-5' }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
-      <circle cx="12" cy="12" r="8" />
-      <circle cx="12" cy="12" r="4" />
-      <circle cx="12" cy="12" r="1.25" fill="currentColor" stroke="none" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M8 4h8v3.5a4 4 0 0 1-8 0V4z"
+      />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8 5.5H5.5A2.5 2.5 0 0 0 8 8" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16 5.5h2.5A2.5 2.5 0 0 1 16 8" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 11.5V14" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9.5 20h5" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 14h3l.5 6h-4l.5-6z" />
+    </svg>
+  );
+}
+
+/** Rentabilité : symbole dollar. */
+export function IconProfitability({ className = 'w-5 h-5' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.25" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M12 7v10M14.5 9.25c0-1.1-1.12-2-2.5-2s-2.5.9-2.5 2 1.12 2 2.5 2 2.5.9 2.5 2-1.12 2-2.5 2-2.5-.9-2.5-2"
+      />
     </svg>
   );
 }

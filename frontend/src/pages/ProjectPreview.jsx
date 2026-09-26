@@ -64,7 +64,9 @@ export default function ProjectPreview() {
       analysis &&
       (analysis.summary || analysis.outlook) &&
       Array.isArray(analysis.competitors) &&
-      typeof analysis.feasibilityExplanation === 'string';
+      typeof analysis.feasibilityExplanation === 'string' &&
+      // Régénère si les liens web concurrents n’ont pas encore été demandés.
+      analysis.competitors.some((c) => c && Object.prototype.hasOwnProperty.call(c, 'url'));
     if (hasEnrichedShape) {
       return undefined;
     }
