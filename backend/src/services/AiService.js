@@ -382,12 +382,16 @@ async function rawChatText({
   timeoutMs = AI_REQUEST_TIMEOUT_MS,
   thinkingBudget = 1024,
   responseSchema = null,
+  googleSearch = false,
 }) {
   return withAiGuard(async () => {
     const startedAt = Date.now();
     const outTokens = Math.min(65_536, Math.max(1024, Number(maxOutputTokens) || 16_384));
     const requestTimeout = Math.min(300_000, Math.max(15_000, Number(timeoutMs) || AI_REQUEST_TIMEOUT_MS));
-    const thinkBudget = Math.max(0, Number(thinkingBudget) || 0);
+    // Grounding Google Search : pas de thinking / schema (conflits fréquents).
+    const useGoogleSearch = Boolean(googleSearch) && providerId === 'gemini';
+    const thinkBudget = useGoogleSearch ? 0 : Math.max(0, Number(thinkingBudget) || 0);
+    const schema = useGoogleSearch ? null : responseSchema;
     const trustedSystem = buildTrustedSystemText(aiConfig, systemContent);
 
     const safeUser = clipAiOutput(String(userContent || ''), 60_000);
@@ -398,7 +402,8 @@ async function rawChatText({
       maxOutputTokens: outTokens,
       timeoutMs: requestTimeout,
       thinkingBudget: thinkBudget || null,
-      hasResponseSchema: Boolean(responseSchema),
+      hasResponseSchema: Boolean(schema),
+      googleSearch: useGoogleSearch,
       systemChars: trustedSystem.length,
       userChars: safeUser.length,
       systemPreview: trustedSystem.slice(0, 2000),
@@ -418,14 +423,17 @@ async function rawChatText({
             responseMimeType: 'application/json',
           },
         };
-        if (responseSchema) {
-          body.generationConfig.responseSchema = responseSchema;
+        if (schema) {
+          body.generationConfig.responseSchema = schema;
         }
         if (thinkBudget > 0) {
           body.generationConfig.thinkingConfig = { thinkingBudget: thinkBudget };
         }
         if (trustedSystem) {
           body.systemInstruction = { parts: [{ text: trustedSystem }] };
+        }
+        if (useGoogleSearch) {
+          body.tools = [{ google_search: {} }];
         }
 
         const response = await fetchWithTimeout(
@@ -439,7 +447,7 @@ async function rawChatText({
         );
         if (!response.ok) {
           const errBody = await response.text().catch(() => '');
-          // Repli sans thinkingConfig / schema si le modèle les refuse.
+          // Repli sans thinkingConfig / schema / google_search si le modèle les refuse.
           if (response.status === 400) {
             let retried = false;
             if (/thinking|Thinking/i.test(errBody) && body.generationConfig.thinkingConfig) {
@@ -448,6 +456,10 @@ async function rawChatText({
             }
             if (/schema|Schema|response_schema/i.test(errBody) && body.generationConfig.responseSchema) {
               delete body.generationConfig.responseSchema;
+              retried = true;
+            }
+            if (/google_search|GoogleSearch|tool/i.test(errBody) && body.tools) {
+              delete body.tools;
               retried = true;
             }
             if (retried) {
@@ -466,7 +478,7 @@ async function rawChatText({
                 data: retryData,
                 providerId,
                 aiConfig,
-                requestJson,
+                requestJson: { ...requestJson, googleSearch: Boolean(body.tools) },
                 startedAt,
               });
             }
@@ -711,9 +723,77 @@ function normalizeBusinesses(raw) {
         rationale: String(item?.rationale || '').trim().slice(0, 800),
         feasibility,
         modes: normalizeBusinessModes(item?.modes, feasibility),
+        competitionScore: normalizeFeasibility(item?.competitionScore ?? item?.competition_score),
+        competitionLabel: String(item?.competitionLabel || item?.competition_label || '')
+          .trim()
+          .slice(0, 40) || null,
+        competitionNote: String(item?.competitionNote || item?.competition_note || '')
+          .trim()
+          .slice(0, 200) || null,
+        competitionSource: ['web', 'estimated'].includes(item?.competitionSource)
+          ? item.competitionSource
+          : null,
       };
     })
     .filter((item) => item.title);
+}
+
+function competitionLabelFromScore(score) {
+  if (score == null) return null;
+  if (score <= 24) return 'Faible';
+  if (score <= 49) return 'Modérée';
+  if (score <= 74) return 'Forte';
+  return 'Très forte';
+}
+
+function normalizeCompetitionItems(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .slice(0, 12)
+    .map((item) => {
+      const title = String(item?.title || '').trim().slice(0, 200);
+      const competitionScore = normalizeFeasibility(
+        item?.competitionScore ?? item?.competition_score
+      );
+      return {
+        title,
+        competitionScore,
+        competitionLabel:
+          String(item?.competitionLabel || item?.competition_label || '')
+            .trim()
+            .slice(0, 40) || competitionLabelFromScore(competitionScore),
+        competitionNote: String(item?.competitionNote || item?.competition_note || '')
+          .trim()
+          .slice(0, 200) || null,
+      };
+    })
+    .filter((item) => item.title);
+}
+
+function mergeCompetitionIntoBusinesses(businesses, items, source) {
+  const byTitle = new Map();
+  for (const item of items || []) {
+    byTitle.set(item.title.toLowerCase(), item);
+  }
+  return (businesses || []).map((b) => {
+    const hit = byTitle.get(String(b.title || '').toLowerCase());
+    if (!hit || hit.competitionScore == null) {
+      return {
+        ...b,
+        competitionScore: b.competitionScore ?? null,
+        competitionLabel: b.competitionLabel ?? null,
+        competitionNote: b.competitionNote ?? null,
+        competitionSource: b.competitionSource ?? null,
+      };
+    }
+    return {
+      ...b,
+      competitionScore: hit.competitionScore,
+      competitionLabel: hit.competitionLabel || competitionLabelFromScore(hit.competitionScore),
+      competitionNote: hit.competitionNote,
+      competitionSource: source,
+    };
+  });
 }
 
 function normalizeLocations(raw) {
@@ -847,6 +927,7 @@ export function createAiService({ settingsService, currencyService }) {
     {
       systemExtra = '',
       fabulousVoice = false,
+      googleSearch = false,
       maxOutputTokens,
       timeoutMs,
       thinkingBudget,
@@ -875,6 +956,7 @@ export function createAiService({ settingsService, currencyService }) {
       ? resolveAiPrompt(aiConfig.fabulousVoicePrompt, DEFAULT_FABULOUS_VOICE)
       : '';
     const mergedExtra = [systemExtra, voiceExtra].filter(Boolean).join('\n\n');
+    const useGoogleSearch = Boolean(googleSearch) && providerId === 'gemini';
 
     const buildSystem = (extra) =>
       [
@@ -894,7 +976,8 @@ export function createAiService({ settingsService, currencyService }) {
         maxOutputTokens: maxOutputTokens ?? 16_384,
         timeoutMs,
         thinkingBudget: think,
-        responseSchema: providerId === 'gemini' ? schema || null : null,
+        responseSchema: providerId === 'gemini' && !useGoogleSearch ? schema || null : null,
+        googleSearch: useGoogleSearch,
       });
       return extractJson(text);
     };
@@ -903,8 +986,8 @@ export function createAiService({ settingsService, currencyService }) {
       try {
         return await callOnce({
           extra: mergedExtra,
-          think: thinkingBudget,
-          schema: responseSchema,
+          think: useGoogleSearch ? 0 : thinkingBudget,
+          schema: useGoogleSearch ? null : responseSchema,
         });
       } catch (firstErr) {
         const isJsonFail =
@@ -1277,7 +1360,71 @@ export function createAiService({ settingsService, currencyService }) {
         aiConfig
       );
       const data = await requestStepJson(userContent, { temperature });
-      return normalizeBusinesses(data.businesses).slice(0, count);
+      const businesses = normalizeBusinesses(data.businesses).slice(0, count);
+      try {
+        return await this.estimateBusinessCompetition({
+          businesses,
+          ou,
+          budget,
+          currency,
+          temperature,
+        });
+      } catch (err) {
+        console.warn('[ai] concurrence business :', err.message);
+        return businesses;
+      }
+    },
+
+    /**
+     * 2ᵉ passe : score de concurrence (Gemini + Google Search si dispo).
+     */
+    async estimateBusinessCompetition({
+      businesses = [],
+      ou = '',
+      budget,
+      currency = 'EUR',
+      temperature = null,
+    }) {
+      if (!Array.isArray(businesses) || !businesses.length) return businesses;
+
+      const aiConfig = await settingsService.getAiConfig();
+      if (!aiConfig.businessCompetitionPrompt) {
+        return businesses.map((b) => ({
+          ...b,
+          competitionScore: b.competitionScore ?? null,
+          competitionLabel: b.competitionLabel ?? null,
+          competitionNote: b.competitionNote ?? null,
+          competitionSource: b.competitionSource ?? null,
+        }));
+      }
+
+      const payload = businesses.map((b) => ({
+        title: b.title,
+        activity: b.activity || '',
+        pitch: b.pitch || '',
+        modes: (b.modes || []).map((m) => m.type).filter(Boolean),
+      }));
+
+      const userContent = interpolate(aiConfig.businessCompetitionPrompt, {
+        businesses_json: JSON.stringify(payload).slice(0, 12_000),
+        ou: String(ou || '').trim().slice(0, 200) || 'non précisée',
+        budget,
+        currency: String(currency || 'EUR').slice(0, 8),
+      });
+
+      const useWeb = aiConfig.provider === 'gemini';
+      const data = await requestStepJson(userContent, {
+        temperature: temperature != null ? temperature : 0.4,
+        googleSearch: useWeb,
+        thinkingBudget: 0,
+        maxOutputTokens: 8192,
+      });
+      const items = normalizeCompetitionItems(data.items || data.businesses || []);
+      return mergeCompetitionIntoBusinesses(
+        businesses,
+        items,
+        useWeb ? 'web' : 'estimated'
+      );
     },
 
     async searchLocations({

@@ -52,6 +52,9 @@ export function createSettingsService({ settingsRepository, aiPromptRepository }
         'project_assistant'
       );
       const projectAuditPrompt = await aiPromptRepository.findByKey('project_audit');
+      const businessCompetitionPrompt = await aiPromptRepository.findByKey(
+        'business_competition'
+      );
 
       const provider = settings.ai_provider || config.ai.defaultProvider;
       const providerDef = getProviderById(provider);
@@ -85,6 +88,7 @@ export function createSettingsService({ settingsRepository, aiPromptRepository }
         fabulousTaskChecklistPrompt: fabulousTaskChecklistPrompt?.content || null,
         projectAssistantPrompt: projectAssistantPrompt?.content || null,
         projectAuditPrompt: projectAuditPrompt?.content || null,
+        businessCompetitionPrompt: businessCompetitionPrompt?.content || null,
       };
     },
 

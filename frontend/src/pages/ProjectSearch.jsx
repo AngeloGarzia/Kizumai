@@ -28,6 +28,10 @@ import {
   formatDigitalSetupLabel,
   formatMobilityLabel,
 } from '../constants/locationModes.js';
+import {
+  competitionDisplayLabel,
+  competitionPillStyle,
+} from '../utils/competitionPill.js';
 
 const BASE_STEPS = [
   { key: 'businesses', label: 'Business' },
@@ -795,6 +799,17 @@ export default function ProjectSearch() {
           : null,
         mobility: modeType === LOCATION_MODE.NOMADIC ? mobilitySetup : null,
         digitalSetup: modeType === LOCATION_MODE.DEMATERIALIZED ? digitalSetup : null,
+        competition:
+          selectedBusiness.competitionScore != null ||
+          selectedBusiness.competitionLabel ||
+          selectedBusiness.competitionNote
+            ? {
+                score: selectedBusiness.competitionScore ?? null,
+                label: selectedBusiness.competitionLabel || null,
+                note: selectedBusiness.competitionNote || null,
+                source: selectedBusiness.competitionSource || null,
+              }
+            : null,
       },
       training: trainingForBusiness
         ? {
@@ -944,7 +959,30 @@ export default function ProjectSearch() {
                         style={tileStyle}
                       >
                         <div className="flex items-start justify-between gap-3">
-                          <h3 className="font-semibold text-prune-900">{business.title}</h3>
+                          <div className="min-w-0 flex-1 flex flex-wrap items-center gap-2">
+                            <h3 className="font-semibold text-prune-900">{business.title}</h3>
+                            <span
+                              className="inline-flex items-center rounded-lg border px-2 py-0.5 text-[11px] font-semibold tracking-wide"
+                              style={competitionPillStyle(business.competitionScore)}
+                              title={
+                                [
+                                  business.competitionNote,
+                                  business.competitionSource === 'web'
+                                    ? 'Estimation avec recherche web'
+                                    : business.competitionSource === 'estimated'
+                                      ? 'Estimation sans recherche web'
+                                      : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(' — ') || 'Concurrence estimée'
+                              }
+                            >
+                              Concurrence · {competitionDisplayLabel(business)}
+                              {business.competitionScore != null
+                                ? ` (${business.competitionScore})`
+                                : ''}
+                            </span>
+                          </div>
                           {business.feasibility != null && (
                             <span
                               className="shrink-0 text-[15px] font-bold tabular-nums"

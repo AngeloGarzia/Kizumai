@@ -4,7 +4,7 @@
 > En production, la source de vérité est la table `ai_prompts` (éditable via Admin).
 > Pour régénérer : `node scripts/export-ai-prompts.mjs`
 
-Généré le 2026-09-26 — **22 prompts**.
+Généré le 2026-09-26 — **23 prompts**.
 
 ## Sommaire
 
@@ -15,6 +15,7 @@ Généré le 2026-09-26 — **22 prompts**.
 - [`ai_memory_context_prefix`](#ai_memory_context_prefix) — Préfixe contexte mémoire — Système — préfixe injection mémoire
 - [`ai_trusted_system`](#ai_trusted_system) — Garde-fou système (trusted) — Système — couche confiance / garde-fous
 - [`budget`](#budget) — Prompt Budget — Créer son avenir — 3/4 propositions budget
+- [`business_competition`](#business_competition) — Concurrence business — estimation (web si dispo)
 - [`carte_implantation`](#carte_implantation) — Carte implantation France — Carte France — scores par région
 - [`document_scan`](#document_scan) — Scan document — résumé + contacts / dates / adresses — Scan Fabulous d’un document (résumé, contacts, dates, adresses)
 - [`fabulous_page_guide`](#fabulous_page_guide) — Fabulous — guide de page — Guide Fabulous contextualisé par page
@@ -175,6 +176,41 @@ Précision : {{refine}}
 
 Réponds UNIQUEMENT avec un JSON valide, en français, sans texte autour :
 {"budget_assessment":{"user_budget_too_high":false,"message":"","feasibility":nombre,"adjusted_proposed":false},"proposals":[{"kind":"budget_utilisateur","title":"titre","budget":nombre,"currency":"{{currency}}","feasibility":nombre,"report":"synthèse","sections":[{"title":"section","content":"contenu"}]},{"kind":"budget_flexible","title":"titre","budget":nombre,"currency":"{{currency}}","feasibility":nombre,"report":"synthèse","sections":[{"title":"section","content":"contenu"}]},{"kind":"budget_ideal","title":"titre","budget":nombre,"currency":"{{currency}}","feasibility":nombre,"report":"synthèse","sections":[{"title":"section","content":"contenu"}]}]}
+```
+
+---
+
+## `business_competition`
+
+| | |
+|---|---|
+| **Nom** | Concurrence business — estimation (web si dispo) |
+| **Rôle** | `user` |
+| **Dernière migration** | `067_business_competition.sql` |
+
+```text
+Tu estimes la CONCURRENCE déjà en place (ou très probable) pour chaque idée de business ci-dessous.
+Zone / marché de référence : {{ou}}
+Budget utilisateur : {{budget}} {{currency}}
+
+RÈGLES :
+1) Pour chaque business, évalue la densité concurrentielle locale ou sectorielle (acteurs similaires, saturation, barrières).
+2) Si la recherche web est disponible, utilise-la pour te baser sur des signaux réels (annuaires, acteurs connus, tendances locales). Sinon, estime clairement à partir de ton savoir.
+3) competitionScore : entier 0–100
+   - 0–24 : concurrence faible / niche ouverte
+   - 25–49 : concurrence modérée
+   - 50–74 : concurrence forte
+   - 75–100 : marché saturé / très concurrentiel
+4) competitionLabel : Faible | Modérée | Forte | Très forte (cohérent avec le score).
+5) competitionNote : 1 phrase courte (max ~140 caractères) justifiant le score pour le porteur.
+6) Reprends EXACTEMENT les titres fournis (même orthographe) — un item par business, pas plus, pas moins.
+7) N'invente pas de noms d'entreprises absents de sources si tu n'as pas de web ; reste prudent.
+
+Business à évaluer (JSON) :
+{{businesses_json}}
+
+Réponds UNIQUEMENT avec un JSON valide, en français, sans texte autour :
+{"items":[{"title":"titre exact","competitionScore":42,"competitionLabel":"Modérée","competitionNote":"phrase courte"}]}
 ```
 
 ---

@@ -16,6 +16,11 @@ import { PROJECT_STAGE_LABELS, nextStageId, stageHref } from '../constants/proje
 import { useProject } from '../context/ProjectContext.jsx';
 import { assistantPhrases } from '../constants/assistant.js';
 import { DOCUMENT_ACCEPT } from '../utils/safeDisplay.js';
+import {
+  competitionDisplayLabel,
+  competitionPillStyle,
+  normalizeCompetition,
+} from '../utils/competitionPill.js';
 
 const STATUS_LABELS = {
   not_started: 'Non démarrée',
@@ -46,6 +51,42 @@ function formatDate(value) {
     month: 'short',
     year: 'numeric',
   }).format(new Date(value));
+}
+
+function CompetitionSnapshot({ competition }) {
+  const c = normalizeCompetition(competition);
+  if (!c) {
+    return (
+      <div className="mx-5 mb-3 rounded-xl border border-prune-100 bg-prune-50/80 px-4 py-3">
+        <p className="text-sm text-prune-600">
+          Pas encore d’estimation de concurrence liée à ce projet. Elle est calculée à la sélection
+          de l’idée business.
+        </p>
+      </div>
+    );
+  }
+  const sourceHint =
+    c.source === 'web'
+      ? 'Estimation avec recherche web'
+      : c.source === 'estimated'
+        ? 'Estimation sans recherche web'
+        : null;
+  return (
+    <div className="mx-5 mb-3 rounded-xl border border-prune-100 bg-prune-50/80 px-4 py-3 space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <span
+          className="inline-flex items-center rounded-lg border px-2.5 py-1 text-xs font-semibold tracking-wide"
+          style={competitionPillStyle(c.score)}
+          title={[c.note, sourceHint].filter(Boolean).join(' — ') || undefined}
+        >
+          Concurrence · {competitionDisplayLabel(c)}
+          {c.score != null ? ` (${c.score})` : ''}
+        </span>
+        {sourceHint && <span className="text-xs text-prune-500">{sourceHint}</span>}
+      </div>
+      {c.note && <p className="text-sm text-prune-700 leading-snug">{c.note}</p>}
+    </div>
+  );
 }
 
 function TaskPanel({
@@ -628,6 +669,12 @@ export default function StageWorkspace({ projectId, stage }) {
             ) : (
               (data?.workflows || []).map((wf) => {
                 const doneCount = wf.tasks.filter((t) => t.status === 'done').length;
+                const competitionSnap =
+                  wf.slug === 'concurrence'
+                    ? normalizeCompetition(
+                        project?.metadata?.competition ?? data?.competition ?? null
+                      )
+                    : null;
                 return (
                   <details
                     key={wf.slug}
@@ -635,12 +682,27 @@ export default function StageWorkspace({ projectId, stage }) {
                     open={doneCount < wf.tasks.length}
                   >
                     <summary className="cursor-pointer list-none px-5 py-4 flex items-center justify-between gap-3">
-                      <span className="font-semibold text-prune-900">{wf.title}</span>
-                      <span className="text-sm text-prune-500">
+                      <span className="min-w-0 flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-prune-900">{wf.title}</span>
+                        {competitionSnap && (
+                          <span
+                            className="inline-flex items-center rounded-lg border px-2 py-0.5 text-[11px] font-semibold tracking-wide"
+                            style={competitionPillStyle(competitionSnap.score)}
+                            title={competitionSnap.note || undefined}
+                          >
+                            {competitionDisplayLabel(competitionSnap)}
+                            {competitionSnap.score != null ? ` (${competitionSnap.score})` : ''}
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-sm text-prune-500 shrink-0">
                         {doneCount}/{wf.tasks.length}
                         <IconChevronRight className="inline w-4 h-4 ml-1 group-open:rotate-90 transition-transform" />
                       </span>
                     </summary>
+                    {wf.slug === 'concurrence' && (
+                      <CompetitionSnapshot competition={competitionSnap} />
+                    )}
                     <ul className="px-5 pb-2">
                       {wf.tasks.map((task) => (
                         <TaskPanel

@@ -131,7 +131,7 @@ export function createProjectStageService({
     });
   }
 
-  async function hydrateRun(run, userId, projectId) {
+  async function hydrateRun(run, userId, projectId, project = null) {
     const tasks = await projectStageRepository.listTasks(run.id);
     const links = await projectStageRepository.listLinks(run.id);
     const milestones = await projectStageRepository.listMilestones(run.id);
@@ -144,6 +144,14 @@ export function createProjectStageService({
       checklist: task.metadata?.checklist || null,
     }));
 
+    const proj = project || (await projectRepository.findById(projectId));
+    const competition =
+      proj?.metadata?.competition &&
+      typeof proj.metadata.competition === 'object' &&
+      !Array.isArray(proj.metadata.competition)
+        ? proj.metadata.competition
+        : null;
+
     return {
       run: { ...run, progressPercent },
       workflows: groupWorkflows(tasksWithDocs),
@@ -154,10 +162,11 @@ export function createProjectStageService({
       events: linked.events,
       links: linked.raw,
       progressPercent,
+      competition,
     };
   }
 
-  async function refreshProgress(run, userId, projectId) {
+  async function refreshProgress(run, userId, projectId, project = null) {
     const tasks = await projectStageRepository.listTasks(run.id);
     const progressPercent = computeProgress(tasks);
     const required = tasks.filter((t) => t.action?.isRequired !== false);
@@ -207,7 +216,12 @@ export function createProjectStageService({
       }
     }
 
-    return hydrateRun(updated || { ...run, status, progressPercent, startedAt, completedAt }, userId, projectId);
+    return hydrateRun(
+      updated || { ...run, status, progressPercent, startedAt, completedAt },
+      userId,
+      projectId,
+      project
+    );
   }
 
   return {
@@ -260,7 +274,7 @@ export function createProjectStageService({
         );
       }
 
-      return refreshProgress(run, userId, projectId);
+      return refreshProgress(run, userId, projectId, project);
     },
 
     async updateTask(userId, projectId, stage, taskId, payload) {

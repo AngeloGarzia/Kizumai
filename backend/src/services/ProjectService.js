@@ -595,9 +595,31 @@ export function createProjectService({
 
       const metaIn =
         metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? { ...metadata } : {};
+      const competitionRaw = metaIn.competition;
+      let competition = null;
+      if (competitionRaw && typeof competitionRaw === 'object' && !Array.isArray(competitionRaw)) {
+        const score =
+          competitionRaw.score != null
+            ? Number(competitionRaw.score)
+            : competitionRaw.competitionScore != null
+              ? Number(competitionRaw.competitionScore)
+              : null;
+        const label = competitionRaw.label || competitionRaw.competitionLabel || null;
+        const note = competitionRaw.note || competitionRaw.competitionNote || null;
+        const source = competitionRaw.source || competitionRaw.competitionSource || null;
+        if (score != null || label || note) {
+          competition = {
+            score: Number.isFinite(score) ? Math.min(100, Math.max(0, Math.round(score))) : null,
+            label: label ? String(label).slice(0, 40) : null,
+            note: note ? String(note).slice(0, 280) : null,
+            source: source === 'web' || source === 'estimated' ? source : null,
+          };
+        }
+      }
       const projectMeta = {
         ...metaIn,
         locationMode: mode,
+        ...(competition ? { competition } : {}),
       };
 
       const project = await projectRepository.create({

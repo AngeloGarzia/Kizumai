@@ -23,6 +23,7 @@ const EXPECTED = [
   'fabulous_task_checklist',
   'project_assistant',
   'project_audit',
+  'business_competition',
 ];
 
 const { rows } = await pool.query(`
