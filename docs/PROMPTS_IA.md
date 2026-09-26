@@ -479,7 +479,7 @@ Réponds UNIQUEMENT avec un JSON valide, en français, sans texte autour :
 |---|---|
 | **Nom** | Prompt Lieux |
 | **Rôle** | `user` |
-| **Dernière migration** | `066_ai_prompts_ux_pass.sql` |
+| **Dernière migration** | `076_lieux_fabulous_rank.sql` |
 | **Usage** | Créer son avenir — propositions de lieux (mode fixe) |
 
 ```text
@@ -501,7 +501,13 @@ Pour CHAQUE lieu, fournis :
 - city : ville ou zone principale ;
 - area : quartier, axe, micro-zone ou type d'emplacement ;
 - rationale : justification incluant clientèle cible, avantage du flux/localisation, cohérence avec le business, contrainte à vérifier et première action terrain ;
-- feasibility : score de 0 à 100 selon adéquation business/lieu, coût probable, accès clientèle et complexité opérationnelle.
+- feasibility : score de 0 à 100 selon adéquation business/lieu, coût probable, accès clientèle et complexité opérationnelle ;
+- feasibilityNote : 2 phrases max (~280 car.) expliquant POURQUOI ce niveau d'adéquation pour CE lieu précis. INTERDIT de parler de barème, de segments, de « score /100 » ou de méthode de calcul ;
+- fabulousRank : rang de PRÉDILECTION Fabulous, entier UNIQUE de 1 à {{count}} (1 = le meilleur choix global, {{count}} = le moins recommandé parmi cette liste). Classe selon adéquation réelle business/lieu, coût, flux clientèle et complexité. Le rang 1 doit vraiment cumuler le meilleur équilibre réaliste ;
+- fabulousPickNote : 1 phrase (~160 car.) justifiant ce rang (surtout pour 1–3).
+
+Barème feasibility : 0–33 difficile ; 34–66 possible avec effort ; 67–100 réaliste.
+Les fabulousRank doivent être cohérents avec feasibility (pas de rang 1 avec un lieu peu adapté sauf angle exceptionnel justifié dans fabulousPickNote).
 
 Business choisi : {{business}}
 Secteur / activité : {{business_activity}}
@@ -513,7 +519,7 @@ Précision pour affiner : {{refine}}
 Lieux déjà proposés à NE PAS répéter : {{avoid}}
 
 Réponds UNIQUEMENT avec un JSON valide, en français, sans texte autour :
-{"locations":[{"label":"intitulé du lieu","city":"ville","area":"quartier ou zone","rationale":"lien explicite avec le business et, le cas échéant, avec la zone saisie","feasibility":nombre}]}
+{"locations":[{"label":"intitulé du lieu","city":"ville","area":"quartier ou zone","rationale":"lien explicite avec le business et, le cas échéant, avec la zone saisie","feasibility":nombre,"feasibilityNote":"explication métier","fabulousRank":1,"fabulousPickNote":"pourquoi ce rang"}]}
 ```
 
 ---

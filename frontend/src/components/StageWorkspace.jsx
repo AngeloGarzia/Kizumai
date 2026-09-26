@@ -95,6 +95,95 @@ function CompetitionSnapshot({ competition }) {
   );
 }
 
+function FabulousCompetitorsList({ competitors, impact, className = '' }) {
+  const list = Array.isArray(competitors)
+    ? competitors
+        .map((c) => {
+          if (!c || typeof c !== 'object') return null;
+          const name = String(c.name || '').trim();
+          if (!name) return null;
+          return {
+            name,
+            kind: c.kind ? String(c.kind).trim() : null,
+            impact: c.impact ? String(c.impact).trim() : null,
+            url: c.url ? String(c.url).trim() : null,
+          };
+        })
+        .filter(Boolean)
+        .slice(0, 5)
+    : [];
+  const impactText = impact ? String(impact).trim() : '';
+
+  if (!list.length && !impactText) return null;
+
+  const linkHost = (href) => {
+    try {
+      return new URL(href).hostname.replace(/^www\./, '');
+    } catch {
+      return href;
+    }
+  };
+
+  return (
+    <div
+      className={[
+        'mx-5 mb-3 rounded-xl border border-topaz-100 bg-topaz-50/40 px-4 py-3 space-y-3',
+        className,
+      ].join(' ')}
+    >
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wider text-topaz-700">
+          Concurrents identifiés par Fabulous
+        </p>
+        <p className="text-xs text-prune-500 mt-0.5">
+          Liste reprise de l’analyse à la création du projet (jusqu’à 5).
+        </p>
+      </div>
+      {impactText && (
+        <p className="text-sm text-prune-700 leading-relaxed">{impactText}</p>
+      )}
+      {list.length > 0 && (
+        <ol className="space-y-2.5">
+          {list.map((c, index) => (
+            <li
+              key={`${c.name}-${index}`}
+              className="rounded-lg border border-prune-100 bg-white px-3 py-2.5"
+            >
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <span className="text-xs font-bold tabular-nums text-prune-400">
+                  {index + 1}.
+                </span>
+                <span className="text-sm font-semibold text-prune-900">{c.name}</span>
+                {c.kind && (
+                  <span className="text-[11px] font-medium uppercase tracking-wide text-prune-400">
+                    {c.kind}
+                  </span>
+                )}
+              </div>
+              {c.impact && (
+                <p className="mt-1 text-sm text-prune-700 leading-relaxed">{c.impact}</p>
+              )}
+              {c.url && (
+                <a
+                  href={c.url}
+                  target="_blank"
+                  rel="noopener noreferrer nofollow"
+                  className="mt-1.5 inline-flex items-center gap-1 text-sm font-medium text-topaz-700 hover:text-topaz-900 underline-offset-2 hover:underline break-all"
+                >
+                  {linkHost(c.url)}
+                  <span aria-hidden="true" className="text-xs">
+                    ↗
+                  </span>
+                </a>
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
 function TaskPanel({
   task,
   busy,
@@ -105,11 +194,20 @@ function TaskPanel({
   onUpload,
   onChecklist,
   onToggleChecklistItem,
+  fabulousCompetitors = null,
+  competitionImpact = null,
 }) {
   const done = task.status === 'done';
   const docs = Array.isArray(task.documents) ? task.documents : [];
   const checklist = task.checklist || task.metadata?.checklist || null;
   const fileInputRef = useRef(null);
+  const isListerConcurrents =
+    task.action?.slug === 'lister-concurrents' ||
+    task.slug === 'lister-concurrents' ||
+    /lister\s*5\s*concurrent/i.test(String(task.action?.title || ''));
+  const fabulousCount = Array.isArray(fabulousCompetitors)
+    ? fabulousCompetitors.filter((c) => c && String(c.name || '').trim()).length
+    : 0;
 
   return (
     <li className="border-b border-prune-50 last:border-0">
@@ -151,6 +249,11 @@ function TaskPanel({
             {docs.length > 0 && (
               <span className="text-xs text-prune-500">{docs.length} doc{docs.length > 1 ? 's' : ''}</span>
             )}
+            {isListerConcurrents && fabulousCount > 0 && (
+              <span className="text-xs font-semibold text-wasabi-700">
+                {fabulousCount} concurrent{fabulousCount > 1 ? 's' : ''} Fabulous
+              </span>
+            )}
             <span className="text-xs font-semibold text-prune-400 inline-flex items-center gap-0.5">
               {expanded ? 'Replier' : 'Ouvrir'}
               <IconChevronRight
@@ -160,6 +263,14 @@ function TaskPanel({
           </div>
         </button>
       </div>
+
+      {isListerConcurrents && (fabulousCount > 0 || competitionImpact) && (
+        <FabulousCompetitorsList
+          competitors={fabulousCompetitors}
+          impact={competitionImpact}
+          className="!ml-8 !mr-0 !mb-3"
+        />
+      )}
 
       {expanded && (
         <div className="ml-8 mb-4 rounded-xl border border-prune-100 bg-prune-50/70 p-4 space-y-4">
@@ -675,12 +786,18 @@ export default function StageWorkspace({ projectId, stage }) {
             ) : (
               (data?.workflows || []).map((wf) => {
                 const doneCount = wf.tasks.filter((t) => t.status === 'done').length;
-                const competitionSnap =
-                  wf.slug === 'concurrence'
-                    ? normalizeCompetition(
-                        project?.metadata?.competition ?? data?.competition ?? null
-                      )
-                    : null;
+                const isConcurrence = wf.slug === 'concurrence';
+                const competitionSnap = isConcurrence
+                  ? normalizeCompetition(
+                      project?.metadata?.competition ?? data?.competition ?? null
+                    )
+                  : null;
+                const fabulousCompetitors = isConcurrence
+                  ? project?.metadata?.competitors ?? null
+                  : null;
+                const competitionImpact = isConcurrence
+                  ? project?.metadata?.competitionImpact ?? null
+                  : null;
                 return (
                   <details
                     key={wf.slug}
@@ -699,7 +816,7 @@ export default function StageWorkspace({ projectId, stage }) {
                         <IconChevronRight className="inline w-4 h-4 ml-1 group-open:rotate-90 transition-transform" />
                       </span>
                     </summary>
-                    {wf.slug === 'concurrence' && (
+                    {isConcurrence && (
                       <CompetitionSnapshot competition={competitionSnap} />
                     )}
                     <ul className="px-5 pb-2">
@@ -717,6 +834,8 @@ export default function StageWorkspace({ projectId, stage }) {
                           onUpload={uploadForTask}
                           onChecklist={generateChecklist}
                           onToggleChecklistItem={toggleChecklistItem}
+                          fabulousCompetitors={fabulousCompetitors}
+                          competitionImpact={competitionImpact}
                         />
                       ))}
                     </ul>

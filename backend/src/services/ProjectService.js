@@ -3,7 +3,33 @@ import { hasPaidAccess, MAX_PROJECTS_PER_USER } from '../constants/plans.js';
 import { computeProjectProgress } from '../constants/projectStages.js';
 import { withAiUsageContext } from '../utils/aiUsage.js';
 import { createAdvancementCoachService } from './AdvancementCoachService.js';
+import { sanitizePublicHttpUrl } from '../utils/ssrf.js';
 import pool from '../database/pool.js';
+
+/** Concurrents Fabulous (affichage étude de marché) — max 5. */
+function sanitizeCompetitorsList(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((c) => {
+      if (!c || typeof c !== 'object') return null;
+      const name = String(c.name || c.title || '')
+        .trim()
+        .slice(0, 120);
+      if (!name) return null;
+      return {
+        name,
+        kind: String(c.kind || c.type || '')
+          .trim()
+          .slice(0, 40) || null,
+        impact: String(c.impact || c.effect || '')
+          .trim()
+          .slice(0, 500) || null,
+        url: sanitizePublicHttpUrl(c.url || c.website || c.link || '', { maxLength: 500 }),
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 5);
+}
 
 const LOCATION_SUGGEST_TIMEOUT_MS = 4500;
 
@@ -614,6 +640,8 @@ export function createProjectService({
         'mobility',
         'digitalSetup',
         'competition',
+        'competitors',
+        'competitionImpact',
         'profitability',
         'budgetPlan',
         'training',
@@ -643,6 +671,11 @@ export function createProjectService({
           };
         }
       }
+
+      const competitors = sanitizeCompetitorsList(metaAllowed.competitors);
+      const competitionImpact = metaAllowed.competitionImpact
+        ? String(metaAllowed.competitionImpact).trim().slice(0, 800)
+        : null;
 
       const profitabilityRaw = metaAllowed.profitability;
       let profitability = null;
@@ -708,6 +741,8 @@ export function createProjectService({
         ...metaAllowed,
         locationMode: mode,
         ...(competition ? { competition } : {}),
+        ...(competitors.length ? { competitors } : {}),
+        ...(competitionImpact ? { competitionImpact } : {}),
         ...(profitability ? { profitability } : {}),
         ...(budgetPlan ? { budgetPlan } : {}),
       };

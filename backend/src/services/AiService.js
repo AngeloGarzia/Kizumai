@@ -1014,8 +1014,49 @@ function normalizeLocations(raw) {
       area: String(item?.area || '').trim().slice(0, 200),
       rationale: String(item?.rationale || '').trim().slice(0, 800),
       feasibility: normalizeFeasibility(item?.feasibility),
+      feasibilityNote:
+        String(item?.feasibilityNote || item?.feasibility_note || '')
+          .trim()
+          .slice(0, 420) || null,
+      fabulousRank: (() => {
+        const r = Number(item?.fabulousRank ?? item?.fabulous_rank);
+        return Number.isFinite(r) && r >= 1 ? Math.min(12, Math.round(r)) : null;
+      })(),
+      fabulousPickNote:
+        String(item?.fabulousPickNote || item?.fabulous_pick_note || '')
+          .trim()
+          .slice(0, 200) || null,
     }))
     .filter((item) => item.label || item.city);
+}
+
+/** Assure des fabulousRank uniques 1…n pour les lieux (1 = préféré Fabulous). */
+function ensureLocationFabulousRanks(locations) {
+  if (!Array.isArray(locations) || !locations.length) return locations;
+  const ranks = locations.map((l) => l.fabulousRank);
+  const uniqueValid =
+    ranks.every((r) => r != null && r >= 1) && new Set(ranks).size === ranks.length;
+  if (uniqueValid) {
+    return [...locations].sort((a, b) => a.fabulousRank - b.fabulousRank);
+  }
+  const ordered = [...locations].sort((a, b) => {
+    const fa = a.feasibility != null && Number.isFinite(Number(a.feasibility))
+      ? Number(a.feasibility)
+      : -1;
+    const fb = b.feasibility != null && Number.isFinite(Number(b.feasibility))
+      ? Number(b.feasibility)
+      : -1;
+    return fb - fa;
+  });
+  return ordered.map((l, idx) => ({
+    ...l,
+    fabulousRank: idx + 1,
+    fabulousPickNote:
+      l.fabulousPickNote ||
+      (idx === 0
+        ? 'Meilleure adéquation business / lieu parmi les propositions.'
+        : null),
+  }));
 }
 
 const TRAINING_FORMATS = new Set(['en_ligne', 'presentiel', 'mixte']);
@@ -1691,7 +1732,7 @@ export function createAiService({ settingsService, currencyService }) {
           count: Math.min(8, Math.max(1, Number(count) || 5)),
         }), memoryContext, aiConfig);
       const data = await requestStepJson(userContent, { temperature });
-      return normalizeLocations(data.locations).slice(0, count);
+      return ensureLocationFabulousRanks(normalizeLocations(data.locations)).slice(0, count);
     },
 
     async evaluateFranceImplantation({

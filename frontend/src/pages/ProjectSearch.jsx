@@ -269,6 +269,29 @@ export default function ProjectSearch() {
     [businesses]
   );
 
+  const sortedLocations = useMemo(() => {
+    const sorted = [...locations].sort((a, b) => {
+      const ra = Number(a?.fabulousRank);
+      const rb = Number(b?.fabulousRank);
+      const hasRa = Number.isFinite(ra) && ra >= 1;
+      const hasRb = Number.isFinite(rb) && rb >= 1;
+      if (hasRa && hasRb && ra !== rb) return ra - rb;
+      if (hasRa && !hasRb) return -1;
+      if (!hasRa && hasRb) return 1;
+      const fa = Number(a?.feasibility);
+      const fb = Number(b?.feasibility);
+      const sa = Number.isFinite(fa) ? fa : -1;
+      const sb = Number.isFinite(fb) ? fb : -1;
+      return sb - sa;
+    });
+    const allRanked = sorted.every((l) => {
+      const r = Number(l?.fabulousRank);
+      return Number.isFinite(r) && r >= 1;
+    });
+    if (allRanked) return sorted;
+    return sorted.map((l, idx) => ({ ...l, fabulousRank: idx + 1 }));
+  }, [locations]);
+
   const fabulousPickLabel = (rank) => {
     if (rank === 1) return assistantPhrases.preferredPick;
     if (rank === 2) return assistantPhrases.preferredPickAlt;
@@ -1058,29 +1081,82 @@ export default function ProjectSearch() {
                       Changer de région (carte)
                     </button>
                   </div>
-                  {locations.map((location, index) => (
-                    <SelectableCard key={index} onSelect={() => handleSelectLocation(location)}>
-                      <div className="flex items-start justify-between gap-3">
-                        <h3 className="font-semibold text-prune-900">
-                          {location.label}
-                          {location.city ? ` — ${location.city}` : ''}
+                  {sortedLocations.map((location, index) => {
+                    const pickRank = Number(location.fabulousRank);
+                    const pickLabel = fabulousPickLabel(pickRank);
+                    const placeTitle = [location.label, location.city]
+                      .filter(Boolean)
+                      .join(' — ');
+                    return (
+                      <div
+                        key={index}
+                        className={[
+                          'rounded-2xl border p-4 sm:p-5 hover:shadow-sm transition-all min-w-0 w-full max-w-full overflow-hidden',
+                          fabulousPreferenceTileClass(pickRank),
+                        ].join(' ')}
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <FeasibilityRoundPill
+                            score={location.feasibility}
+                            size="sm"
+                            onClick={() =>
+                              setMetricDetail(
+                                buildMetricPillDetail('feasibility', {
+                                  score: location.feasibility,
+                                  businessTitle: placeTitle,
+                                  rationale: location.rationale,
+                                  note:
+                                    location.feasibilityNote ||
+                                    location.fabulousPickNote ||
+                                    null,
+                                })
+                              )
+                            }
+                          />
+                          {pickLabel && (
+                            <span
+                              className={[
+                                'inline-flex max-w-full items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide truncate',
+                                pickRank === 1
+                                  ? 'bg-wasabi-600 text-white fabulous-pick-blink'
+                                  : pickRank === 2
+                                    ? 'bg-topaz-500 text-white'
+                                    : 'bg-amber-500 text-white',
+                              ].join(' ')}
+                              title={location.fabulousPickNote || pickLabel}
+                            >
+                              {pickLabel}
+                            </span>
+                          )}
+                        </div>
+                        <h3
+                          className={[
+                            'font-semibold text-prune-900 break-words',
+                            pickLabel ? 'mt-1.5' : 'mt-3',
+                          ].join(' ')}
+                        >
+                          {placeTitle}
                         </h3>
-                        {location.feasibility != null && (
-                          <span className="shrink-0 text-xs font-bold tabular-nums text-prune-600">
-                            {location.feasibility}%
-                          </span>
+                        {location.area && (
+                          <p className="text-xs font-medium uppercase tracking-wide text-topaz-600 mt-0.5 break-words">
+                            {location.area}
+                          </p>
                         )}
+                        {location.rationale && (
+                          <p className="text-sm text-prune-500 mt-2 break-words">
+                            {location.rationale}
+                          </p>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleSelectLocation(location)}
+                          className="btn-primary w-full mt-4"
+                        >
+                          Choisir ce lieu
+                        </button>
                       </div>
-                      {location.area && (
-                        <p className="text-xs font-medium uppercase tracking-wide text-topaz-600 mt-0.5">
-                          {location.area}
-                        </p>
-                      )}
-                      {location.rationale && (
-                        <p className="text-sm text-prune-500 mt-2">{location.rationale}</p>
-                      )}
-                    </SelectableCard>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 

@@ -31,8 +31,8 @@ export default function FabulousFab({ open = false, onOpen }) {
       className={[
         'fixed z-[60] flex items-center gap-2 rounded-full',
         'right-4 sm:right-6',
-        /* Au-dessus de la bottom nav flottante (mb-3 + pilule ~5–6rem) + marge */
-        'bottom-[calc(8.25rem+env(safe-area-inset-bottom,0px))] sm:bottom-[calc(9rem+env(safe-area-inset-bottom,0px))]',
+        /* Au-dessus de la bottom nav (pilule ~4–5rem + mb-3) sans chevauchement */
+        'bottom-[calc(6.75rem+env(safe-area-inset-bottom,0px))] sm:bottom-[calc(7.5rem+env(safe-area-inset-bottom,0px))]',
         'lg:bottom-8 lg:right-8',
         'pl-2.5 pr-3.5 py-2 sm:pl-3 sm:pr-4 sm:py-2.5',
         'shadow-lg shadow-prune-900/20 border transition-all duration-200',

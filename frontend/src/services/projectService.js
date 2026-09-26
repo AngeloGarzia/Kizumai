@@ -7,7 +7,31 @@ export const projectService = {
     return data.preview;
   },
 
-  async createProject({ quoi, ou, budget, currency, title, report, sections, locationMode, metadata }) {
+  async createProject({
+    quoi,
+    ou,
+    budget,
+    currency,
+    title,
+    report,
+    sections,
+    locationMode,
+    metadata,
+    fabulousAnalysis,
+  }) {
+    const analysis =
+      fabulousAnalysis && typeof fabulousAnalysis === 'object' ? fabulousAnalysis : {};
+    const baseMeta =
+      metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? { ...metadata } : {};
+    const mergedMeta = {
+      ...baseMeta,
+      ...(Array.isArray(analysis.competitors) && analysis.competitors.length
+        ? { competitors: analysis.competitors }
+        : {}),
+      ...(analysis.competitionImpact
+        ? { competitionImpact: analysis.competitionImpact }
+        : {}),
+    };
     const { data } = await api.post('/projects', {
       quoi,
       ou,
@@ -17,7 +41,7 @@ export const projectService = {
       report,
       sections,
       locationMode,
-      metadata,
+      metadata: mergedMeta,
     });
     return data.project;
   },
