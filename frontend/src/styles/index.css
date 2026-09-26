@@ -34,6 +34,29 @@
   animation: progress-next-pulse 1.2s ease-in-out infinite;
 }
 
+/* Badge « Le préféré de Fabulous » */
+@keyframes fabulous-pick-blink {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(232, 114, 42, 0.35);
+  }
+  50% {
+    opacity: 0.72;
+    box-shadow: 0 0 10px 1px rgba(232, 114, 42, 0.55);
+  }
+}
+
+.fabulous-pick-blink {
+  animation: fabulous-pick-blink 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fabulous-pick-blink {
+    animation: none;
+  }
+}
+
 /* Pastilles métriques : clignotement léger selon le score (durée via --pill-pulse-ms). */
 @keyframes metric-pill-blink {
   0%,

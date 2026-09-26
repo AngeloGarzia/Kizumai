@@ -808,7 +808,7 @@ function normalizeBusinesses(raw) {
       const competitionNote =
         String(item?.competitionNote || item?.competition_note || '')
           .trim()
-          .slice(0, 200) || null;
+          .slice(0, 420) || null;
       const rawSource = item?.competitionSource || item?.competition_source;
       const competitionSource = ['web', 'estimated'].includes(rawSource)
         ? rawSource
@@ -825,13 +825,18 @@ function normalizeBusinesses(raw) {
       const profitabilityNote =
         String(item?.profitabilityNote || item?.profitability_note || '')
           .trim()
-          .slice(0, 200) || null;
+          .slice(0, 420) || null;
+      const feasibilityNote =
+        String(item?.feasibilityNote || item?.feasibility_note || '')
+          .trim()
+          .slice(0, 420) || null;
       return {
         title: String(item?.title || '').trim().slice(0, 200),
         activity: String(item?.activity || '').trim().slice(0, 200),
         pitch: String(item?.pitch || '').trim().slice(0, 800),
         rationale: String(item?.rationale || '').trim().slice(0, 800),
         feasibility,
+        feasibilityNote,
         modes: normalizeBusinessModes(item?.modes, feasibility),
         competitionScore,
         competitionLabel,
@@ -840,9 +845,57 @@ function normalizeBusinesses(raw) {
         profitabilityScore,
         profitabilityLabel,
         profitabilityNote,
+        fabulousRank: (() => {
+          const r = Number(item?.fabulousRank ?? item?.fabulous_rank);
+          return Number.isFinite(r) && r >= 1 ? Math.min(12, Math.round(r)) : null;
+        })(),
+        fabulousPickNote:
+          String(item?.fabulousPickNote || item?.fabulous_pick_note || '')
+            .trim()
+            .slice(0, 200) || null,
       };
     })
     .filter((item) => item.title);
+}
+
+/** Score de predilection : installation + rendement − concurrence. */
+function preferenceCompositeScore(b) {
+  const f = b?.feasibility != null && Number.isFinite(Number(b.feasibility))
+    ? Number(b.feasibility)
+    : 50;
+  const p =
+    b?.profitabilityScore != null && Number.isFinite(Number(b.profitabilityScore))
+      ? Number(b.profitabilityScore)
+      : 50;
+  const c =
+    b?.competitionScore != null && Number.isFinite(Number(b.competitionScore))
+      ? Number(b.competitionScore)
+      : 50;
+  return f * 0.35 + p * 0.4 + (100 - c) * 0.25;
+}
+
+/** Assure des fabulousRank uniques 1…n (1 = préféré Fabulous). */
+function ensureFabulousRanks(businesses) {
+  if (!Array.isArray(businesses) || !businesses.length) return businesses;
+  const ranks = businesses.map((b) => b.fabulousRank);
+  const uniqueValid =
+    ranks.every((r) => r != null && r >= 1) &&
+    new Set(ranks).size === ranks.length;
+  if (uniqueValid) {
+    return [...businesses].sort((a, b) => a.fabulousRank - b.fabulousRank);
+  }
+  const ordered = [...businesses].sort(
+    (a, b) => preferenceCompositeScore(b) - preferenceCompositeScore(a)
+  );
+  return ordered.map((b, idx) => ({
+    ...b,
+    fabulousRank: idx + 1,
+    fabulousPickNote:
+      b.fabulousPickNote ||
+      (idx === 0
+        ? 'Meilleur équilibre installation / rentabilité / concurrence.'
+        : null),
+  }));
 }
 
 function competitionLabelFromScore(score) {
@@ -1534,8 +1587,8 @@ export function createAiService({ settingsService, currencyService }) {
         aiConfig
       );
       const data = await requestStepJson(userContent, { temperature });
-      // Concurrence + faisabilité dans la même passe (comme feasibility).
-      return normalizeBusinesses(data.businesses).slice(0, count);
+      // Concurrence + faisabilité + rentabilité + rang Fabulous dans la même passe.
+      return ensureFabulousRanks(normalizeBusinesses(data.businesses)).slice(0, count);
     },
 
     /**

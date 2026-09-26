@@ -214,14 +214,31 @@ export function createAdminService({
 
     async getUsersOverview() {
       const users = sanitizeUsers(await userRepository.findAll());
+      const tokensByUser = await aiUsageLogRepository.totalsGroupedByUser();
+      const withTokens = users.map((u) => {
+        const t = tokensByUser.get(Number(u.id)) || {
+          requests: 0,
+          errors: 0,
+          tokensPrompt: 0,
+          tokensCompletion: 0,
+          tokensTotal: 0,
+        };
+        return {
+          ...u,
+          aiTokensTotal: t.tokensTotal,
+          aiTokensPrompt: t.tokensPrompt,
+          aiTokensCompletion: t.tokensCompletion,
+          aiRequests: t.requests,
+        };
+      });
       return {
-        users,
-        administrators: users.filter((u) => u.role === ROLES.ADMIN),
-        regularUsers: users.filter((u) => u.role === ROLES.USER),
+        users: withTokens,
+        administrators: withTokens.filter((u) => u.role === ROLES.ADMIN),
+        regularUsers: withTokens.filter((u) => u.role === ROLES.USER),
         totals: {
-          all: users.length,
-          admins: users.filter((u) => u.role === ROLES.ADMIN).length,
-          users: users.filter((u) => u.role === ROLES.USER).length,
+          all: withTokens.length,
+          admins: withTokens.filter((u) => u.role === ROLES.ADMIN).length,
+          users: withTokens.filter((u) => u.role === ROLES.USER).length,
         },
       };
     },
@@ -232,6 +249,11 @@ export function createAdminService({
       if (!target) throw new AppError('Utilisateur introuvable', 404);
 
       const projects = await projectRepository.findByUserId(targetId);
+      const projectTokenMap = await aiUsageLogRepository.totalsGroupedByProjectIds(
+        projects.map((p) => p.id)
+      );
+      const userAiTotals = await aiUsageLogRepository.totalsForUser(targetId);
+
       const enrichedProjects = await Promise.all(
         projects.map(async (project) => {
           const [documents, memorySnapshot, related] = await Promise.all([
@@ -251,6 +273,13 @@ export function createAdminService({
             ),
           ]);
           const counts = related.rows[0] || {};
+          const aiTokens = projectTokenMap.get(Number(project.id)) || {
+            requests: 0,
+            errors: 0,
+            tokensPrompt: 0,
+            tokensCompletion: 0,
+            tokensTotal: 0,
+          };
           return {
             id: project.id,
             title: project.title,
@@ -271,6 +300,7 @@ export function createAdminService({
             location: project.location,
             createdAt: project.createdAt,
             updatedAt: project.updatedAt,
+            aiUsage: aiTokens,
             counts: {
               documents: documents.length,
               memoryNodes: counts.memory_nodes || 0,
@@ -322,7 +352,6 @@ export function createAdminService({
            (SELECT COUNT(*)::int FROM push_subscriptions WHERE user_id = $1) AS push_subscriptions,
            (SELECT COUNT(*)::int FROM refresh_tokens WHERE user_id = $1) AS refresh_tokens,
            (SELECT COUNT(*)::int FROM user_connections WHERE user_id = $1) AS connections,
-           (SELECT COUNT(*)::int FROM ai_usage_logs WHERE user_id = $1) AS ai_usage,
            (SELECT COUNT(*)::int FROM documents d
               INNER JOIN projects p ON p.id = d.project_id
               WHERE p.user_id = $1) AS documents`,
@@ -342,7 +371,10 @@ export function createAdminService({
           pushSubscriptions: s.push_subscriptions || 0,
           refreshTokens: s.refresh_tokens || 0,
           connections: s.connections || 0,
-          aiUsage: s.ai_usage || 0,
+          aiRequests: userAiTotals.requests,
+          aiTokensTotal: userAiTotals.tokensTotal,
+          aiTokensPrompt: userAiTotals.tokensPrompt,
+          aiTokensCompletion: userAiTotals.tokensCompletion,
         },
         projects: enrichedProjects,
       };

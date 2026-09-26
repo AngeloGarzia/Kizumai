@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 /**
- * Popup détail calcul / explication d’une pastille métrique.
+ * Popup d’explication métier d’une pastille (concurrence / rentabilité / faisabilité).
  */
 export default function MetricPillDetailModal({ detail, onClose }) {
   const closeRef = useRef(null);
@@ -20,6 +20,13 @@ export default function MetricPillDetailModal({ detail, onClose }) {
   }, [detail, onClose]);
 
   if (!detail) return null;
+
+  const points = Array.isArray(detail.explainPoints)
+    ? detail.explainPoints.filter(Boolean)
+    : Array.isArray(detail.calcSteps)
+      ? detail.calcSteps.filter(Boolean)
+      : [];
+  const pointsTitle = detail.explainTitle || detail.calcTitle || 'Explication';
 
   return (
     <div
@@ -47,9 +54,6 @@ export default function MetricPillDetailModal({ detail, onClose }) {
               {detail.title}
             </h2>
             <p className="mt-1 text-sm font-semibold text-prune-700">{detail.headline}</p>
-            {detail.scoreLabel && (
-              <p className="mt-0.5 text-xs tabular-nums text-prune-400">{detail.scoreLabel}</p>
-            )}
           </div>
           <button
             ref={closeRef}
@@ -65,23 +69,23 @@ export default function MetricPillDetailModal({ detail, onClose }) {
           <p className="text-sm text-prune-700 leading-relaxed">{detail.summary}</p>
         )}
 
-        {Array.isArray(detail.calcSteps) && detail.calcSteps.length > 0 && (
+        {points.length > 0 && (
           <div className="rounded-2xl border border-prune-100 bg-prune-50/60 p-4 space-y-2">
-            <h3 className="text-sm font-semibold text-prune-900">{detail.calcTitle}</h3>
-            <ol className="list-decimal pl-4 space-y-1.5">
-              {detail.calcSteps.map((step, i) => (
-                <li key={i} className="text-sm text-prune-700 leading-relaxed">
+            <h3 className="text-sm font-semibold text-prune-900">{pointsTitle}</h3>
+            <ul className="space-y-2">
+              {points.map((step, i) => (
+                <li key={i} className="text-sm text-prune-700 leading-relaxed pl-3 border-l-2 border-topaz-300">
                   {step}
                 </li>
               ))}
-            </ol>
+            </ul>
           </div>
         )}
 
         {detail.meaning && (
           <div>
             <h3 className="text-sm font-semibold text-prune-900 mb-1.5">
-              {detail.meaningTitle}
+              {detail.meaningTitle || 'En pratique'}
             </h3>
             <p className="text-sm text-prune-700 leading-relaxed">{detail.meaning}</p>
           </div>

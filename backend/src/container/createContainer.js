@@ -155,6 +155,7 @@ export function createContainer() {
     projectMemorySnapshotRepository,
     aiService,
     settingsService,
+    projectRepository,
   });
 
   const projectMemoryUpdateService = createProjectMemoryUpdateService({

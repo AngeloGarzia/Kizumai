@@ -42,6 +42,28 @@ function formatUsageDayLabel(dayKey) {
   });
 }
 
+function formatTokenCount(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return '0';
+  return n.toLocaleString('fr-FR');
+}
+
+const USER_STAT_LABELS = {
+  projects: 'Projets',
+  contacts: 'Contacts',
+  plannerEvents: 'Agenda',
+  learningRecords: 'Apprentissages',
+  documentScans: 'Scans docs',
+  documents: 'Documents',
+  pushSubscriptions: 'Push',
+  refreshTokens: 'Sessions',
+  connections: 'Connexions',
+  aiRequests: 'Requêtes IA',
+  aiTokensTotal: 'Tokens IA (total)',
+  aiTokensPrompt: 'Tokens prompt',
+  aiTokensCompletion: 'Tokens complétion',
+};
+
 const SETUP_SECTIONS = [
   {
     id: 'memory',
@@ -328,6 +350,7 @@ export default function Admin() {
         String(u.id).includes(q) ||
         String(u.role || '').toLowerCase().includes(q) ||
         String(u.plan || '').toLowerCase().includes(q) ||
+        String(u.aiTokensTotal ?? '').includes(q) ||
         (u.emailVerified ? 'validé' : 'attente').includes(q)
     );
   }, [usersOverview, userSearch]);
@@ -342,6 +365,60 @@ export default function Admin() {
     }
     return map;
   }, [aiUsage?.recent]);
+
+  /** Connexions regroupées : jour (récent → ancien) → utilisateurs (tuiles). */
+  const connectionsByDay = useMemo(() => {
+    const dayMap = new Map();
+    for (const conn of connections) {
+      const day = parisDayKey(conn.createdAt) || 'inconnu';
+      if (!dayMap.has(day)) dayMap.set(day, new Map());
+      const userKey =
+        conn.userId != null
+          ? `id:${conn.userId}`
+          : conn.email
+            ? `email:${String(conn.email).toLowerCase()}`
+            : `anon:${conn.id}`;
+      const users = dayMap.get(day);
+      if (!users.has(userKey)) {
+        users.set(userKey, {
+          key: userKey,
+          userId: conn.userId ?? null,
+          email: conn.email || null,
+          events: [],
+        });
+      }
+      const bucket = users.get(userKey);
+      if (!bucket.email && conn.email) bucket.email = conn.email;
+      if (bucket.userId == null && conn.userId != null) bucket.userId = conn.userId;
+      bucket.events.push(conn);
+    }
+
+    return [...dayMap.entries()]
+      .sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0))
+      .map(([day, usersMap]) => {
+        const users = [...usersMap.values()]
+          .map((u) => {
+            const events = [...u.events].sort(
+              (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+            );
+            return {
+              ...u,
+              events,
+              latestAt: events[0]?.createdAt || null,
+            };
+          })
+          .sort((a, b) => {
+            const ta = a.latestAt ? new Date(a.latestAt).getTime() : 0;
+            const tb = b.latestAt ? new Date(b.latestAt).getTime() : 0;
+            return tb - ta;
+          });
+        return {
+          day,
+          users,
+          totalEvents: users.reduce((n, u) => n + u.events.length, 0),
+        };
+      });
+  }, [connections]);
 
   const toggleUsageDay = (dayKey) => {
     setExpandedUsageDays((prev) => {
@@ -1253,6 +1330,9 @@ export default function Admin() {
                           <th className="px-4 py-3 font-semibold text-prune-700">Compte</th>
                           <th className="px-4 py-3 font-semibold text-prune-700">Plan</th>
                           <th className="px-4 py-3 font-semibold text-prune-700">Rôle</th>
+                          <th className="px-4 py-3 font-semibold text-prune-700 text-right">
+                            Tokens IA
+                          </th>
                           <th className="px-4 py-3 font-semibold text-prune-700">Actions</th>
                         </tr>
                       </thead>
@@ -1296,6 +1376,14 @@ export default function Admin() {
                                 >
                                   {user.role === 'admin' ? 'Administrateur' : 'Utilisateur'}
                                 </span>
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <p className="font-semibold tabular-nums text-prune-900">
+                                  {formatTokenCount(user.aiTokensTotal)}
+                                </p>
+                                <p className="text-[11px] text-prune-500 tabular-nums">
+                                  {formatTokenCount(user.aiRequests)} req.
+                                </p>
                               </td>
                               <td className="px-4 py-3">
                                 <div className="flex flex-wrap gap-2">
@@ -1352,7 +1440,7 @@ export default function Admin() {
                         })}
                         {filteredUsers.length === 0 && (
                           <tr>
-                            <td colSpan={6} className="px-4 py-8 text-center text-prune-500">
+                            <td colSpan={7} className="px-4 py-8 text-center text-prune-500">
                               Aucun utilisateur ne correspond à la recherche.
                             </td>
                           </tr>
@@ -1365,35 +1453,95 @@ export default function Admin() {
             )}
 
             {tab === 'connections' && (
-              <div className="card overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-prune-50 text-left">
-                      <tr>
-                        <th className="px-4 py-3 font-semibold text-prune-700">Date</th>
-                        <th className="px-4 py-3 font-semibold text-prune-700">Email</th>
-                        <th className="px-4 py-3 font-semibold text-prune-700">Action</th>
-                        <th className="px-4 py-3 font-semibold text-prune-700">IP</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {connections.map((conn) => (
-                        <tr key={conn.id} className="border-t border-prune-100">
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            {new Date(conn.createdAt).toLocaleString('fr-FR')}
-                          </td>
-                          <td className="px-4 py-3">{conn.email || '—'}</td>
-                          <td className="px-4 py-3">
-                            <span className="px-2 py-1 rounded-lg bg-prune-100 text-prune-700 text-xs font-medium">
-                              {conn.action}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-prune-500">{conn.ipAddress || '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+              <div className="space-y-5">
+                {connectionsByDay.length === 0 && (
+                  <div className="card p-6 text-sm text-prune-500 text-center">
+                    Aucune connexion enregistrée.
+                  </div>
+                )}
+                {connectionsByDay.map(({ day, users, totalEvents }) => (
+                  <section key={day} className="space-y-3">
+                    <header className="flex items-baseline justify-between gap-3 px-1">
+                      <h2 className="text-sm font-bold text-prune-900 capitalize">
+                        {day === 'inconnu' ? 'Date inconnue' : formatUsageDayLabel(day)}
+                      </h2>
+                      <p className="text-xs text-prune-500 tabular-nums">
+                        {users.length} utilisateur{users.length > 1 ? 's' : ''} ·{' '}
+                        {totalEvents} connexion{totalEvents > 1 ? 's' : ''}
+                      </p>
+                    </header>
+                    <div className="space-y-2">
+                      {users.map((user) => {
+                        const label =
+                          user.email ||
+                          (user.userId != null ? `Utilisateur #${user.userId}` : 'Anonyme');
+                        const latest = user.latestAt
+                          ? new Date(user.latestAt).toLocaleTimeString('fr-FR', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
+                          : '—';
+                        return (
+                          <details
+                            key={`${day}-${user.key}`}
+                            className="group rounded-2xl border border-prune-100 bg-white open:shadow-sm"
+                          >
+                            <summary className="cursor-pointer list-none flex items-center justify-between gap-3 px-4 py-3 select-none">
+                              <div className="min-w-0 flex items-center gap-3">
+                                <span
+                                  className="shrink-0 text-prune-400 transition-transform group-open:rotate-90"
+                                  aria-hidden="true"
+                                >
+                                  ▸
+                                </span>
+                                <div className="min-w-0">
+                                  <p className="font-semibold text-prune-900 truncate">{label}</p>
+                                  <p className="text-xs text-prune-500">
+                                    Dernière activité {latest}
+                                    {user.userId != null ? ` · #${user.userId}` : ''}
+                                  </p>
+                                </div>
+                              </div>
+                              <span className="shrink-0 rounded-full bg-prune-100 px-2.5 py-0.5 text-xs font-semibold text-prune-700 tabular-nums">
+                                {user.events.length}
+                              </span>
+                            </summary>
+                            <div className="border-t border-prune-100 px-4 py-3 space-y-2">
+                              {user.events.map((conn) => (
+                                <div
+                                  key={conn.id}
+                                  className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
+                                >
+                                  <span className="tabular-nums text-prune-500 whitespace-nowrap">
+                                    {new Date(conn.createdAt).toLocaleTimeString('fr-FR', {
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                      second: '2-digit',
+                                    })}
+                                  </span>
+                                  <span className="px-2 py-0.5 rounded-lg bg-prune-100 text-prune-700 text-xs font-medium">
+                                    {conn.action}
+                                  </span>
+                                  <span className="text-prune-500 text-xs">
+                                    IP {conn.ipAddress || '—'}
+                                  </span>
+                                  {conn.userAgent && (
+                                    <span
+                                      className="text-[11px] text-prune-400 truncate max-w-full sm:max-w-md"
+                                      title={conn.userAgent}
+                                    >
+                                      {conn.userAgent}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ))}
               </div>
             )}
 
@@ -1546,12 +1694,30 @@ export default function Admin() {
                 <section className="space-y-2">
                   <h3 className="text-sm font-bold text-prune-800">Compteurs liés</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
-                    {Object.entries(userDetails.stats || {}).map(([key, value]) => (
-                      <div key={key} className="rounded-xl border border-prune-100 px-3 py-2">
-                        <p className="text-xs text-prune-500">{key}</p>
-                        <p className="font-semibold text-prune-900">{value}</p>
-                      </div>
-                    ))}
+                    {Object.entries(userDetails.stats || {}).map(([key, value]) => {
+                      const isToken =
+                        key === 'aiTokensTotal' ||
+                        key === 'aiTokensPrompt' ||
+                        key === 'aiTokensCompletion';
+                      return (
+                        <div
+                          key={key}
+                          className={[
+                            'rounded-xl border px-3 py-2',
+                            key === 'aiTokensTotal'
+                              ? 'border-topaz-200 bg-topaz-50/50'
+                              : 'border-prune-100',
+                          ].join(' ')}
+                        >
+                          <p className="text-xs text-prune-500">
+                            {USER_STAT_LABELS[key] || key}
+                          </p>
+                          <p className="font-semibold text-prune-900 tabular-nums">
+                            {isToken ? formatTokenCount(value) : value}
+                          </p>
+                        </div>
+                      );
+                    })}
                   </div>
                 </section>
 
@@ -1575,6 +1741,17 @@ export default function Admin() {
                           {project.status} · {project.stage} · {project.source} ·{' '}
                           {formatAdminDate(project.createdAt)}
                         </p>
+                        {project.aiUsage && (
+                          <p className="mt-1.5 text-xs font-medium text-topaz-700 tabular-nums">
+                            Tokens IA : {formatTokenCount(project.aiUsage.tokensTotal)}
+                            <span className="text-prune-500 font-normal">
+                              {' '}
+                              ({formatTokenCount(project.aiUsage.requests)} req. · prompt{' '}
+                              {formatTokenCount(project.aiUsage.tokensPrompt)} · complétion{' '}
+                              {formatTokenCount(project.aiUsage.tokensCompletion)})
+                            </span>
+                          </p>
+                        )}
                       </div>
                       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                         {[

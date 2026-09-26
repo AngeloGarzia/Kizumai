@@ -152,4 +152,100 @@ export const AiUsageLogRepository = {
     );
     return rows.map(mapRow);
   },
+
+  /**
+   * Totaux tokens pour un compte utilisateur (logs directs + logs projet sans user_id).
+   */
+  async totalsForUser(userId) {
+    const uid = Number(userId);
+    if (!Number.isFinite(uid)) {
+      return emptyTokenTotals();
+    }
+    const { rows } = await pool.query(
+      `SELECT
+         COUNT(*)::int AS requests,
+         COUNT(*) FILTER (WHERE l.status = 'error')::int AS errors,
+         COALESCE(SUM(l.tokens_prompt), 0)::bigint AS tokens_prompt,
+         COALESCE(SUM(l.tokens_completion), 0)::bigint AS tokens_completion,
+         COALESCE(SUM(${TOKEN_TOTAL_EXPR}), 0)::bigint AS tokens_total
+       FROM ai_usage_logs l
+       LEFT JOIN projects p ON p.id = l.project_id
+       WHERE COALESCE(l.user_id, p.user_id) = $1`,
+      [uid]
+    );
+    return mapTokenTotals(rows[0]);
+  },
+
+  /**
+   * Totaux tokens par user_id (carte userId → totaux) pour la liste admin.
+   */
+  async totalsGroupedByUser() {
+    const { rows } = await pool.query(
+      `SELECT
+         COALESCE(l.user_id, p.user_id) AS user_id,
+         COUNT(*)::int AS requests,
+         COUNT(*) FILTER (WHERE l.status = 'error')::int AS errors,
+         COALESCE(SUM(l.tokens_prompt), 0)::bigint AS tokens_prompt,
+         COALESCE(SUM(l.tokens_completion), 0)::bigint AS tokens_completion,
+         COALESCE(SUM(${TOKEN_TOTAL_EXPR}), 0)::bigint AS tokens_total
+       FROM ai_usage_logs l
+       LEFT JOIN projects p ON p.id = l.project_id
+       WHERE COALESCE(l.user_id, p.user_id) IS NOT NULL
+       GROUP BY 1`
+    );
+    const map = new Map();
+    for (const row of rows) {
+      map.set(Number(row.user_id), mapTokenTotals(row));
+    }
+    return map;
+  },
+
+  /**
+   * Totaux tokens par project_id.
+   */
+  async totalsGroupedByProjectIds(projectIds = []) {
+    const ids = [...new Set((projectIds || []).map(Number).filter(Number.isFinite))];
+    if (!ids.length) return new Map();
+    const { rows } = await pool.query(
+      `SELECT
+         l.project_id,
+         COUNT(*)::int AS requests,
+         COUNT(*) FILTER (WHERE l.status = 'error')::int AS errors,
+         COALESCE(SUM(l.tokens_prompt), 0)::bigint AS tokens_prompt,
+         COALESCE(SUM(l.tokens_completion), 0)::bigint AS tokens_completion,
+         COALESCE(SUM(${TOKEN_TOTAL_EXPR}), 0)::bigint AS tokens_total
+       FROM ai_usage_logs l
+       WHERE l.project_id = ANY($1::int[])
+       GROUP BY l.project_id`,
+      [ids]
+    );
+    const map = new Map();
+    for (const row of rows) {
+      map.set(Number(row.project_id), mapTokenTotals(row));
+    }
+    return map;
+  },
 };
+
+const TOKEN_TOTAL_EXPR =
+  'COALESCE(l.tokens_total, COALESCE(l.tokens_prompt,0) + COALESCE(l.tokens_completion,0))';
+
+function emptyTokenTotals() {
+  return {
+    requests: 0,
+    errors: 0,
+    tokensPrompt: 0,
+    tokensCompletion: 0,
+    tokensTotal: 0,
+  };
+}
+
+function mapTokenTotals(row = {}) {
+  return {
+    requests: Number(row.requests || 0),
+    errors: Number(row.errors || 0),
+    tokensPrompt: Number(row.tokens_prompt || 0),
+    tokensCompletion: Number(row.tokens_completion || 0),
+    tokensTotal: Number(row.tokens_total || 0),
+  };
+}

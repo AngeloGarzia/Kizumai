@@ -26,11 +26,6 @@ export default function BusinessMetricPills({
     [
       competition?.note,
       competitionDisplayLabel(competition),
-      competition?.source === 'web'
-        ? 'Estimation avec recherche web'
-        : competition?.source === 'estimated'
-          ? 'Estimation sans recherche web'
-          : null,
       'Cliquez pour le détail',
     ]
       .filter(Boolean)
@@ -59,7 +54,10 @@ export default function BusinessMetricPills({
             score: competition?.score,
             label: competitionDisplayLabel(competition),
             note: competition?.note,
-            source: competition?.source,
+            businessTitle: business?.title,
+            activity: business?.activity,
+            pitch: business?.pitch,
+            rationale: business?.rationale,
           })
         }
       />
@@ -72,6 +70,10 @@ export default function BusinessMetricPills({
             score: profitability?.score,
             label: profitabilityDisplayLabel(profitability),
             note: profitability?.note,
+            businessTitle: business?.title,
+            activity: business?.activity,
+            pitch: business?.pitch,
+            rationale: business?.rationale,
           })
         }
       />
@@ -82,6 +84,11 @@ export default function BusinessMetricPills({
           open('feasibility', {
             score: business?.feasibility,
             modes: business?.modes,
+            businessTitle: business?.title,
+            activity: business?.activity,
+            pitch: business?.pitch,
+            rationale: business?.rationale,
+            note: business?.feasibilityNote || business?.fabulousPickNote || null,
           })
         }
       />

@@ -4,7 +4,6 @@ import BrandLogo from '../components/BrandLogo.jsx';
 import FeasibilityGauge, {
   averageFeasibility,
   computeJourneyFeasibility,
-  feasibilityTileStyle,
 } from '../components/FeasibilityGauge.jsx';
 import FeasibilityRoundPill from '../components/FeasibilityRoundPill.jsx';
 import {
@@ -254,6 +253,13 @@ export default function ProjectSearch() {
   const sortedBusinesses = useMemo(
     () =>
       [...businesses].sort((a, b) => {
+        const ra = Number(a?.fabulousRank);
+        const rb = Number(b?.fabulousRank);
+        const hasRa = Number.isFinite(ra) && ra >= 1;
+        const hasRb = Number.isFinite(rb) && rb >= 1;
+        if (hasRa && hasRb && ra !== rb) return ra - rb;
+        if (hasRa && !hasRb) return -1;
+        if (!hasRa && hasRb) return 1;
         const fa = Number(a?.feasibility);
         const fb = Number(b?.feasibility);
         const sa = Number.isFinite(fa) ? fa : -1;
@@ -262,6 +268,33 @@ export default function ProjectSearch() {
       }),
     [businesses]
   );
+
+  const fabulousPickLabel = (rank) => {
+    if (rank === 1) return assistantPhrases.preferredPick;
+    if (rank === 2) return assistantPhrases.preferredPickAlt;
+    if (rank === 3) return assistantPhrases.preferredPickGood;
+    return null;
+  };
+
+  /** Fond de tuile clairement distinct selon le rang de prédilection Fabulous (1 = meilleur). */
+  const fabulousPreferenceTileClass = (rank) => {
+    if (rank === 1) {
+      return 'border-wasabi-400 bg-wasabi-100 ring-2 ring-wasabi-300/80 shadow-sm shadow-wasabi-500/15';
+    }
+    if (rank === 2) {
+      return 'border-topaz-400 bg-topaz-100 ring-1 ring-topaz-300/70';
+    }
+    if (rank === 3) {
+      return 'border-amber-300 bg-amber-50';
+    }
+    if (rank === 4) {
+      return 'border-prune-200 bg-prune-50';
+    }
+    if (Number.isFinite(rank) && rank >= 5) {
+      return 'border-prune-100 bg-white';
+    }
+    return 'border-prune-100 bg-white';
+  };
 
   const fetchBusinesses = useCallback(async (refineText = '', avoid = []) => {
     const seed = seedRef.current;
@@ -875,16 +908,34 @@ export default function ProjectSearch() {
                   {sortedBusinesses.map((business, index) => {
                     const hasSaved =
                       savedTraining?.businessTitle === business.title && savedTraining?.title;
-                    const tileStyle = feasibilityTileStyle(business.feasibility);
                     const modes = ensureBusinessModes(business);
+                    const pickRank = Number(business.fabulousRank);
+                    const pickLabel = fabulousPickLabel(pickRank);
                     return (
                       <div
                         key={index}
-                        className="rounded-2xl border border-prune-100 bg-white p-5 hover:shadow-sm transition-all"
-                        style={tileStyle}
+                        className={[
+                          'rounded-2xl border p-5 hover:shadow-sm transition-all',
+                          fabulousPreferenceTileClass(pickRank),
+                        ].join(' ')}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
+                            {pickLabel && (
+                              <span
+                                className={[
+                                  'mb-1.5 inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide',
+                                  pickRank === 1
+                                    ? 'bg-wasabi-600 text-white fabulous-pick-blink'
+                                    : pickRank === 2
+                                      ? 'bg-topaz-500 text-white'
+                                      : 'bg-amber-500 text-white',
+                                ].join(' ')}
+                                title={business.fabulousPickNote || pickLabel}
+                              >
+                                {pickLabel}
+                              </span>
+                            )}
                             <h3 className="font-semibold text-prune-900 pr-2">{business.title}</h3>
                           </div>
                           <BusinessMetricPills
@@ -1067,6 +1118,8 @@ export default function ProjectSearch() {
                                     score: proposal.profitabilityScore,
                                     label: profitabilityDisplayLabel(proposal),
                                     note: proposal.profitabilityNote,
+                                    businessTitle: proposal.title,
+                                    pitch: proposal.report,
                                   })
                                 )
                               }
@@ -1078,6 +1131,8 @@ export default function ProjectSearch() {
                                 setMetricDetail(
                                   buildMetricPillDetail('feasibility', {
                                     score: proposal.feasibility,
+                                    businessTitle: proposal.title,
+                                    pitch: proposal.report,
                                   })
                                 )
                               }

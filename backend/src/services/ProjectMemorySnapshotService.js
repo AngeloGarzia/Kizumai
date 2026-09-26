@@ -9,6 +9,7 @@ export function createProjectMemorySnapshotService({
   projectMemorySnapshotRepository,
   aiService,
   settingsService = null,
+  projectRepository = null,
 }) {
   async function memoryConfig() {
     if (settingsService) return settingsService.getMemoryConfig();
@@ -48,8 +49,13 @@ export function createProjectMemorySnapshotService({
 
       let result;
       try {
+        let userId = null;
+        if (projectRepository?.findById) {
+          const project = await projectRepository.findById(projectId);
+          userId = project?.userId ?? null;
+        }
         result = await withAiUsageContext(
-          { projectId, purpose: 'memory_snapshot' },
+          { userId, projectId, purpose: 'memory_snapshot' },
           () =>
             aiService.generateMemorySnapshot({
               memoriesText,
