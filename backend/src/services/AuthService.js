@@ -85,6 +85,10 @@ export function createAuthService({
           console.warn(
             `[auth] Échec envoi email de confirmation à ${user.email} : ${mailResult?.error || 'inconnu'}`
           );
+          // En dév, exposer le lien pour ne pas bloquer les tests si SMTP est cassé.
+          if (!config.isProd) {
+            console.log(`[auth] Lien de confirmation (fallback dév) : ${confirmUrl}`);
+          }
         }
 
         if (mailResult?.skipped) {

@@ -110,3 +110,38 @@ export function IconCheck({ className = 'w-3 h-3' }) {
     </svg>
   );
 }
+
+/** Magasin / point de vente ancré. */
+export function IconStore({ className = 'w-6 h-6' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 10l1.5-5h13L20 10" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 10h16v10H4V10z" />
+      <path strokeLinecap="round" d="M9 20v-6h6v6" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 10c0 1.1.9 2 2 2s2-.9 2-2c0 1.1.9 2 2 2s2-.9 2-2c0 1.1.9 2 2 2s2-.9 2-2c0 1.1.9 2 2 2s2-.9 2-2" />
+    </svg>
+  );
+}
+
+/** Camionnette / mobilité. */
+export function IconVan({ className = 'w-6 h-6' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 15V8a1 1 0 011-1h9v8H3z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M13 10h4.5L21 13.5V15h-8v-5z" />
+      <circle cx="7" cy="16.5" r="1.75" />
+      <circle cx="17" cy="16.5" r="1.75" />
+      <path strokeLinecap="round" d="M8.75 16.5h6.5" />
+    </svg>
+  );
+}
+
+/** Ordinateur / activité dématérialisée. */
+export function IconMonitor({ className = 'w-6 h-6' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="12" rx="2" />
+      <path strokeLinecap="round" d="M8 20h8M12 16v4" />
+    </svg>
+  );
+}

@@ -45,6 +45,11 @@ export function competitionPillStyle(score) {
   };
 }
 
+/** Pastille ronde coin de carte : concurrence vert → marron. */
+export function competitionRoundPillStyle(score) {
+  return competitionPillStyle(score);
+}
+
 /** Normalise business (API) ou snapshot metadata (`score`/`label`/…). */
 export function normalizeCompetition(input) {
   if (!input || typeof input !== 'object') return null;

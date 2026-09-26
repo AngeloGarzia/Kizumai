@@ -103,23 +103,38 @@ export const UpdateLearningRecordRequestDto = {
 
 export const CreateFromAiRequestDto = {
   from(body = {}) {
-    const training =
+    const raw =
       body.training && typeof body.training === 'object' && !Array.isArray(body.training)
-        ? pick(body.training, [
-            'title',
-            'organization',
-            'level',
-            'field',
-            'durationLabel',
-            'description',
-            'skills',
-          ])
+        ? body.training
         : null;
-    if (!training) {
+    if (!raw) {
       throw new AppError('Formation IA manquante', 400);
     }
+    const duration = optionalString(raw.duration ?? raw.durationLabel, { max: 120 });
+    const rationale = optionalString(raw.rationale ?? raw.description, { max: 4000 });
+    const training = {
+      title: optionalString(raw.title, { max: 200 }),
+      organization: optionalString(raw.organization, { max: 200 }),
+      level: optionalString(raw.level, { max: 80 }),
+      field: optionalString(raw.field, { max: 120 }),
+      duration,
+      durationLabel: duration,
+      rationale,
+      description: rationale,
+      format: optionalString(raw.format, { max: 40 }),
+      skills: Array.isArray(raw.skills) ? raw.skills : undefined,
+    };
+    if (!training.title) {
+      throw new AppError('Formation IA invalide', 400);
+    }
+    let business = body.business;
+    if (business != null && typeof business === 'object' && !Array.isArray(business)) {
+      business = { ...business };
+    } else {
+      business = optionalString(business, { max: 300 });
+    }
     return {
-      business: optionalString(body.business, { max: 300 }),
+      business,
       training,
       projectId: optionalId(body.projectId, 'projectId'),
     };

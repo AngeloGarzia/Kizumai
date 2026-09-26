@@ -17,6 +17,12 @@ export const learningService = {
     return api.post('/learning-records', payload).then((r) => r.data.record);
   },
 
+  createFromAi({ business, training, projectId }) {
+    return api
+      .post('/learning-records/from-ai', { business, training, projectId })
+      .then((r) => r.data.record);
+  },
+
   update(id, payload) {
     return api.patch(`/learning-records/${id}`, payload).then((r) => r.data.record);
   },

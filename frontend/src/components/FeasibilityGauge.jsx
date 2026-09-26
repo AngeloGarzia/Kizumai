@@ -65,6 +65,24 @@ export function feasibilityAccentColor(score) {
   return mixColorCss(t);
 }
 
+/** Pastille ronde coin de carte : score réussite rouge → vert. */
+export function feasibilityRoundPillStyle(score) {
+  const t = feasibilityTone(score);
+  if (t == null) {
+    return {
+      backgroundColor: 'rgb(243 240 237)',
+      color: 'rgb(100 90 85)',
+      borderColor: 'rgb(220 214 208)',
+    };
+  }
+  const { r, g, b } = mixColor(t);
+  return {
+    backgroundColor: `rgba(${r}, ${g}, ${b}, 0.22)`,
+    color: `rgb(${Math.max(36, r - 28)}, ${Math.max(28, g - 28)}, ${Math.max(20, b - 20)})`,
+    borderColor: `rgba(${r}, ${g}, ${b}, 0.55)`,
+  };
+}
+
 export default function FeasibilityGauge({ score, compact = false }) {
   const value = clamp(score);
   const display = value ?? 0;

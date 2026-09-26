@@ -28,7 +28,11 @@ export function renderAccountConfirmation(vars = {}) {
       <p style="margin:0 0 12px">Bonjour <strong>${escapeHtml(name)}</strong>,</p>
       <p style="margin:0 0 12px">Merci pour votre inscription sur Kizumai.</p>
       <p style="margin:0 0 12px">Cliquez sur le bouton ci-dessous pour <strong>activer votre compte</strong>. Sans cette confirmation, vous ne pourrez pas vous connecter.</p>
-      <p style="margin:0;font-size:13px;color:#7a6674">Ce lien expire dans ${expiresHours}&nbsp;heures. Si vous n’êtes pas à l’origine de cette inscription, ignorez cet email.</p>
+      <p style="margin:16px 0 0;font-size:13px;line-height:1.5;color:#5c4a56;word-break:break-all">
+        Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur&nbsp;:<br />
+        <a href="${escapeHtml(confirmUrl)}" style="color:#3b1f33">${escapeHtml(confirmUrl)}</a>
+      </p>
+      <p style="margin:16px 0 0;font-size:13px;color:#7a6674">Ce lien expire dans ${expiresHours}&nbsp;heures. Si vous n’êtes pas à l’origine de cette inscription, ignorez cet email.</p>
     `,
     ctaLabel: 'Confirmer mon email',
     ctaUrl: confirmUrl,

@@ -4,13 +4,16 @@ import MainLayout from '../components/MainLayout.jsx';
 import BrandLogo from '../components/BrandLogo.jsx';
 import Button from '../components/Button.jsx';
 import Input from '../components/Input.jsx';
+import TrainingAssistModal from '../components/TrainingAssistModal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
   RECORD_STATUS_OPTIONS,
   RECORD_TYPE_OPTIONS,
   learningService,
 } from '../services/learningService.js';
+import { projectService } from '../services/projectService.js';
 import { useProject } from '../context/ProjectContext.jsx';
+import { ASSISTANT_NAME } from '../constants/assistant.js';
 
 const EMPTY_FORM = {
   recordType: 'formation',
@@ -26,7 +29,7 @@ const EMPTY_FORM = {
 export default function Competences() {
   const navigate = useNavigate();
   const { isAuthenticated, isPaid } = useAuth();
-  const { currentProjectId } = useProject();
+  const { currentProject, currentProjectId } = useProject();
   const [records, setRecords] = useState([]);
   const projectId = currentProjectId;
   const [loading, setLoading] = useState(true);
@@ -35,6 +38,17 @@ export default function Competences() {
   const [message, setMessage] = useState('');
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
+
+  const [assistOpen, setAssistOpen] = useState(false);
+  const [region, setRegion] = useState('');
+  const [trainings, setTrainings] = useState([]);
+  const [trainingLoading, setTrainingLoading] = useState(false);
+  const [trainingError, setTrainingError] = useState('');
+  const [trainingRefine, setTrainingRefine] = useState('');
+  const [savedTrainingTitle, setSavedTrainingTitle] = useState(null);
+
+  const businessLabel =
+    currentProject?.quoi || currentProject?.title || currentProject?.activity?.label || 'votre projet';
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,6 +70,10 @@ export default function Competences() {
     }
     load();
   }, [isAuthenticated, isPaid, navigate, load]);
+
+  useEffect(() => {
+    setRegion(currentProject?.ou || '');
+  }, [currentProject?.ou, currentProject?.id]);
 
   const startEdit = (record) => {
     setEditingId(record.id);
@@ -127,6 +145,77 @@ export default function Competences() {
     }
   };
 
+  const fetchTrainings = useCallback(
+    async (refineText = '', avoid = []) => {
+      const zone = String(region || '').trim();
+      if (!zone) {
+        setTrainingError('Indiquez une région pour lancer la recherche.');
+        return;
+      }
+      setTrainingLoading(true);
+      setTrainingError('');
+      try {
+        const result = await projectService.searchTrainings({
+          business: businessLabel,
+          quoi: currentProject?.quoi || businessLabel,
+          ou: zone,
+          budget: currentProject?.budget,
+          currency: currentProject?.currency || 'EUR',
+          projectId: projectId || undefined,
+          refine: refineText,
+          avoid,
+        });
+        setTrainings(Array.isArray(result) ? result : []);
+      } catch (err) {
+        setTrainingError(err.message || 'Impossible de charger les formations.');
+      } finally {
+        setTrainingLoading(false);
+      }
+    },
+    [region, businessLabel, currentProject, projectId]
+  );
+
+  const openAssist = () => {
+    setAssistOpen(true);
+    setTrainings([]);
+    setTrainingRefine('');
+    setTrainingError('');
+    setSavedTrainingTitle(null);
+    if (String(region || '').trim()) {
+      fetchTrainings('', []);
+    }
+  };
+
+  const closeAssist = () => {
+    setAssistOpen(false);
+    setTrainings([]);
+    setTrainingRefine('');
+    setTrainingError('');
+  };
+
+  const saveTrainingFromAi = async (training) => {
+    setBusy(true);
+    setTrainingError('');
+    try {
+      await learningService.createFromAi({
+        business: {
+          title: businessLabel,
+          quoi: currentProject?.quoi || businessLabel,
+          ou: region,
+        },
+        training,
+        projectId: projectId || null,
+      });
+      setSavedTrainingTitle(training.title);
+      setMessage(`Formation « ${training.title} » ajoutée à vos compétences.`);
+      await load();
+    } catch (err) {
+      setTrainingError(err.message || 'Impossible d’enregistrer la formation.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const typeLabel = (value) =>
     RECORD_TYPE_OPTIONS.find((o) => o.value === value)?.label || value;
   const statusLabel = (value) =>
@@ -153,6 +242,24 @@ export default function Competences() {
 
           {error && <p className="alert-error">{error}</p>}
           {message && <p className="alert-success">{message}</p>}
+
+          <section className="rounded-2xl border border-wasabi-200 bg-wasabi-50/60 p-4 sm:p-5 space-y-3">
+            <h2 className="text-lg font-bold text-prune-900">
+              Demander à {ASSISTANT_NAME}
+            </h2>
+            <p className="text-sm text-prune-600">
+              Recherche des formations pertinentes pour « {businessLabel} »
+              {region ? ` autour de ${region}` : ''} .
+            </p>
+            {!projectId && (
+              <p className="text-xs text-prune-500">
+                Sélectionnez un projet courant pour lier automatiquement les suggestions.
+              </p>
+            )}
+            <Button type="button" className="w-full sm:w-auto" onClick={openAssist} disabled={busy}>
+              Chercher des formations avec {ASSISTANT_NAME}
+            </Button>
+          </section>
 
           <form onSubmit={save} className="rounded-2xl bg-white/80 border border-prune-100 p-4 sm:p-5 space-y-3">
             <h2 className="text-lg font-bold text-prune-900">
@@ -257,6 +364,7 @@ export default function Competences() {
                       <div className="min-w-0">
                         <p className="text-xs font-semibold uppercase tracking-wide text-topaz-600">
                           {typeLabel(record.recordType)} · {statusLabel(record.status)}
+                          {record.source === 'ai_suggestion' ? ` · ${ASSISTANT_NAME}` : ''}
                         </p>
                         <h3 className="font-semibold text-prune-900 truncate">{record.title}</h3>
                         {record.organization && (
@@ -291,6 +399,33 @@ export default function Competences() {
             )}
           </section>
         </main>
+
+        {assistOpen && (
+          <TrainingAssistModal
+            businessTitle={businessLabel}
+            showRegion
+            region={region}
+            onRegionChange={setRegion}
+            trainings={trainings}
+            loading={trainingLoading}
+            error={trainingError}
+            refine={trainingRefine}
+            onRefineChange={setTrainingRefine}
+            onSearch={() => fetchTrainings('', [])}
+            onRefine={() =>
+              fetchTrainings(
+                trainingRefine,
+                trainings.map((t) => t.title)
+              )
+            }
+            savedTitle={savedTrainingTitle}
+            onSave={saveTrainingFromAi}
+            saveLabel="Ajouter à mes formations"
+            savedLabel="Ajoutée ✓"
+            onClose={closeAssist}
+            closeLabel="Fermer"
+          />
+        )}
 
     </MainLayout>
   );

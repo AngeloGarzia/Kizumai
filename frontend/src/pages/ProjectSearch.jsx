@@ -4,7 +4,7 @@ import BrandLogo from '../components/BrandLogo.jsx';
 import FeasibilityGauge, {
   averageFeasibility,
   computeJourneyFeasibility,
-  feasibilityAccentColor,
+  feasibilityRoundPillStyle,
   feasibilityTileStyle,
 } from '../components/FeasibilityGauge.jsx';
 import {
@@ -18,6 +18,7 @@ import {
 import { IconChevronRight } from '../components/icons.jsx';
 import FranceImplantationModal from '../components/FranceImplantationModal.jsx';
 import FabulousThinking from '../components/FabulousThinking.jsx';
+import TrainingAssistModal from '../components/TrainingAssistModal.jsx';
 import MobilitySetupPanel from '../components/MobilitySetupPanel.jsx';
 import DigitalSetupPanel from '../components/DigitalSetupPanel.jsx';
 import { assistantPhrases } from '../constants/assistant.js';
@@ -30,7 +31,8 @@ import {
 } from '../constants/locationModes.js';
 import {
   competitionDisplayLabel,
-  competitionPillStyle,
+  competitionRoundPillStyle,
+  normalizeCompetition,
 } from '../utils/competitionPill.js';
 
 const BASE_STEPS = [
@@ -140,127 +142,6 @@ function RefineBar({ placeholder, value, onChange, onSubmit, disabled }) {
         {assistantPhrases.refineWith}
       </button>
     </form>
-  );
-}
-
-const FORMAT_LABEL = {
-  en_ligne: 'En ligne',
-  presentiel: 'Présentiel',
-  mixte: 'Mixte',
-};
-
-function TrainingModal({
-  business,
-  trainings,
-  loading,
-  error,
-  refine,
-  onRefineChange,
-  onRefine,
-  savedTitle,
-  onSave,
-  onClose,
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="training-modal-title"
-    >
-      <button
-        type="button"
-        className="absolute inset-0 bg-prune-900/50"
-        aria-label="Fermer"
-        onClick={onClose}
-      />
-      <div className="relative w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-white shadow-xl p-5 sm:p-6">
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-prune-500">
-              Assistance formation
-            </p>
-            <h2 id="training-modal-title" className="text-lg font-bold text-prune-900 mt-1">
-              Formations pour « {business.title} »
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-lg text-prune-500 hover:bg-prune-50"
-            aria-label="Fermer"
-          >
-            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
-            </svg>
-          </button>
-        </div>
-
-        {error && <p className="alert-error mb-3">{error}</p>}
-
-        {loading ? (
-          <FabulousThinking message={assistantPhrases.preparingTrainings} />
-        ) : trainings.length === 0 && !error ? (
-          <p className="py-8 text-center text-sm text-prune-500 mb-4">
-            Aucune formation pour le moment. Affinez ou réessayez.
-          </p>
-        ) : (
-          <div className="space-y-3 mb-4">
-            {trainings.map((training, index) => {
-              const saved = savedTitle === training.title;
-              return (
-                <div
-                  key={index}
-                  className={[
-                    'rounded-2xl border p-4',
-                    saved ? 'border-wasabi-400 bg-wasabi-50/50' : 'border-prune-100',
-                  ].join(' ')}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-semibold text-prune-900">{training.title}</h3>
-                    <span className="shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full bg-prune-100 text-prune-700">
-                      {training.level}
-                    </span>
-                  </div>
-                  <p className="text-xs text-prune-500 mt-1">
-                    {training.duration || 'Durée à préciser'}
-                    {' · '}
-                    {FORMAT_LABEL[training.format] || training.format}
-                  </p>
-                  {training.rationale && (
-                    <p className="text-sm text-prune-600 mt-2">{training.rationale}</p>
-                  )}
-                  {training.skills?.length > 0 && (
-                    <p className="text-xs text-prune-500 mt-2">
-                      Compétences : {training.skills.join(', ')}
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => onSave(training)}
-                    className="mt-3 text-xs font-semibold text-wasabi-700 hover:underline"
-                  >
-                    {saved ? 'Formation mise de côté ✓' : 'Mettre de côté'}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        <RefineBar
-          placeholder="Ex : plutôt courte, certifiante, gestion…"
-          value={refine}
-          onChange={onRefineChange}
-          onSubmit={onRefine}
-          disabled={loading}
-        />
-
-        <button type="button" onClick={onClose} className="btn-secondary w-full mt-4">
-          Continuer le choix du business
-        </button>
-      </div>
-    </div>
   );
 }
 
@@ -950,8 +831,20 @@ export default function ProjectSearch() {
                     const hasSaved =
                       savedTraining?.businessTitle === business.title && savedTraining?.title;
                     const tileStyle = feasibilityTileStyle(business.feasibility);
-                    const accent = feasibilityAccentColor(business.feasibility);
                     const modes = ensureBusinessModes(business);
+                    const competition = normalizeCompetition(business);
+                    const competitionTitle =
+                      [
+                        competition?.note,
+                        competitionDisplayLabel(competition),
+                        competition?.source === 'web'
+                          ? 'Estimation avec recherche web'
+                          : competition?.source === 'estimated'
+                            ? 'Estimation sans recherche web'
+                            : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' — ') || 'Concurrence estimée';
                     return (
                       <div
                         key={index}
@@ -959,38 +852,33 @@ export default function ProjectSearch() {
                         style={tileStyle}
                       >
                         <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0 flex-1 flex flex-wrap items-center gap-2">
-                            <h3 className="font-semibold text-prune-900">{business.title}</h3>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-semibold text-prune-900 pr-2">{business.title}</h3>
+                          </div>
+                          <div className="shrink-0 flex items-center gap-2">
                             <span
-                              className="inline-flex items-center rounded-lg border px-2 py-0.5 text-[11px] font-semibold tracking-wide"
-                              style={competitionPillStyle(business.competitionScore)}
-                              title={
-                                [
-                                  business.competitionNote,
-                                  business.competitionSource === 'web'
-                                    ? 'Estimation avec recherche web'
-                                    : business.competitionSource === 'estimated'
-                                      ? 'Estimation sans recherche web'
-                                      : null,
-                                ]
-                                  .filter(Boolean)
-                                  .join(' — ') || 'Concurrence estimée'
+                              className="inline-flex h-14 w-14 items-center justify-center rounded-full border text-[18px] font-bold tabular-nums leading-none"
+                              style={competitionRoundPillStyle(competition?.score)}
+                              title={competitionTitle}
+                              aria-label={`Concurrence : ${competitionDisplayLabel(competition)}${
+                                competition?.score != null ? ` ${competition.score}` : ''
+                              }`}
+                            >
+                              {competition?.score != null ? competition.score : '—'}
+                            </span>
+                            <span
+                              className="inline-flex h-14 w-14 items-center justify-center rounded-full border text-[18px] font-bold tabular-nums leading-none"
+                              style={feasibilityRoundPillStyle(business.feasibility)}
+                              title="Chance de réussite estimée"
+                              aria-label={
+                                business.feasibility != null
+                                  ? `Réussite estimée ${business.feasibility} %`
+                                  : 'Réussite non disponible'
                               }
                             >
-                              Concurrence · {competitionDisplayLabel(business)}
-                              {business.competitionScore != null
-                                ? ` (${business.competitionScore})`
-                                : ''}
+                              {business.feasibility != null ? `${business.feasibility}%` : '—'}
                             </span>
                           </div>
-                          {business.feasibility != null && (
-                            <span
-                              className="shrink-0 text-[15px] font-bold tabular-nums"
-                              style={{ color: accent }}
-                            >
-                              {business.feasibility}%
-                            </span>
-                          )}
                         </div>
                         {business.activity && (
                           <p className="text-xs font-medium uppercase tracking-wide text-topaz-600 mt-0.5">
@@ -1003,56 +891,62 @@ export default function ProjectSearch() {
                         {business.rationale && (
                           <p className="text-sm text-prune-500 mt-1">{business.rationale}</p>
                         )}
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {modes.map((mode) => {
-                            const meta = LOCATION_MODE_META[mode.type];
-                            return (
-                              <span
-                                key={mode.type}
-                                className={[
-                                  'inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-xs font-semibold',
-                                  meta.chipClass,
-                                ].join(' ')}
-                                title={mode.angle || meta.shortLabel}
-                              >
-                                {mode.label || meta.shortLabel}
-                                {mode.feasibility != null ? ` · ${mode.feasibility}%` : ''}
-                              </span>
-                            );
-                          })}
-                        </div>
                         {hasSaved && (
                           <p className="mt-2 text-xs font-medium text-wasabi-700">
                             Formation mise de côté : {savedTraining.title}
                           </p>
                         )}
-                        <div className="mt-4 flex flex-col gap-2">
-                          <div className="flex flex-col sm:flex-row flex-wrap gap-2">
-                            {modes.map((mode) => {
-                              const meta = LOCATION_MODE_META[mode.type];
-                              return (
-                                <button
-                                  key={mode.type}
-                                  type="button"
-                                  onClick={() => handleSelectBusinessMode(business, mode)}
+                        <div
+                          className={[
+                            'mt-4 grid gap-2',
+                            modes.length >= 3
+                              ? 'grid-cols-3'
+                              : modes.length === 2
+                                ? 'grid-cols-2'
+                                : 'grid-cols-1',
+                          ].join(' ')}
+                        >
+                          {modes.map((mode) => {
+                            const meta = LOCATION_MODE_META[mode.type];
+                            const ModeIcon = meta.Icon;
+                            return (
+                              <button
+                                key={mode.type}
+                                type="button"
+                                onClick={() => handleSelectBusinessMode(business, mode)}
+                                title={mode.angle || meta.shortLabel}
+                                className={[
+                                  'flex flex-col items-center gap-2 rounded-xl border px-2 py-3.5 text-center transition-all hover:shadow-sm hover:ring-2',
+                                  meta.tileClass,
+                                ].join(' ')}
+                              >
+                                <span
                                   className={[
-                                    'flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors',
-                                    meta.buttonClass,
+                                    'inline-flex h-12 w-12 items-center justify-center rounded-full',
+                                    meta.iconWrapClass,
                                   ].join(' ')}
                                 >
+                                  <ModeIcon className="w-7 h-7" />
+                                </span>
+                                <span className="text-sm font-semibold leading-tight">
                                   {mode.label || meta.shortLabel}
-                                </button>
-                              );
-                            })}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={(e) => openTrainingAssist(business, e)}
-                            className="btn-secondary w-full"
-                          >
-                            Formation utile ?
-                          </button>
+                                </span>
+                                {mode.feasibility != null && (
+                                  <span className="text-xs font-semibold tabular-nums opacity-80">
+                                    {mode.feasibility}%
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
                         </div>
+                        <button
+                          type="button"
+                          onClick={(e) => openTrainingAssist(business, e)}
+                          className="btn-secondary w-full mt-2"
+                        >
+                          Formation utile ?
+                        </button>
                       </div>
                     );
                   })}
@@ -1224,8 +1118,8 @@ export default function ProjectSearch() {
       )}
 
       {trainingBusiness && (
-        <TrainingModal
-          business={trainingBusiness}
+        <TrainingAssistModal
+          businessTitle={trainingBusiness.title}
           trainings={trainings}
           loading={trainingLoading}
           error={trainingError}
@@ -1250,6 +1144,7 @@ export default function ProjectSearch() {
             })
           }
           onClose={closeTrainingAssist}
+          closeLabel="Continuer le choix du business"
         />
       )}
     </div>
