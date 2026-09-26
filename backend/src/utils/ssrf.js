@@ -151,3 +151,32 @@ export function assertSafeExternalUrl(raw, { allowRelative = false } = {}) {
   }
   return parsed.toString();
 }
+
+/**
+ * Filtre une URL http(s) destinée à l’AFFICHAGE uniquement (pas de fetch).
+ * Retourne l’URL normalisée ou null. Pour tout appel réseau sortant vers une URL
+ * non contrôlée par le serveur, utiliser assertSafeExternalUrlAsync.
+ */
+export function sanitizePublicHttpUrl(raw, { maxLength = 500 } = {}) {
+  const s = String(raw || '').trim();
+  if (!s || /^null$/i.test(s) || s === '-') return null;
+  try {
+    const withProto = /^https?:\/\//i.test(s) ? s : `https://${s}`;
+    const parsed = new URL(withProto);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+    if (parsed.username || parsed.password) return null;
+
+    const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    if (!host || !host.includes('.')) return null;
+    if (BLOCKED_HOSTS.has(host) || host.endsWith('.localhost') || host.endsWith('.local')) {
+      return null;
+    }
+    if (net.isIP(host) && isBlockedIp(host)) return null;
+
+    parsed.hash = '';
+    const out = parsed.toString();
+    return out.length > maxLength ? out.slice(0, maxLength) : out;
+  } catch {
+    return null;
+  }
+}

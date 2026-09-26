@@ -11,7 +11,7 @@ import { CreateContactRequestDto } from '../src/dto/contact.dto.js';
 import { UpdatePromptRequestDto } from '../src/dto/admin.dto.js';
 import { ApplyScanRequestDto } from '../src/dto/documentScan.dto.js';
 import { wrapUntrusted } from '../src/utils/aiPromptSafety.js';
-import { isBlockedIp, assertSafeExternalUrl } from '../src/utils/ssrf.js';
+import { isBlockedIp, assertSafeExternalUrl, sanitizePublicHttpUrl } from '../src/utils/ssrf.js';
 import { withAiGuard, _resetAiGuardForTests } from '../src/utils/aiGuard.js';
 import { AppError } from '../src/utils/AppError.js';
 
@@ -113,6 +113,13 @@ describe('SSRF guards', () => {
       () => assertSafeExternalUrl('http://169.254.169.254/latest/meta-data/'),
       AppError
     );
+  });
+
+  it('sanitizePublicHttpUrl allows public hosts and blocks private', () => {
+    assert.equal(sanitizePublicHttpUrl('https://example.com/path'), 'https://example.com/path');
+    assert.equal(sanitizePublicHttpUrl('http://127.0.0.1/'), null);
+    assert.equal(sanitizePublicHttpUrl('http://169.254.169.254/latest'), null);
+    assert.equal(sanitizePublicHttpUrl('http://localhost/admin'), null);
   });
 });
 

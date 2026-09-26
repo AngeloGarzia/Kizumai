@@ -13,6 +13,7 @@ import {
   withAiUsageContext,
 } from '../utils/aiUsage.js';
 import { normalizeFranceImplantation } from '../constants/franceRegions.js';
+import { sanitizePublicHttpUrl } from '../utils/ssrf.js';
 
 const AI_REQUEST_TIMEOUT_MS = Number(process.env.AI_REQUEST_TIMEOUT_MS) || 60_000;
 const AI_FRANCE_TIMEOUT_MS =
@@ -1964,42 +1965,11 @@ export function createAiService({ settingsService, currencyService }) {
         ? data.risks.map((s) => clipAiOutput(String(s || '').trim(), 400)).filter(Boolean).slice(0, 6)
         : [];
 
-      const sanitizeCompetitorUrl = (raw) => {
-        const s = String(raw || '').trim();
-        if (!s || /^null$/i.test(s) || s === '-') return null;
-        try {
-          const withProto = /^https?:\/\//i.test(s) ? s : `https://${s}`;
-          const u = new URL(withProto);
-          if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
-          if (u.username || u.password) return null;
-          const host = String(u.hostname || '').toLowerCase();
-          if (!host || !host.includes('.')) return null;
-          if (
-            host === 'localhost' ||
-            host.endsWith('.localhost') ||
-            host === 'metadata.google.internal'
-          ) {
-            return null;
-          }
-          // Bloque IP privées / loopback (sans DNS — filtre détermiste).
-          if (
-            /^(127\.|10\.|192\.168\.|169\.254\.|0\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/.test(
-              host
-            ) ||
-            /^172\.(1[6-9]|2\d|3[0-1])\./.test(host) ||
-            host === '::1' ||
-            host.startsWith('fe80:') ||
-            host.startsWith('fc') ||
-            host.startsWith('fd')
-          ) {
-            return null;
-          }
-          u.hash = '';
-          return u.toString().slice(0, 500);
-        } catch {
-          return null;
-        }
-      };
+      // URLs concurrents : affichage uniquement — jamais de fetch() vers ces hôtes
+      // sans assertSafeExternalUrlAsync (garde SSRF DNS).
+      // URLs concurrents : affichage uniquement — jamais de fetch() vers ces hôtes
+      // sans assertSafeExternalUrlAsync (garde SSRF DNS).
+      const sanitizeCompetitorUrl = (raw) => sanitizePublicHttpUrl(raw, { maxLength: 500 });
 
       const competitors = Array.isArray(data.competitors)
         ? data.competitors
