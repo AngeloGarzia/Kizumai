@@ -4,9 +4,9 @@ import BrandLogo from '../components/BrandLogo.jsx';
 import FeasibilityGauge, {
   averageFeasibility,
   computeJourneyFeasibility,
-  feasibilityRoundPillStyle,
   feasibilityTileStyle,
 } from '../components/FeasibilityGauge.jsx';
+import FeasibilityRoundPill from '../components/FeasibilityRoundPill.jsx';
 import {
   projectService,
   getSearchSeed,
@@ -31,9 +31,9 @@ import {
 } from '../constants/locationModes.js';
 import {
   competitionDisplayLabel,
-  competitionRoundPillStyle,
   normalizeCompetition,
 } from '../utils/competitionPill.js';
+import CompetitionSegmentsPill from '../components/CompetitionSegmentsPill.jsx';
 
 const BASE_STEPS = [
   { key: 'businesses', label: 'Business' },
@@ -691,6 +691,14 @@ export default function ProjectSearch() {
                 source: selectedBusiness.competitionSource || null,
               }
             : null,
+        budgetPlan: {
+          kind: proposal.kind || 'budget_utilisateur',
+          label: proposalKindLabel(proposal.kind),
+          selectedBudget: proposal.budget,
+          currency: proposal.currency || seed.currency,
+          feasibility: proposal.feasibility ?? null,
+          userSeedBudget: seed.budget ?? null,
+        },
       },
       training: trainingForBusiness
         ? {
@@ -709,6 +717,31 @@ export default function ProjectSearch() {
             : selectedMode?.feasibility ?? selectedBusiness?.feasibility,
         budgetScore: proposal.feasibility ?? budgetAssessment?.feasibility,
       }),
+      feasibilityBreakdown: {
+        business: {
+          score: selectedMode?.feasibility ?? selectedBusiness?.feasibility ?? null,
+          weight: 0.4,
+          label: 'Idée / business',
+        },
+        location: {
+          score:
+            modeType === LOCATION_MODE.FIXED
+              ? selectedLocation?.feasibility ?? null
+              : selectedMode?.feasibility ?? selectedBusiness?.feasibility ?? null,
+          weight: 0.35,
+          label:
+            modeType === LOCATION_MODE.NOMADIC
+              ? 'Ancrage mobilité'
+              : modeType === LOCATION_MODE.DEMATERIALIZED
+                ? 'Setup digital'
+                : 'Lieu',
+        },
+        budget: {
+          score: proposal.feasibility ?? budgetAssessment?.feasibility ?? null,
+          weight: 0.25,
+          label: 'Budget',
+        },
+      },
     });
     // Garde seed + progression pour pouvoir revenir modifier le parcours.
     saveSearchProgress({
@@ -856,28 +889,11 @@ export default function ProjectSearch() {
                             <h3 className="font-semibold text-prune-900 pr-2">{business.title}</h3>
                           </div>
                           <div className="shrink-0 flex items-center gap-2">
-                            <span
-                              className="inline-flex h-14 w-14 items-center justify-center rounded-full border text-[18px] font-bold tabular-nums leading-none"
-                              style={competitionRoundPillStyle(competition?.score)}
+                            <CompetitionSegmentsPill
+                              competition={competition}
                               title={competitionTitle}
-                              aria-label={`Concurrence : ${competitionDisplayLabel(competition)}${
-                                competition?.score != null ? ` ${competition.score} %` : ''
-                              }`}
-                            >
-                              {competition?.score != null ? `${competition.score}%` : '—'}
-                            </span>
-                            <span
-                              className="inline-flex h-14 w-14 items-center justify-center rounded-full border text-[18px] font-bold tabular-nums leading-none"
-                              style={feasibilityRoundPillStyle(business.feasibility)}
-                              title="Chance de réussite estimée"
-                              aria-label={
-                                business.feasibility != null
-                                  ? `Réussite estimée ${business.feasibility} %`
-                                  : 'Réussite non disponible'
-                              }
-                            >
-                              {business.feasibility != null ? `${business.feasibility}%` : '—'}
-                            </span>
+                            />
+                            <FeasibilityRoundPill score={business.feasibility} />
                           </div>
                         </div>
                         {business.activity && (

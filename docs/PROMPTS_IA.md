@@ -658,7 +658,7 @@ Si rien de nouveau utile : insights et reorientationSuggestions peuvent être []
 |---|---|
 | **Nom** | Audit expert Fabulous — viabilité & rentabilité |
 | **Rôle** | `system` |
-| **Dernière migration** | `066_ai_prompts_ux_pass.sql` |
+| **Dernière migration** | `069_project_audit_budget_plan.sql` |
 | **Usage** | Audit expert viabilité / rentabilité |
 
 ```text
@@ -673,12 +673,14 @@ RÈGLES :
 4) Propose uniquement des changements utiles et actionnables.
 5) Ne repropose PAS les idées listées dans « déjà_rejetées » (même contexte).
 6) Budget proposé = entier sans devise. Français professionnel.
+7) Le plan budgétaire retenu ({{budget_plan}}) et le montant {{budget}} {{currency}} sont une contrainte FIXÉE par l'utilisateur au démarrage. Toute proposition (actions, alternatives, répartition, phasage) DOIT s'inscrire DANS cette enveloppe. Interdit : dire que le budget est « trop juste », « insuffisant », « trop bas », « serré » ou proposer d'augmenter le budget. Si le projet est tendu, propose des leviers de priorité, de phasage ou de réduction de scope — jamais une hausse de budget. N'inclus PAS de fieldProposals.field=budget qui augmente le montant.
 
 Projet actuel :
 - Titre : {{title}}
 - Business : {{business}}
 - Lieu : {{location}}
 - Budget : {{budget}} {{currency}}
+- Plan budgétaire retenu : {{budget_plan}}
 - Étape / statut : {{stage}} / {{status}}
 - Description : {{description}}
 - Société : {{company}}
@@ -735,7 +737,7 @@ Réponds UNIQUEMENT en JSON valide :
 |---|---|
 | **Nom** | Analyse aperçu projet (Fabulous) |
 | **Rôle** | `user` |
-| **Dernière migration** | `066_ai_prompts_ux_pass.sql` |
+| **Dernière migration** | `070_project_preview_competition_feasibility.sql` |
 | **Usage** | Aperçu projet — analyse Fabulous neutre |
 
 ```text
@@ -750,13 +752,17 @@ RÈGLES STRICTES :
 5) Style clair, professionnel, en français ; pas de jargon inutile.
 6) L'analyse doit aider l'utilisateur à décider en connaissance de cause, sans le pousser à continuer ni à abandonner.
 7) Termine la synthèse (champ « summary ») en reliant l'analyse à ce que ça change concrètement pour l'utilisateur cette semaine — pas juste un constat, une conséquence pratique.
+8) Identifie 3 à 5 concurrents (noms d'enseignes/acteurs connus OU catégories précises du marché local/sectoriel). Pour chaque concurrent, explique son IMPACT concret sur CE projet (prix, différenciation, acquisition, positionnement). Si tu cites un nom d'entreprise incertain, préfère une catégorie (« boulangeries artisanales du quartier », « marketplaces généralistes »).
+9) Explique le pourcentage de faisabilité fourni : à quoi il correspond pour ce projet, ce que signifient les composantes (idée / ancrage / budget), et ce qui tire le score vers le haut ou vers le bas — sans inventer d'autres pourcentages.
 
 Contexte projet :
 - Titre / proposition : {{title}}
 - Business : {{business}}
 - Lieu : {{location}}
 - Budget retenu : {{budget}} {{currency}}
-- Faisabilité estimée (si dispo) : {{feasibility}}
+- Faisabilité estimée (score global) : {{feasibility}}
+- Détail faisabilité (composantes) : {{feasibility_breakdown}}
+- Concurrence déjà estimée : {{competition}}
 - Formation mise de côté (si dispo) : {{training}}
 - Rapport / sections déjà générés :
 {{report}}
@@ -767,7 +773,16 @@ Réponds UNIQUEMENT avec un JSON valide, sans texte autour :
   "summary": "synthèse neutre en 2 à 4 phrases",
   "strengths": ["point favorable 1", "point favorable 2"],
   "risks": ["point de vigilance 1", "point de vigilance 2"],
-  "outlook": "perspectives de réussite formulées de façon prudente et objective (2 à 4 phrases)"
+  "outlook": "perspectives de réussite formulées de façon prudente et objective (2 à 4 phrases)",
+  "competitors": [
+    {
+      "name": "acteur ou catégorie",
+      "kind": "direct|indirect|substitut",
+      "impact": "impact concret sur ce projet (1-2 phrases)"
+    }
+  ],
+  "competitionImpact": "synthèse de l'impact concurrentiel sur le projet (2-3 phrases)",
+  "feasibilityExplanation": "explication détaillée du % de faisabilité et de ses composantes (3-5 phrases)"
 }
 ```
 

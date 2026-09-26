@@ -58,7 +58,14 @@ export default function ProjectPreview() {
 
   useEffect(() => {
     if (!preview) return undefined;
-    if (preview.fabulousAnalysis?.summary || preview.fabulousAnalysis?.outlook) {
+    // Régénère si l’analyse ancienne n’a pas encore concurrents / détail faisabilité.
+    const analysis = preview.fabulousAnalysis;
+    const hasEnrichedShape =
+      analysis &&
+      (analysis.summary || analysis.outlook) &&
+      Array.isArray(analysis.competitors) &&
+      typeof analysis.feasibilityExplanation === 'string';
+    if (hasEnrichedShape) {
       return undefined;
     }
 
@@ -67,6 +74,8 @@ export default function ProjectPreview() {
     setAnalysisError('');
 
     const seed = getSearchSeed();
+    const competition = preview.metadata?.competition || null;
+    const breakdown = preview.feasibilityBreakdown || null;
     projectService
       .analyzeProjectPreview({
         title: preview.title,
@@ -78,11 +87,13 @@ export default function ProjectPreview() {
         sections: preview.sections,
         training: preview.training,
         feasibility: preview.feasibility,
+        competition,
+        feasibilityBreakdown: breakdown,
         temperature: seed?.temperature,
       })
-      .then((analysis) => {
-        if (!active || !analysis) return;
-        const next = { ...preview, fabulousAnalysis: analysis };
+      .then((nextAnalysis) => {
+        if (!active || !nextAnalysis) return;
+        const next = { ...preview, fabulousAnalysis: nextAnalysis };
         setPreview(next);
         saveProjectDraft(next);
       })
@@ -182,7 +193,11 @@ export default function ProjectPreview() {
 
         <div className="space-y-6">
           {preview.feasibility != null && (
-            <FeasibilityGauge score={preview.feasibility} />
+            <FeasibilityGauge
+              score={preview.feasibility}
+              breakdown={preview.feasibilityBreakdown}
+              explanation={preview.fabulousAnalysis?.feasibilityExplanation}
+            />
           )}
           <ProjectReport
             project={preview}

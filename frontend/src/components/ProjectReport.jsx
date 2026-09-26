@@ -1,6 +1,11 @@
 import { sanitizeDisplayText } from '../utils/safeDisplay.js';
 import { ASSISTANT_NAME, assistantPhrases } from '../constants/assistant.js';
 import FabulousThinking from './FabulousThinking.jsx';
+import CompetitionSegmentsPill from './CompetitionSegmentsPill.jsx';
+import {
+  competitionDisplayLabel,
+  normalizeCompetition,
+} from '../utils/competitionPill.js';
 
 function formatBudget(amount, currency) {
   if (amount == null) return '—';
@@ -78,6 +83,92 @@ function renderSectionContent(content) {
       {paragraph}
     </p>
   ));
+}
+
+function CompetitionBlock({ competition, analysis }) {
+  const normalized = normalizeCompetition(competition);
+  const competitors = Array.isArray(analysis?.competitors)
+    ? analysis.competitors
+        .map((c) => {
+          if (!c || typeof c !== 'object') return null;
+          const name = asText(c.name || c.title).trim();
+          if (!name) return null;
+          return {
+            name: name.slice(0, 120),
+            kind: asText(c.kind || c.type || '').trim().slice(0, 40) || null,
+            impact: asText(c.impact || c.effect || '').trim().slice(0, 500) || null,
+          };
+        })
+        .filter(Boolean)
+        .slice(0, 6)
+    : [];
+  const impactSummary = asText(analysis?.competitionImpact || '').trim();
+
+  if (!normalized && !competitors.length && !impactSummary) return null;
+
+  const titleBits = [
+    normalized?.note,
+    competitionDisplayLabel(normalized),
+    normalized?.source === 'web'
+      ? 'estimation web'
+      : normalized?.source === 'estimated'
+        ? 'estimation'
+        : null,
+  ].filter(Boolean);
+
+  return (
+    <section className="px-5 sm:px-8 py-5 sm:py-6 border-b border-prune-100">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+        <div>
+          <p className="text-xs font-semibold tracking-widest text-prune-500 uppercase">
+            Concurrence
+          </p>
+          <p className="mt-1 text-xs text-prune-400">
+            Acteurs repérés et impact sur votre projet
+          </p>
+        </div>
+        {normalized && (
+          <CompetitionSegmentsPill
+            competition={normalized}
+            title={titleBits.join(' — ')}
+          />
+        )}
+      </div>
+
+      {normalized?.note && (
+        <p className="text-sm text-prune-700 leading-relaxed mb-4">{asText(normalized.note)}</p>
+      )}
+
+      {impactSummary && (
+        <p className="text-sm sm:text-base text-prune-800 leading-relaxed mb-4">
+          {impactSummary}
+        </p>
+      )}
+
+      {competitors.length > 0 && (
+        <ul className="space-y-3">
+          {competitors.map((c, index) => (
+            <li
+              key={`${c.name}-${index}`}
+              className="rounded-xl border border-prune-100 bg-white/70 px-4 py-3"
+            >
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <span className="text-sm font-semibold text-prune-900">{c.name}</span>
+                {c.kind && (
+                  <span className="text-xs font-medium uppercase tracking-wide text-prune-400">
+                    {c.kind}
+                  </span>
+                )}
+              </div>
+              {c.impact && (
+                <p className="mt-1.5 text-sm text-prune-700 leading-relaxed">{c.impact}</p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
 }
 
 function FabulousAnalysisBlock({ analysis, loading, error }) {
@@ -178,6 +269,7 @@ export default function ProjectReport({
   const activityLabel = project.quoi || project.activity?.label || project.title || '—';
   const training = project.training || project.metadata?.training;
   const analysis = fabulousAnalysis || project.fabulousAnalysis || null;
+  const competition = project.metadata?.competition || project.competition || null;
   const locationMode =
     project.locationMode ||
     project.metadata?.locationMode ||
@@ -210,6 +302,8 @@ export default function ProjectReport({
         loading={analysisLoading}
         error={analysisError}
       />
+
+      <CompetitionBlock competition={competition} analysis={analysis} />
 
       {sections.length > 0 ? (
         <div className="divide-y divide-prune-100">

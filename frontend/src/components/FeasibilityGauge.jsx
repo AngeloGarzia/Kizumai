@@ -87,13 +87,72 @@ export function feasibilityRoundPillStyle(score) {
   };
 }
 
-export default function FeasibilityGauge({ score, compact = false }) {
+/** Moyenne des scores disponibles (ignore null). */
+export function averageFeasibility(items) {
+  if (!Array.isArray(items) || !items.length) return null;
+  const scores = items
+    .map((item) => clamp(item?.feasibility))
+    .filter((s) => s != null);
+  if (!scores.length) return null;
+  return Math.round(scores.reduce((sum, s) => sum + s, 0) / scores.length);
+}
+
+/**
+ * Score parcours : pondère idée (40 %), lieu (35 %), budget (25 %)
+ * selon les infos déjà connues à l'étape courante.
+ */
+export function computeJourneyFeasibility({
+  businessScore,
+  locationScore,
+  budgetScore,
+}) {
+  const parts = [];
+  if (businessScore != null) parts.push({ weight: 0.4, value: businessScore });
+  if (locationScore != null) parts.push({ weight: 0.35, value: locationScore });
+  if (budgetScore != null) parts.push({ weight: 0.25, value: budgetScore });
+  if (!parts.length) return null;
+  const weightSum = parts.reduce((sum, p) => sum + p.weight, 0);
+  return Math.round(parts.reduce((sum, p) => sum + p.value * p.weight, 0) / weightSum);
+}
+
+/** Lignes affichables pour expliquer le % (idée 40 % · lieu 35 % · budget 25 %). */
+export function feasibilityBreakdownRows(breakdown) {
+  if (!breakdown || typeof breakdown !== 'object') return [];
+  const keys = [
+    ['business', 'Idée / business', 40],
+    ['location', 'Lieu', 35],
+    ['budget', 'Budget', 25],
+  ];
+  return keys
+    .map(([key, fallbackLabel, weightPct]) => {
+      const part = breakdown[key];
+      if (!part || part.score == null || Number.isNaN(Number(part.score))) return null;
+      const score = clamp(part.score);
+      if (score == null) return null;
+      return {
+        key,
+        label: part.label || fallbackLabel,
+        score,
+        weightPct: Math.round((Number(part.weight) || weightPct / 100) * 100),
+      };
+    })
+    .filter(Boolean);
+}
+
+export default function FeasibilityGauge({
+  score,
+  compact = false,
+  breakdown = null,
+  explanation = null,
+}) {
   const value = clamp(score);
   const display = value ?? 0;
   const t = display / 100;
   const color = mixColorCss(t);
   const label = feasibilityLabel(value);
   const ready = value != null;
+  const rows = !compact ? feasibilityBreakdownRows(breakdown) : [];
+  const detailText = !compact && explanation ? String(explanation).trim() : '';
 
   return (
     <div
@@ -152,34 +211,52 @@ export default function FeasibilityGauge({ score, compact = false }) {
         </span>
         <span className="text-xs text-wasabi-600 text-right">Plus facile</span>
       </div>
+
+      {rows.length > 0 && (
+        <div className="mt-4 border-t border-prune-100 pt-3 space-y-2.5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-prune-500">
+            Détail du score
+          </p>
+          <p className="text-xs text-prune-500 leading-relaxed">
+            Moyenne pondérée : idée 40&nbsp;% · ancrage 35&nbsp;% · budget 25&nbsp;% (seules les
+            composantes connues sont prises en compte).
+          </p>
+          <ul className="space-y-2">
+            {rows.map((row) => {
+              const rowColor = mixColorCss(row.score / 100);
+              return (
+                <li key={row.key} className="flex items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="text-xs font-medium text-prune-800 truncate">
+                        {row.label}
+                      </span>
+                      <span className="text-xs tabular-nums text-prune-500 shrink-0">
+                        {row.score}% · poids {row.weightPct}%
+                      </span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-prune-100 overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${row.score}%`,
+                          background: rowColor,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      {detailText ? (
+        <p className="mt-3 text-sm text-prune-700 leading-relaxed border-t border-prune-100 pt-3">
+          {detailText}
+        </p>
+      ) : null}
     </div>
   );
-}
-
-/** Moyenne des scores disponibles (ignore null). */
-export function averageFeasibility(items) {
-  if (!Array.isArray(items) || !items.length) return null;
-  const scores = items
-    .map((item) => clamp(item?.feasibility))
-    .filter((s) => s != null);
-  if (!scores.length) return null;
-  return Math.round(scores.reduce((sum, s) => sum + s, 0) / scores.length);
-}
-
-/**
- * Score parcours : pondère idée (40 %), lieu (35 %), budget (25 %)
- * selon les infos déjà connues à l'étape courante.
- */
-export function computeJourneyFeasibility({
-  businessScore,
-  locationScore,
-  budgetScore,
-}) {
-  const parts = [];
-  if (businessScore != null) parts.push({ weight: 0.4, value: businessScore });
-  if (locationScore != null) parts.push({ weight: 0.35, value: locationScore });
-  if (budgetScore != null) parts.push({ weight: 0.25, value: budgetScore });
-  if (!parts.length) return null;
-  const weightSum = parts.reduce((sum, p) => sum + p.weight, 0);
-  return Math.round(parts.reduce((sum, p) => sum + p.value * p.weight, 0) / weightSum);
 }

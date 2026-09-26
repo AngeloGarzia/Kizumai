@@ -493,6 +493,8 @@ export function createProjectService({
       sections = [],
       training = null,
       feasibility = null,
+      competition = null,
+      feasibilityBreakdown = null,
       userId = null,
       projectId = null,
       temperature = null,
@@ -519,6 +521,8 @@ export function createProjectService({
             sections,
             training,
             feasibility,
+            competition,
+            feasibilityBreakdown,
             memoryContext,
             temperature,
           })
@@ -616,10 +620,44 @@ export function createProjectService({
           };
         }
       }
+
+      const BUDGET_PLAN_KINDS = new Set([
+        'budget_utilisateur',
+        'budget_flexible',
+        'budget_ideal',
+        'budget_ajuste',
+      ]);
+      const budgetPlanRaw = metaIn.budgetPlan;
+      let budgetPlan = null;
+      if (budgetPlanRaw && typeof budgetPlanRaw === 'object' && !Array.isArray(budgetPlanRaw)) {
+        const kind = String(budgetPlanRaw.kind || '').trim();
+        if (BUDGET_PLAN_KINDS.has(kind)) {
+          const selectedBudget =
+            budgetPlanRaw.selectedBudget != null
+              ? Number(budgetPlanRaw.selectedBudget)
+              : Number(resolved.budget);
+          const userSeedBudget =
+            budgetPlanRaw.userSeedBudget != null ? Number(budgetPlanRaw.userSeedBudget) : null;
+          const feasibility =
+            budgetPlanRaw.feasibility != null ? Number(budgetPlanRaw.feasibility) : null;
+          budgetPlan = {
+            kind,
+            label: budgetPlanRaw.label ? String(budgetPlanRaw.label).slice(0, 80) : null,
+            selectedBudget: Number.isFinite(selectedBudget) ? Math.round(selectedBudget) : null,
+            currency: String(budgetPlanRaw.currency || resolved.currency || 'EUR').slice(0, 8),
+            feasibility: Number.isFinite(feasibility)
+              ? Math.min(100, Math.max(0, Math.round(feasibility)))
+              : null,
+            userSeedBudget: Number.isFinite(userSeedBudget) ? Math.round(userSeedBudget) : null,
+          };
+        }
+      }
+
       const projectMeta = {
         ...metaIn,
         locationMode: mode,
         ...(competition ? { competition } : {}),
+        ...(budgetPlan ? { budgetPlan } : {}),
       };
 
       const project = await projectRepository.create({
@@ -652,7 +690,9 @@ export function createProjectService({
             `ancrage : ${mode}`,
             `lieu / contexte : ${resolved.ou}`,
             resolved.budget != null
-              ? `budget : ${resolved.budget} ${resolved.currency || 'EUR'}`
+              ? `budget : ${resolved.budget} ${resolved.currency || 'EUR'}${
+                  budgetPlan?.kind ? ` (plan ${budgetPlan.kind})` : ''
+                }`
               : null,
             resolved.report
               ? `rapport : ${String(resolved.report).slice(0, 1200)}`

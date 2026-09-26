@@ -145,3 +145,27 @@ export function IconMonitor({ className = 'w-6 h-6' }) {
     </svg>
   );
 }
+
+/** Concurrence : deux acteurs face à face. */
+export function IconCompetition({ className = 'w-5 h-5' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+      <circle cx="8" cy="8" r="2.5" />
+      <circle cx="16" cy="8" r="2.5" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3.5 19c0-2.8 2-4.5 4.5-4.5S12.5 16.2 12.5 19" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M11.5 19c0-2.8 2-4.5 4.5-4.5S20.5 16.2 20.5 19" />
+      <path strokeLinecap="round" d="M12 11v3" />
+    </svg>
+  );
+}
+
+/** Faisabilité / réussite : cible. */
+export function IconFeasibility({ className = 'w-5 h-5' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+      <circle cx="12" cy="12" r="8" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="12" cy="12" r="1.25" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}

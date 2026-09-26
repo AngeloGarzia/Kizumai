@@ -1708,6 +1708,8 @@ export function createAiService({ settingsService, currencyService }) {
       sections = [],
       training = null,
       feasibility = null,
+      competition = null,
+      feasibilityBreakdown = null,
       memoryContext = '',
       temperature = null,
     }) {
@@ -1744,6 +1746,42 @@ export function createAiService({ settingsService, currencyService }) {
             .join(' · ')
         : 'aucune';
 
+      const competitionText = (() => {
+        if (!competition || typeof competition !== 'object') return 'non fournie';
+        const score = competition.score ?? competition.competitionScore;
+        const label = competition.label || competition.competitionLabel || '';
+        const note = competition.note || competition.competitionNote || '';
+        const source = competition.source || competition.competitionSource || '';
+        const bits = [
+          score != null && Number.isFinite(Number(score))
+            ? `score=${Math.round(Number(score))}/100`
+            : null,
+          label ? `intensité=${String(label).slice(0, 40)}` : null,
+          note ? `note=${String(note).slice(0, 280)}` : null,
+          source ? `source=${String(source).slice(0, 40)}` : null,
+        ].filter(Boolean);
+        return bits.length ? bits.join(' · ') : 'non fournie';
+      })();
+
+      const breakdownText = (() => {
+        if (!feasibilityBreakdown || typeof feasibilityBreakdown !== 'object') {
+          return 'non fourni';
+        }
+        const parts = ['business', 'location', 'budget']
+          .map((key) => {
+            const part = feasibilityBreakdown[key];
+            if (!part || part.score == null || !Number.isFinite(Number(part.score))) return null;
+            const label = part.label || key;
+            const weight =
+              part.weight != null && Number.isFinite(Number(part.weight))
+                ? ` poids=${Math.round(Number(part.weight) * 100)}%`
+                : '';
+            return `${label}=${Math.round(Number(part.score))}%${weight}`;
+          })
+          .filter(Boolean);
+        return parts.length ? parts.join(' · ') : 'non fourni';
+      })();
+
       const userContent = memCtx(
         interpolate(aiConfig.projectPreviewAnalysisPrompt, {
           title: String(title || business || '').trim().slice(0, 200),
@@ -1758,6 +1796,8 @@ export function createAiService({ settingsService, currencyService }) {
             feasibility != null && Number.isFinite(Number(feasibility))
               ? String(Math.round(Number(feasibility)))
               : 'non fournie',
+          competition: competitionText,
+          feasibility_breakdown: breakdownText,
         }),
         memoryContext,
         aiConfig
@@ -1771,11 +1811,33 @@ export function createAiService({ settingsService, currencyService }) {
         ? data.risks.map((s) => clipAiOutput(String(s || '').trim(), 400)).filter(Boolean).slice(0, 6)
         : [];
 
+      const competitors = Array.isArray(data.competitors)
+        ? data.competitors
+            .map((c) => {
+              if (!c || typeof c !== 'object') return null;
+              const name = clipAiOutput(String(c.name || c.title || '').trim(), 120);
+              if (!name) return null;
+              return {
+                name,
+                kind: clipAiOutput(String(c.kind || c.type || '').trim(), 40) || null,
+                impact: clipAiOutput(String(c.impact || c.effect || '').trim(), 500) || null,
+              };
+            })
+            .filter(Boolean)
+            .slice(0, 6)
+        : [];
+
       return {
         summary: clipAiOutput(String(data.summary || '').trim(), 2000),
         strengths,
         risks,
         outlook: clipAiOutput(String(data.outlook || '').trim(), 2000),
+        competitors,
+        competitionImpact: clipAiOutput(String(data.competitionImpact || '').trim(), 1200),
+        feasibilityExplanation: clipAiOutput(
+          String(data.feasibilityExplanation || '').trim(),
+          1200
+        ),
       };
     },
 
@@ -1890,6 +1952,7 @@ export function createAiService({ settingsService, currencyService }) {
       location,
       budget,
       currency,
+      budgetPlan,
       stage,
       status,
       description,
@@ -1911,6 +1974,7 @@ export function createAiService({ settingsService, currencyService }) {
         location: String(location || '').trim().slice(0, 300) || 'non défini',
         budget: budget != null && String(budget).trim() !== '' ? String(budget) : 'non défini',
         currency: String(currency || 'EUR').slice(0, 8),
+        budget_plan: String(budgetPlan || '').trim() || 'non précisé',
         stage: String(stage || '').slice(0, 40),
         status: String(status || '').slice(0, 40),
         description: String(description || '').trim().slice(0, 4000) || 'aucune',

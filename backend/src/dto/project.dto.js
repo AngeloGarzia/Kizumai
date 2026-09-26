@@ -150,6 +150,16 @@ export const BuildProposalsRequestDto = {
 
 export const ProjectPreviewAnalysisRequestDto = {
   from(body = {}) {
+    const competition =
+      body.competition && typeof body.competition === 'object' && !Array.isArray(body.competition)
+        ? body.competition
+        : null;
+    const feasibilityBreakdown =
+      body.feasibilityBreakdown &&
+      typeof body.feasibilityBreakdown === 'object' &&
+      !Array.isArray(body.feasibilityBreakdown)
+        ? body.feasibilityBreakdown
+        : null;
     return {
       title: optionalString(body.title, { max: 200 }) || '',
       business: optionalString(body.business ?? body.quoi, { max: 200 }),
@@ -160,6 +170,8 @@ export const ProjectPreviewAnalysisRequestDto = {
       sections: Array.isArray(body.sections) ? body.sections : [],
       training: body.training && typeof body.training === 'object' ? body.training : null,
       feasibility: optionalNumber(body.feasibility),
+      competition,
+      feasibilityBreakdown,
       projectId: optionalProjectId(body),
     };
   },

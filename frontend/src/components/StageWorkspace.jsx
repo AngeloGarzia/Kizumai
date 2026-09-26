@@ -17,10 +17,13 @@ import { useProject } from '../context/ProjectContext.jsx';
 import { assistantPhrases } from '../constants/assistant.js';
 import { DOCUMENT_ACCEPT } from '../utils/safeDisplay.js';
 import {
+  COMPETITION_SEGMENT_COUNT,
   competitionDisplayLabel,
   competitionPillStyle,
+  competitionSegments,
   normalizeCompetition,
 } from '../utils/competitionPill.js';
+import CompetitionSegmentsPill from './CompetitionSegmentsPill.jsx';
 
 const STATUS_LABELS = {
   not_started: 'Non démarrée',
@@ -74,13 +77,16 @@ function CompetitionSnapshot({ competition }) {
   return (
     <div className="mx-5 mb-3 rounded-xl border border-prune-100 bg-prune-50/80 px-4 py-3 space-y-2">
       <div className="flex flex-wrap items-center gap-2">
+        <CompetitionSegmentsPill competition={c} size="sm" />
         <span
           className="inline-flex items-center rounded-lg border px-2.5 py-1 text-xs font-semibold tracking-wide"
           style={competitionPillStyle(c.score)}
           title={[c.note, sourceHint].filter(Boolean).join(' — ') || undefined}
         >
           Concurrence · {competitionDisplayLabel(c)}
-          {c.score != null ? ` (${c.score})` : ''}
+          {competitionSegments(c.score) != null
+            ? ` · ${competitionSegments(c.score)}/${COMPETITION_SEGMENT_COUNT}`
+            : ''}
         </span>
         {sourceHint && <span className="text-xs text-prune-500">{sourceHint}</span>}
       </div>
@@ -685,14 +691,7 @@ export default function StageWorkspace({ projectId, stage }) {
                       <span className="min-w-0 flex flex-wrap items-center gap-2">
                         <span className="font-semibold text-prune-900">{wf.title}</span>
                         {competitionSnap && (
-                          <span
-                            className="inline-flex items-center rounded-lg border px-2 py-0.5 text-[11px] font-semibold tracking-wide"
-                            style={competitionPillStyle(competitionSnap.score)}
-                            title={competitionSnap.note || undefined}
-                          >
-                            {competitionDisplayLabel(competitionSnap)}
-                            {competitionSnap.score != null ? ` (${competitionSnap.score}%)` : ''}
-                          </span>
+                          <CompetitionSegmentsPill competition={competitionSnap} size="sm" />
                         )}
                       </span>
                       <span className="text-sm text-prune-500 shrink-0">

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { projectService } from '../services/projectService.js';
 
 const SCOPE_OPTIONS = [
   { value: 'country', label: 'France' },
@@ -47,6 +48,42 @@ export default function DigitalSetupPanel({
   );
   const [opsNotes, setOpsNotes] = useState(initial?.opsNotes || '');
   const [error, setError] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [loadingSuggest, setLoadingSuggest] = useState(false);
+  const [showSuggest, setShowSuggest] = useState(false);
+  const [suggestError, setSuggestError] = useState('');
+  const requestRef = useRef(0);
+
+  useEffect(() => {
+    const query = legalAddress.trim();
+    const requestId = requestRef.current + 1;
+    requestRef.current = requestId;
+
+    if (query.length < 2) {
+      setSuggestions([]);
+      setLoadingSuggest(false);
+      setSuggestError('');
+      return undefined;
+    }
+
+    setLoadingSuggest(true);
+    setSuggestError('');
+    const timer = setTimeout(async () => {
+      try {
+        const list = await projectService.suggestLocations(query);
+        if (requestRef.current === requestId) setSuggestions(list);
+      } catch {
+        if (requestRef.current === requestId) {
+          setSuggestions([]);
+          setSuggestError('Suggestions indisponibles. Vous pouvez saisir le lieu manuellement.');
+        }
+      } finally {
+        if (requestRef.current === requestId) setLoadingSuggest(false);
+      }
+    }, 280);
+
+    return () => clearTimeout(timer);
+  }, [legalAddress]);
 
   const toggleChannel = (value) => {
     setChannels((prev) =>
@@ -155,7 +192,7 @@ export default function DigitalSetupPanel({
         </div>
       </fieldset>
 
-      <div>
+      <div className="relative">
         <label htmlFor="digital-legal" className="block text-sm font-medium text-prune-800 mb-1">
           Adresse légale / siège social
         </label>
@@ -163,11 +200,53 @@ export default function DigitalSetupPanel({
           id="digital-legal"
           type="text"
           className="input-field w-full"
-          placeholder="Ex : domicile, domiciliation, le cas échéant un bureau…"
+          placeholder="Ex : Lyon, Paris 11e, Bordeaux…"
           value={legalAddress}
-          onChange={(e) => setLegalAddress(e.target.value)}
+          onChange={(e) => {
+            setLegalAddress(e.target.value);
+            setShowSuggest(true);
+          }}
+          onFocus={() => setShowSuggest(true)}
+          onBlur={() => setTimeout(() => setShowSuggest(false), 120)}
           disabled={disabled}
+          autoComplete="off"
         />
+        {showSuggest && legalAddress.trim().length >= 2 && (
+          <div className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-prune-100 bg-white shadow-lg">
+            {loadingSuggest && (
+              <p className="px-4 py-3 text-sm text-prune-500">Recherche de lieux…</p>
+            )}
+            {!loadingSuggest && suggestError && (
+              <p className="px-4 py-3 text-sm text-amber-700">{suggestError}</p>
+            )}
+            {!loadingSuggest && !suggestError && suggestions.length === 0 && (
+              <p className="px-4 py-3 text-sm text-prune-500">
+                Aucun lieu trouvé pour « {legalAddress.trim()} ». Vous pouvez continuer avec cette
+                saisie.
+              </p>
+            )}
+            {!loadingSuggest &&
+              suggestions.map((loc) => (
+                <button
+                  key={`${loc.label}-${loc.latitude}-${loc.longitude}`}
+                  type="button"
+                  className="block w-full px-4 py-2.5 text-left text-sm text-prune-800 hover:bg-prune-50"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setLegalAddress(loc.label);
+                    setShowSuggest(false);
+                  }}
+                >
+                  <span className="font-medium">{loc.label}</span>
+                  {loc.displayName && loc.displayName !== loc.label && (
+                    <span className="mt-0.5 block truncate text-xs text-prune-500">
+                      {loc.displayName}
+                    </span>
+                  )}
+                </button>
+              ))}
+          </div>
+        )}
         <p className="mt-1 text-xs text-prune-400">
           Distinct du « lieu business » : pas de magasin, mais une adresse déclarée.
         </p>

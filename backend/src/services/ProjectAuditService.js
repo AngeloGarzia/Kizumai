@@ -23,6 +23,37 @@ function clip(value, max) {
   return s.length > max ? s.slice(0, max) : s;
 }
 
+const BUDGET_PLAN_KIND_LABELS = {
+  budget_utilisateur: 'Votre budget',
+  budget_flexible: 'Budget flexible',
+  budget_ideal: 'Budget idéal (Fabulous)',
+  budget_ajuste: 'Budget ajusté',
+};
+
+/** Texte injecté dans le prompt audit (plan budgétaire retenu au démarrage). */
+function formatBudgetPlanForPrompt(project) {
+  const plan = project?.metadata?.budgetPlan;
+  if (!plan || typeof plan !== 'object') return '';
+  const kind = String(plan.kind || '').trim();
+  if (!kind) return '';
+  const label =
+    plan.label || BUDGET_PLAN_KIND_LABELS[kind] || kind;
+  const amount =
+    plan.selectedBudget != null
+      ? plan.selectedBudget
+      : project.budget != null
+        ? project.budget
+        : null;
+  const currency = plan.currency || project.currency || 'EUR';
+  const parts = [`kind=${kind}`, `label=${label}`];
+  if (amount != null) parts.push(`montant choisi=${amount} ${currency}`);
+  if (plan.userSeedBudget != null && Number(plan.userSeedBudget) !== Number(amount)) {
+    parts.push(`budget saisi initial=${plan.userSeedBudget} ${currency}`);
+  }
+  if (plan.feasibility != null) parts.push(`faisabilité plan=${plan.feasibility}%`);
+  return parts.join(' · ');
+}
+
 function normalizeConfidence(value) {
   const n = Number(value);
   if (Number.isNaN(n)) return null;
@@ -83,6 +114,7 @@ export function createProjectAuditService({
       extras.docCount,
       extras.eventCount,
       clip(extras.memorySummary, 400),
+      clip(extras.budgetPlan, 200),
     ]);
   }
 
@@ -138,12 +170,15 @@ export function createProjectAuditService({
           `- [${e.kind}] ${e.title} @ ${e.startAt ? String(e.startAt).slice(0, 16) : '?'}`
       );
 
+    const budgetPlan = formatBudgetPlanForPrompt(project);
+
     return {
       title: project.title || '',
       business: project.quoi || project.activity?.label || '',
       location: project.ou || project.location?.label || '',
       budget: project.budget != null ? String(project.budget) : '',
       currency: project.currency || 'EUR',
+      budgetPlan,
       stage: project.stage || '',
       status: project.status || '',
       description: clip(project.description, 4000) || 'aucune',
@@ -181,6 +216,15 @@ export function createProjectAuditService({
         const n = Number(String(proposed).replace(/[^\d.-]/g, ''));
         if (!Number.isFinite(n) || n <= 0) continue;
         proposed = String(Math.round(n));
+        // Plan budgétaire retenu au démarrage : jamais proposer une hausse.
+        const currentBudget = Number(current.budget);
+        if (
+          project?.metadata?.budgetPlan?.kind &&
+          Number.isFinite(currentBudget) &&
+          n > currentBudget
+        ) {
+          continue;
+        }
       }
       const currentValue = current[field] || clip(p.currentValue, 500) || '';
       if (!valuesDiffer(currentValue, proposed)) continue;

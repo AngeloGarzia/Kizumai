@@ -67,6 +67,28 @@ export function competitionRoundPillStyle(score) {
   };
 }
 
+export const COMPETITION_SEGMENT_COUNT = 6;
+
+/**
+ * Nombre de segments remplis (0–6) à partir du score 0–100.
+ * 0 → vide ; >0 → au moins 1 ; 100 → 6.
+ */
+export function competitionSegments(score) {
+  if (score == null || Number.isNaN(Number(score))) return null;
+  const s = Math.min(100, Math.max(0, Number(score)));
+  if (s <= 0) return 0;
+  return Math.min(
+    COMPETITION_SEGMENT_COUNT,
+    Math.max(1, Math.round((s / 100) * COMPETITION_SEGMENT_COUNT))
+  );
+}
+
+export function competitionSegmentFillColor(score) {
+  const rgb = competitionRgb(score);
+  if (!rgb) return 'rgb(200 194 188)';
+  return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+}
+
 /** Normalise business (API) ou snapshot metadata (`score`/`label`/…). */
 export function normalizeCompetition(input) {
   if (!input || typeof input !== 'object') return null;
