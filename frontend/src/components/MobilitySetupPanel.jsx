@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { projectService } from '../services/projectService.js';
 import FabulousThinking from './FabulousThinking.jsx';
 import { assistantPhrases } from '../constants/assistant.js';
@@ -9,8 +9,21 @@ const PERIMETER_OPTIONS = [
   { value: 'admin', label: 'Région / département / ville' },
 ];
 
+/** Normalise une sélection multi-circuits (compat ancien format mono). */
+function initialSelectedIds(initial) {
+  if (!initial) return [];
+  if (Array.isArray(initial.circuitTypes) && initial.circuitTypes.length) {
+    return initial.circuitTypes.map(String).filter(Boolean);
+  }
+  if (Array.isArray(initial.selectedCircuits) && initial.selectedCircuits.length) {
+    return initial.selectedCircuits.map((c) => c?.id).filter(Boolean).map(String);
+  }
+  if (initial.circuitType) return [String(initial.circuitType)];
+  return [];
+}
+
 /**
- * Panel mobilité : point de référence + périmètre + type de circuit (proposé par Fabulous).
+ * Panel mobilité : point de référence + périmètre + types de circuit (multi, proposés par Fabulous).
  */
 export default function MobilitySetupPanel({
   businessTitle,
@@ -25,8 +38,7 @@ export default function MobilitySetupPanel({
   const [radiusKm, setRadiusKm] = useState(initial?.radiusKm ?? 50);
   const [maxTravelMinutes, setMaxTravelMinutes] = useState(initial?.maxTravelMinutes ?? 45);
   const [adminLabel, setAdminLabel] = useState(initial?.adminLabel || '');
-  const [circuitType, setCircuitType] = useState(initial?.circuitType || '');
-  const [circuitLabel, setCircuitLabel] = useState(initial?.circuitLabel || '');
+  const [selectedIds, setSelectedIds] = useState(() => initialSelectedIds(initial));
   const [circuits, setCircuits] = useState(
     Array.isArray(initial?.circuitOptions) ? initial.circuitOptions : []
   );
@@ -42,6 +54,21 @@ export default function MobilitySetupPanel({
     business?.title || businessTitle || '',
     business?.activity || '',
   ].join('|');
+
+  const selectedCircuits = useMemo(
+    () =>
+      selectedIds
+        .map((id) => circuits.find((c) => c.id === id))
+        .filter(Boolean),
+    [circuits, selectedIds]
+  );
+
+  const toggleCircuit = (id) => {
+    setSelectedIds((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      return [...prev, id];
+    });
+  };
 
   const loadCircuits = useCallback(async () => {
     const title = String(business?.title || businessTitle || '').trim();
@@ -71,14 +98,9 @@ export default function MobilitySetupPanel({
         setCircuitsError('Aucun circuit proposé. Réessayez.');
         return;
       }
-      setCircuitType((prevId) => {
-        const match = list.find((c) => c.id === prevId);
-        if (match) {
-          setCircuitLabel(match.label);
-          return prevId;
-        }
-        setCircuitLabel(list[0].label);
-        return list[0].id;
+      setSelectedIds((prev) => {
+        const kept = prev.filter((id) => list.some((c) => c.id === id));
+        return kept.length ? kept : [list[0].id];
       });
     } catch (err) {
       if (circuitsRequestRef.current !== requestId) return;
@@ -150,10 +172,12 @@ export default function MobilitySetupPanel({
       setError('Précisez la ou les zones (région, département, ville…).');
       return;
     }
-    if (!circuitType || !circuitLabel) {
-      setError('Choisissez un type de circuit proposé par Fabulous.');
+    if (!selectedCircuits.length) {
+      setError('Choisissez au moins un type de circuit proposé par Fabulous.');
       return;
     }
+    const circuitTypes = selectedCircuits.map((c) => c.id);
+    const circuitLabels = selectedCircuits.map((c) => c.label);
     setError('');
     onSubmit({
       referenceLabel: ref,
@@ -161,8 +185,16 @@ export default function MobilitySetupPanel({
       radiusKm: perimeterType === 'distance' ? Number(radiusKm) : null,
       maxTravelMinutes: perimeterType === 'travel_time' ? Number(maxTravelMinutes) : null,
       adminLabel: perimeterType === 'admin' ? adminLabel.trim() : null,
-      circuitType,
-      circuitLabel,
+      circuitTypes,
+      circuitLabels,
+      selectedCircuits: selectedCircuits.map((c) => ({
+        id: c.id,
+        label: c.label,
+        angle: c.angle || null,
+      })),
+      // Compat anciens lecteurs (mono)
+      circuitType: circuitTypes[0],
+      circuitLabel: circuitLabels.join(', '),
       circuitOptions: circuits,
     });
   };
@@ -220,9 +252,9 @@ export default function MobilitySetupPanel({
       </div>
 
       <fieldset>
-        <legend className="text-sm font-medium text-prune-800 mb-1">Type de circuit</legend>
+        <legend className="text-sm font-medium text-prune-800 mb-1">Types de circuit</legend>
         <p className="text-xs text-prune-500 mb-2">
-          Propositions Fabulous adaptées à « {businessTitle} » (~10 options).
+          Sélection multiple — propositions Fabulous pour « {businessTitle} » (~10 options).
         </p>
         {circuitsLoading && (
           <FabulousThinking message={assistantPhrases.thinking} size="sm" compact />
@@ -241,35 +273,37 @@ export default function MobilitySetupPanel({
           </div>
         )}
         {!circuitsLoading && !circuitsError && circuits.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {circuits.map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                disabled={disabled}
-                title={opt.angle || opt.label}
-                onClick={() => {
-                  setCircuitType(opt.id);
-                  setCircuitLabel(opt.label);
-                }}
-                className={[
-                  'rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors text-left max-w-full',
-                  circuitType === opt.id
-                    ? 'border-wasabi-500 bg-wasabi-100 text-wasabi-900'
-                    : 'border-prune-100 text-prune-600 hover:border-prune-300',
-                ].join(' ')}
-              >
-                {opt.label}
-              </button>
-            ))}
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Types de circuit">
+            {circuits.map((opt) => {
+              const selected = selectedIds.includes(opt.id);
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  disabled={disabled}
+                  title={opt.angle || opt.label}
+                  aria-pressed={selected}
+                  onClick={() => toggleCircuit(opt.id)}
+                  className={[
+                    'rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors text-left max-w-full',
+                    selected
+                      ? 'border-wasabi-500 bg-wasabi-100 text-wasabi-900'
+                      : 'border-prune-100 text-prune-600 hover:border-prune-300',
+                  ].join(' ')}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
           </div>
         )}
-        {circuitType && circuitLabel && (
+        {selectedCircuits.length > 0 && (
           <p className="mt-2 text-xs text-prune-500">
-            Sélection : <span className="font-medium text-prune-700">{circuitLabel}</span>
-            {circuits.find((c) => c.id === circuitType)?.angle
-              ? ` — ${circuits.find((c) => c.id === circuitType).angle}`
-              : ''}
+            {selectedCircuits.length} sélectionné
+            {selectedCircuits.length > 1 ? 's' : ''} :{' '}
+            <span className="font-medium text-prune-700">
+              {selectedCircuits.map((c) => c.label).join(' · ')}
+            </span>
           </p>
         )}
       </fieldset>
@@ -349,7 +383,7 @@ export default function MobilitySetupPanel({
 
       <button
         type="submit"
-        disabled={disabled || circuitsLoading || !circuits.length}
+        disabled={disabled || circuitsLoading || !circuits.length || !selectedIds.length}
         className="btn-primary w-full sm:w-auto disabled:opacity-50"
       >
         Continuer vers le budget

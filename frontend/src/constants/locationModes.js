@@ -66,7 +66,16 @@ export function formatMobilityLabel(mobility) {
   } else if (mobility.perimeterType === 'admin' && mobility.adminLabel) {
     parts.push(mobility.adminLabel);
   }
-  if (mobility.circuitLabel) {
+  if (Array.isArray(mobility.circuitLabels) && mobility.circuitLabels.length) {
+    parts.push(mobility.circuitLabels.filter(Boolean).join(', '));
+  } else if (Array.isArray(mobility.selectedCircuits) && mobility.selectedCircuits.length) {
+    parts.push(
+      mobility.selectedCircuits
+        .map((c) => c?.label)
+        .filter(Boolean)
+        .join(', ')
+    );
+  } else if (mobility.circuitLabel) {
     parts.push(mobility.circuitLabel);
   } else if (mobility.circuitType && mobility.circuitType !== 'other') {
     parts.push(String(mobility.circuitType).replace(/_/g, ' '));
