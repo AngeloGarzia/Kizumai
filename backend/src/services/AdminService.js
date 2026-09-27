@@ -178,6 +178,27 @@ export function createAdminService({
           throw new AppError('Le nombre de projets proposés doit être un entier entre 1 et 8', 400);
         }
       }
+      if (
+        k === 'ai_daily_token_limit' ||
+        k === 'ai_user_daily_token_limit'
+      ) {
+        const n = Number(value);
+        if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0 || n > 1_000_000_000) {
+          throw new AppError(
+            'La limite de tokens doit être un entier entre 0 (illimité) et 1 000 000 000',
+            400
+          );
+        }
+      }
+      if (k === 'ai_max_output_tokens') {
+        const n = Number(value);
+        if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1024 || n > 65_536) {
+          throw new AppError(
+            'Max tokens de sortie : entier entre 1024 et 65536',
+            400
+          );
+        }
+      }
 
       const row = await settingsRepository.upsert(k, String(value));
       return { key: row.key, value: row.value, updatedAt: row.updated_at };
@@ -192,6 +213,9 @@ export function createAdminService({
         'budget_eur_min',
         'budget_eur_max',
         'business_project_suggestions_count',
+        'ai_daily_token_limit',
+        'ai_user_daily_token_limit',
+        'ai_max_output_tokens',
       ]);
       if (protectedKeys.has(k)) {
         throw new AppError('Ce paramètre système ne peut pas être supprimé', 400);
@@ -502,12 +526,31 @@ export function createAdminService({
 
     async getAiUsage({ days = 30 } = {}) {
       const safeDays = Math.min(90, Math.max(1, Number(days) || 30));
+      const settings = await settingsRepository.getAsObject();
       const [totals, byDay, recent] = await Promise.all([
         aiUsageLogRepository.totals({ days: safeDays }),
         aiUsageLogRepository.summarizeByDay({ days: safeDays }),
         aiUsageLogRepository.findRecent({ limit: 40 }),
       ]);
-      return { totals, byDay, recent };
+      const dailyTokenLimit = Math.max(0, Math.floor(Number(settings.ai_daily_token_limit) || 0));
+      const userDailyTokenLimit = Math.max(
+        0,
+        Math.floor(Number(settings.ai_user_daily_token_limit) || 0)
+      );
+      const maxOutputTokens = Math.min(
+        65_536,
+        Math.max(1024, Math.floor(Number(settings.ai_max_output_tokens) || 16_384))
+      );
+      return {
+        totals,
+        byDay,
+        recent,
+        limits: {
+          dailyTokenLimit,
+          userDailyTokenLimit,
+          maxOutputTokens,
+        },
+      };
     },
   };
 }

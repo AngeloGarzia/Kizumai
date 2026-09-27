@@ -204,6 +204,9 @@ const PROTECTED_KEYS = new Set([
   'budget_eur_min',
   'budget_eur_max',
   'business_project_suggestions_count',
+  'ai_daily_token_limit',
+  'ai_user_daily_token_limit',
+  'ai_max_output_tokens',
 ]);
 
 const PROMPT_GROUPS = [
@@ -320,6 +323,11 @@ export default function Admin() {
   const [deletingUser, setDeletingUser] = useState(false);
   const [connections, setConnections] = useState([]);
   const [aiUsage, setAiUsage] = useState(null);
+  const [tokenLimitsDraft, setTokenLimitsDraft] = useState({
+    dailyTokenLimit: '0',
+    userDailyTokenLimit: '0',
+    maxOutputTokens: '16384',
+  });
   const [expandedUsageDays, setExpandedUsageDays] = useState(() => new Set());
   const [broadcast, setBroadcast] = useState({ title: '', body: '', url: '' });
   const [broadcasting, setBroadcasting] = useState(false);
@@ -334,7 +342,12 @@ export default function Admin() {
       settings.filter(
         (s) =>
           !catalogKeys.has(s.key) &&
-          !['ai_provider', 'ai_model', 'ai_temperature'].includes(s.key)
+          !['ai_provider', 'ai_model', 'ai_temperature'].includes(s.key) &&
+          ![
+            'ai_daily_token_limit',
+            'ai_user_daily_token_limit',
+            'ai_max_output_tokens',
+          ].includes(s.key)
       ),
     [settings, catalogKeys]
   );
@@ -469,10 +482,44 @@ export default function Admin() {
     try {
       const data = await adminService.getAiUsage(30);
       setAiUsage(data);
+      const lim = data?.limits || {};
+      setTokenLimitsDraft({
+        dailyTokenLimit: String(lim.dailyTokenLimit ?? 0),
+        userDailyTokenLimit: String(lim.userDailyTokenLimit ?? 0),
+        maxOutputTokens: String(lim.maxOutputTokens ?? 16384),
+      });
     } catch (err) {
       setError(err.message || `Impossible de charger la consommation ${ASSISTANT_NAME}`);
     } finally {
       if (!silent) setLoading(false);
+    }
+  };
+
+  const saveTokenLimits = async (e) => {
+    e.preventDefault();
+    setMessage('');
+    setError('');
+    setBusyKey('token-limits');
+    try {
+      await adminService.upsertAppSetting(
+        'ai_daily_token_limit',
+        String(Math.max(0, Math.floor(Number(tokenLimitsDraft.dailyTokenLimit) || 0)))
+      );
+      await adminService.upsertAppSetting(
+        'ai_user_daily_token_limit',
+        String(Math.max(0, Math.floor(Number(tokenLimitsDraft.userDailyTokenLimit) || 0)))
+      );
+      const out = Math.min(
+        65536,
+        Math.max(1024, Math.floor(Number(tokenLimitsDraft.maxOutputTokens) || 16384))
+      );
+      await adminService.upsertAppSetting('ai_max_output_tokens', String(out));
+      setMessage('Limites tokens enregistrées');
+      await loadAiUsage({ silent: true });
+    } catch (err) {
+      setError(err.message || 'Impossible d’enregistrer les limites tokens');
+    } finally {
+      setBusyKey('');
     }
   };
 
@@ -1105,6 +1152,113 @@ export default function Admin() {
 
             {tab === 'tokens' && aiUsage && (
               <div className="space-y-6">
+                <section className="rounded-2xl bg-white/80 border border-prune-100 p-5 space-y-4">
+                  <div>
+                    <h2 className="text-lg font-bold text-prune-900">Limites tokens</h2>
+                    <p className="text-sm text-prune-500 mt-1">
+                      Réglables à volonté. <span className="font-medium">0</span> = illimité pour
+                      les budgets journaliers. Appliqués immédiatement aux appels{' '}
+                      {ASSISTANT_NAME}.
+                    </p>
+                  </div>
+                  <form
+                    onSubmit={saveTokenLimits}
+                    className="grid gap-4 sm:grid-cols-3 sm:items-end"
+                  >
+                    <div>
+                      <label
+                        htmlFor="ai-daily-token-limit"
+                        className="block text-sm font-medium text-prune-800 mb-1"
+                      >
+                        Budget journalier global
+                      </label>
+                      <input
+                        id="ai-daily-token-limit"
+                        type="number"
+                        min={0}
+                        step={1000}
+                        className="input-field w-full font-mono text-sm"
+                        value={tokenLimitsDraft.dailyTokenLimit}
+                        onChange={(e) =>
+                          setTokenLimitsDraft((d) => ({
+                            ...d,
+                            dailyTokenLimit: e.target.value,
+                          }))
+                        }
+                      />
+                      <p className="text-xs text-prune-400 mt-1">
+                        Aujourd’hui :{' '}
+                        {Number(aiUsage.totals.tokensToday || 0).toLocaleString('fr-FR')}
+                        {Number(aiUsage.limits?.dailyTokenLimit) > 0
+                          ? ` / ${Number(aiUsage.limits.dailyTokenLimit).toLocaleString('fr-FR')}`
+                          : ' · illimité'}
+                      </p>
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="ai-user-daily-token-limit"
+                        className="block text-sm font-medium text-prune-800 mb-1"
+                      >
+                        Budget journalier / compte
+                      </label>
+                      <input
+                        id="ai-user-daily-token-limit"
+                        type="number"
+                        min={0}
+                        step={1000}
+                        className="input-field w-full font-mono text-sm"
+                        value={tokenLimitsDraft.userDailyTokenLimit}
+                        onChange={(e) =>
+                          setTokenLimitsDraft((d) => ({
+                            ...d,
+                            userDailyTokenLimit: e.target.value,
+                          }))
+                        }
+                      />
+                      <p className="text-xs text-prune-400 mt-1">
+                        {Number(aiUsage.limits?.userDailyTokenLimit) > 0
+                          ? `Plafond ${Number(aiUsage.limits.userDailyTokenLimit).toLocaleString('fr-FR')} tokens / user / jour`
+                          : 'Illimité par compte'}
+                      </p>
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="ai-max-output-tokens"
+                        className="block text-sm font-medium text-prune-800 mb-1"
+                      >
+                        Max tokens de sortie / requête
+                      </label>
+                      <input
+                        id="ai-max-output-tokens"
+                        type="number"
+                        min={1024}
+                        max={65536}
+                        step={256}
+                        className="input-field w-full font-mono text-sm"
+                        value={tokenLimitsDraft.maxOutputTokens}
+                        onChange={(e) =>
+                          setTokenLimitsDraft((d) => ({
+                            ...d,
+                            maxOutputTokens: e.target.value,
+                          }))
+                        }
+                      />
+                      <p className="text-xs text-prune-400 mt-1">Entre 1 024 et 65 536</p>
+                    </div>
+                    <div className="sm:col-span-3">
+                      <Button
+                        type="submit"
+                        disabled={busyKey === 'token-limits'}
+                        className="w-auto"
+                      >
+                        {busyKey === 'token-limits'
+                          ? 'Enregistrement…'
+                          : 'Enregistrer les limites'}
+                      </Button>
+                    </div>
+                  </form>
+                </section>
+
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {[
                     ['Aujourd’hui', aiUsage.totals.tokensToday, `${aiUsage.totals.requestsToday} req.`],

@@ -93,6 +93,13 @@ export function createSettingsService({ settingsRepository, aiPromptRepository }
         projectAuditPrompt: projectAuditPrompt?.content || null,
         businessCompetitionPrompt: businessCompetitionPrompt?.content || null,
         mobilityCircuitsPrompt: mobilityCircuitsPrompt?.content || null,
+        /** 0 = illimité */
+        dailyTokenLimit: Math.max(0, Math.floor(num(settings.ai_daily_token_limit, 0))),
+        userDailyTokenLimit: Math.max(0, Math.floor(num(settings.ai_user_daily_token_limit, 0))),
+        maxOutputTokensDefault: Math.min(
+          65_536,
+          Math.max(1024, Math.floor(num(settings.ai_max_output_tokens, 16_384)))
+        ),
       };
     },
 

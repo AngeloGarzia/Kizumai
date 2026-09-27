@@ -176,6 +176,32 @@ export const AiUsageLogRepository = {
     return mapTokenTotals(rows[0]);
   },
 
+  /** Tokens consommés aujourd’hui (Europe/Paris), global ou pour un user. */
+  async tokensToday({ userId = null } = {}) {
+    const uid = userId != null ? Number(userId) : null;
+    const params = [];
+    let userFilter = '';
+    if (Number.isFinite(uid)) {
+      params.push(uid);
+      userFilter = `AND COALESCE(l.user_id, p.user_id) = $1`;
+    }
+    const { rows } = await pool.query(
+      `SELECT
+         COALESCE(SUM(${TOKEN_TOTAL_EXPR}), 0)::bigint AS tokens_total,
+         COUNT(*)::int AS requests
+       FROM ai_usage_logs l
+       LEFT JOIN projects p ON p.id = l.project_id
+       WHERE (l.created_at AT TIME ZONE 'Europe/Paris')::date
+             = (NOW() AT TIME ZONE 'Europe/Paris')::date
+         ${userFilter}`,
+      params
+    );
+    return {
+      tokensTotal: Number(rows[0]?.tokens_total || 0),
+      requests: Number(rows[0]?.requests || 0),
+    };
+  },
+
   /**
    * Totaux tokens par user_id (carte userId → totaux) pour la liste admin.
    */

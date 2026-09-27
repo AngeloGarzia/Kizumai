@@ -78,8 +78,10 @@ export default function BottomNav() {
     if (item.id === 'path') {
       return (
         location.pathname === '/parcours' ||
+        location.pathname.startsWith('/parcours/') ||
         location.pathname.startsWith('/creer-son-avenir') ||
-        location.pathname.startsWith('/projet')
+        // /projet/:id… mais pas /projets
+        /^\/projet(\/|$)/.test(location.pathname)
       );
     }
     if (item.id === 'timeline') return location.pathname.startsWith('/fil-du-temps');

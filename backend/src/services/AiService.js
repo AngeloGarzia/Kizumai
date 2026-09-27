@@ -50,6 +50,36 @@ export function bindAiUsageLogRepository(repo) {
   aiUsageLogRepositoryRef = repo;
 }
 
+/** Vérifie les plafonds tokens admin (0 = illimité). */
+async function assertAiTokenBudgets(aiConfig) {
+  const dailyLimit = Number(aiConfig?.dailyTokenLimit) || 0;
+  const userLimit = Number(aiConfig?.userDailyTokenLimit) || 0;
+  if (dailyLimit <= 0 && userLimit <= 0) return;
+  if (!aiUsageLogRepositoryRef?.tokensToday) return;
+
+  if (dailyLimit > 0) {
+    const global = await aiUsageLogRepositoryRef.tokensToday();
+    if (global.tokensTotal >= dailyLimit) {
+      throw new AppError(
+        `Quota tokens journalier global atteint (${Number(global.tokensTotal).toLocaleString('fr-FR')} / ${dailyLimit.toLocaleString('fr-FR')}). Réessayez demain ou augmentez la limite en admin.`,
+        429
+      );
+    }
+  }
+
+  const ctx = getAiUsageContext();
+  const uid = ctx.userId != null ? Number(ctx.userId) : null;
+  if (userLimit > 0 && Number.isFinite(uid)) {
+    const user = await aiUsageLogRepositoryRef.tokensToday({ userId: uid });
+    if (user.tokensTotal >= userLimit) {
+      throw new AppError(
+        `Quota tokens journalier du compte atteint (${Number(user.tokensTotal).toLocaleString('fr-FR')} / ${userLimit.toLocaleString('fr-FR')}).`,
+        429
+      );
+    }
+  }
+}
+
 function recordAiUsageSafe(entry) {
   if (!aiUsageLogRepositoryRef?.create) return;
   const ctx = getAiUsageContext();
@@ -209,6 +239,7 @@ const INTERPOLATION_MAX = {
   status: 40,
   trigger: 80,
   creativity_directive: 900,
+  dig_deeper_directive: 1200,
 };
 
 /**
@@ -240,12 +271,14 @@ function creativityDirectiveFromTemperature(temperature) {
       'Interdit les idées « catalogue » trop génériques (dépôt-vente vague, coaching générique, e-commerce sans angle) sauf twist très net.',
       'Maximise la diversité entre les idées : secteurs et modèles économiques clairement distincts.',
       'Au moins la moitié des idées doivent surprendre positivement tout en restant lançables.',
+      'SÉVÉRITÉ : une idée originale risquée DOIT avoir des scores honesty-bas (feasibility / profitability) — pas de note haute « pour faire plaisir ».',
     ].join(' ');
   }
   return [
     `NIVEAU CRÉATIVITÉ : MOYEN (${rounded}) — équilibre.`,
     'Mix réalisme et différenciation.',
     'Au moins 1 idée parmi la liste doit sortir franchement du classique, les autres restent solides et crédibles.',
+    'Reste exigeant sur les scores : pas de plateau optimiste 60–80 sur tout le lot.',
   ].join(' ');
 }
 
@@ -489,8 +522,13 @@ async function rawChatText({
   googleSearch = false,
 }) {
   return withAiGuard(async () => {
+    await assertAiTokenBudgets(aiConfig);
     const startedAt = Date.now();
-    const outTokens = Math.min(65_536, Math.max(1024, Number(maxOutputTokens) || 16_384));
+    const fallbackOut = Number(aiConfig?.maxOutputTokensDefault) || 16_384;
+    const outTokens = Math.min(
+      65_536,
+      Math.max(1024, Number(maxOutputTokens) || fallbackOut)
+    );
     const requestTimeout = Math.min(300_000, Math.max(15_000, Number(timeoutMs) || AI_REQUEST_TIMEOUT_MS));
     // Grounding Google Search : pas de thinking / schema (conflits fréquents).
     const useGoogleSearch = Boolean(googleSearch) && providerId === 'gemini';
@@ -847,14 +885,16 @@ function normalizeBusinesses(raw) {
   return raw
     .slice(0, 12)
     .map((item) => {
-      const feasibility = normalizeFeasibility(item?.feasibility);
-      const competitionScore = normalizeFeasibility(
-        item?.competitionScore ?? item?.competition_score
+      const feasibility = compressOptimisticScore(normalizeFeasibility(item?.feasibility));
+      const competitionScore = inflateCompetitionSeverity(
+        normalizeFeasibility(item?.competitionScore ?? item?.competition_score)
       );
       const competitionLabel =
+        competitionLabelFromScore(competitionScore) ||
         String(item?.competitionLabel || item?.competition_label || '')
           .trim()
-          .slice(0, 40) || competitionLabelFromScore(competitionScore);
+          .slice(0, 40) ||
+        null;
       const competitionNote =
         String(item?.competitionNote || item?.competition_note || '')
           .trim()
@@ -865,13 +905,15 @@ function normalizeBusinesses(raw) {
         : competitionScore != null
           ? 'estimated'
           : null;
-      const profitabilityScore = normalizeFeasibility(
-        item?.profitabilityScore ?? item?.profitability_score
+      const profitabilityScore = compressOptimisticScore(
+        normalizeFeasibility(item?.profitabilityScore ?? item?.profitability_score)
       );
       const profitabilityLabel =
+        profitabilityLabelFromScore(profitabilityScore) ||
         String(item?.profitabilityLabel || item?.profitability_label || '')
           .trim()
-          .slice(0, 40) || profitabilityLabelFromScore(profitabilityScore);
+          .slice(0, 40) ||
+        null;
       const profitabilityNote =
         String(item?.profitabilityNote || item?.profitability_note || '')
           .trim()
@@ -908,32 +950,49 @@ function normalizeBusinesses(raw) {
     .filter((item) => item.title);
 }
 
-/** Score de predilection : installation + rendement − concurrence. */
+/**
+ * Tire vers le bas les scores trop flatteurs (faisabilité / rentabilité).
+ * Sous ~55 : inchangé. Au-dessus : compression progressive (plafond pratique ~78).
+ */
+function compressOptimisticScore(score) {
+  if (score == null || !Number.isFinite(Number(score))) return score;
+  const s = Math.min(100, Math.max(0, Math.round(Number(score))));
+  if (s <= 55) return s;
+  const t = (s - 55) / 45;
+  return Math.round(55 + t * 23);
+}
+
+/**
+ * Légère inflation de la concurrence perçue (sévérité) au-dessus de 35.
+ */
+function inflateCompetitionSeverity(score) {
+  if (score == null || !Number.isFinite(Number(score))) return score;
+  const s = Math.min(100, Math.max(0, Math.round(Number(score))));
+  if (s <= 35) return s;
+  const t = (s - 35) / 65;
+  return Math.min(100, Math.round(35 + t * 72));
+}
+
+/** Score de predilection : rentabilité > concurrence supportable > lançabilité. */
 function preferenceCompositeScore(b) {
-  const f = b?.feasibility != null && Number.isFinite(Number(b.feasibility))
-    ? Number(b.feasibility)
-    : 50;
+  const f =
+    b?.feasibility != null && Number.isFinite(Number(b.feasibility))
+      ? Number(b.feasibility)
+      : 45;
   const p =
     b?.profitabilityScore != null && Number.isFinite(Number(b.profitabilityScore))
       ? Number(b.profitabilityScore)
-      : 50;
+      : 45;
   const c =
     b?.competitionScore != null && Number.isFinite(Number(b.competitionScore))
       ? Number(b.competitionScore)
-      : 50;
-  return f * 0.35 + p * 0.4 + (100 - c) * 0.25;
+      : 55;
+  return p * 0.45 + (100 - c) * 0.35 + f * 0.2;
 }
 
-/** Assure des fabulousRank uniques 1…n (1 = préféré Fabulous). */
+/** Assure des fabulousRank uniques 1…n (1 = préféré Fabulous) — recalcule si besoin. */
 function ensureFabulousRanks(businesses) {
   if (!Array.isArray(businesses) || !businesses.length) return businesses;
-  const ranks = businesses.map((b) => b.fabulousRank);
-  const uniqueValid =
-    ranks.every((r) => r != null && r >= 1) &&
-    new Set(ranks).size === ranks.length;
-  if (uniqueValid) {
-    return [...businesses].sort((a, b) => a.fabulousRank - b.fabulousRank);
-  }
   const ordered = [...businesses].sort(
     (a, b) => preferenceCompositeScore(b) - preferenceCompositeScore(a)
   );
@@ -943,7 +1002,7 @@ function ensureFabulousRanks(businesses) {
     fabulousPickNote:
       b.fabulousPickNote ||
       (idx === 0
-        ? 'Meilleur équilibre installation / rentabilité / concurrence.'
+        ? 'Meilleur équilibre rentabilité / concurrence / lançabilité.'
         : null),
   }));
 }
@@ -1708,6 +1767,14 @@ export function createAiService({ settingsService, currencyService }) {
         '{{count}}',
         String(safeCount)
       );
+      const digDeeperDirective = [
+        'MÉTHODE — CREUSE LES MÉNINGES (obligatoire) :',
+        `1) Avant de répondre, explore mentalement AU MOINS ${safeCount * 3} pistes de business DISTINCTES (secteurs, modèles économiques, cibles, angles locaux ou digitaux).`,
+        '2) Pour chaque piste, challenge : demande réelle ? marge crédible ? acquisition clients ? saturation ? fit budget ?',
+        '3) Élimine sans pitié les idées catalogue, vagues, saturées ou à ROI fragile.',
+        `4) Ne mets dans le JSON QUE les ${safeCount} meilleures pistes survivantes — pas les premières qui te viennent.`,
+        '5) Chaque pitch/rationale doit montrer un angle concret (qui paie, pourquoi maintenant, comment gagner).',
+      ].join(' ');
       const template = aiConfig.userPromptTemplate || '';
       const interpolated = interpolate(template, {
         quoi: String(quoi || '').trim().slice(0, 300),
@@ -1720,13 +1787,24 @@ export function createAiService({ settingsService, currencyService }) {
         avoid: joinAvoid(avoid),
         count: safeCount,
         creativity_directive: creativityDirective,
+        dig_deeper_directive: digDeeperDirective,
       });
-      const withCreativity =
-        template.includes('{{creativity_directive}}')
-          ? interpolated
-          : `${interpolated}\n\n${creativityDirective}`;
-      const userContent = memCtx(withCreativity, memoryContext, aiConfig);
-      const data = await requestStepJson(userContent, { temperature });
+      let promptBody = interpolated;
+      if (!template.includes('{{creativity_directive}}')) {
+        promptBody = `${promptBody}\n\n${creativityDirective}`;
+      }
+      if (!template.includes('{{dig_deeper_directive}}')) {
+        promptBody = `${promptBody}\n\n${digDeeperDirective}`;
+      }
+      const userContent = memCtx(promptBody, memoryContext, aiConfig);
+      const data = await requestStepJson(userContent, {
+        temperature,
+        thinkingBudget: 4096,
+        maxOutputTokens: Math.max(
+          Number(aiConfig.maxOutputTokensDefault) || 16_384,
+          12_288
+        ),
+      });
       // Concurrence + faisabilité + rentabilité + rang Fabulous dans la même passe.
       return ensureFabulousRanks(normalizeBusinesses(data.businesses)).slice(0, safeCount);
     },

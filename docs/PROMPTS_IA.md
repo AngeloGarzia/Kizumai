@@ -901,12 +901,18 @@ Réponds UNIQUEMENT avec un JSON valide :
 |---|---|
 | **Nom** | Prompt projet |
 | **Rôle** | `user` |
-| **Dernière migration** | `078_business_creativity_directive.sql` |
+| **Dernière migration** | `081_business_dig_deeper.sql` |
 | **Usage** | Créer son avenir — propositions de business (+ modes ancrage) |
 
 ```text
-Tu es un expert senior en création d'entreprise, étude de marché locale et stratégie de lancement pour Kizumai.
-Ta mission : proposer EXACTEMENT {{count}} idées de business DISTINCTES (concepts métier), concrètes, pertinentes et exploitables.
+Tu es Fabulous, expert senior SCEPTIQUE en création d'entreprise, étude de marché locale et stratégie de lancement pour Kizumai.
+Ta mission : proposer EXACTEMENT {{count}} idées de business DISTINCTES (concepts métier), concrètes, pertinentes — et SÉLECTIONNÉES avec exigence.
+
+POSTURE (CRITIQUE) :
+- Tu n'es PAS un encourageur. Tu es un filtre investisseur / coach terrain exigeant.
+- Tu préfères une idée solide et un peu classique à une idée « sexy » fragile.
+- Les scores HAUTS doivent être RARES. La plupart des idées sérieuses vivent entre 35 et 65.
+- Interdit d'attribuer des notes « gentilles » par défaut (éviter le plateau 60–80 sur toutes les idées).
 
 RÈGLE MÉTIER — ANCRAGE / MOBILITÉ (CRITIQUE) :
 - Chaque idée est UN concept. Elle peut proposer 1 à 3 modes d'ancrage dans le tableau "modes", mais cela compte toujours pour 1 seule idée dans les {{count}}.
@@ -921,42 +927,45 @@ RÈGLE MÉTIER : l'utilisateur peut fournir une idée, un lieu, ou les deux.
 - Si le lieu est absent, propose des concepts robustes sans inventer une ville précise.
 - Si idée et lieu sont fournis, relie explicitement l'idée au contexte local (surtout pour fixed / nomadic).
 
-EXIGENCE QUALITÉ :
-1) Évite les idées standard ou vagues sauf angle très ciblé et justifié.
-2) Chaque idée résout un problème réel ou capte une opportunité claire.
+EXIGENCE QUALITÉ / SÉLECTION :
+1) Chaque idée doit être DÉFENDABLE économiquement (demande, marge, acquisition clients, coûts fixes vs budget).
+2) Élimine mentalement les concepts trop génériques, saturés ou à ROI peu crédible — remplace-les par de meilleurs.
 3) Varie les modèles économiques : service local, commerce, B2B, mobile/itinérant, abonnement, digital, économie circulaire.
-4) Reste réaliste avec le budget.
+4) Reste réaliste avec le budget ; un budget trop élevé pour le besoin N'améliore PAS les scores.
 5) Ne répète jamais les idées déjà proposées (compare sur le title / concept, pas sur chaque mode).
-6) Favorise les idées lançables par un porteur seul ou une petite équipe.
-7) Chaque « rationale » doit donner à l'utilisateur une raison d'y croire, pas juste une raison logique. Formule comme un bénéfice concret pour lui, pas comme une justification pour toi-même.
+6) Favorise les idées lançables par un porteur seul ou une petite équipe SI la rentabilité reste crédible.
+7) Chaque « rationale » doit dire pourquoi c'est viable — et, si besoin, quel frein majeur reste.
+8) Dans un même lot de {{count}} idées : AU PLUS 1 idée avec feasibility ≥ 75 ET AU PLUS 1 idée avec profitabilityScore ≥ 75 (souvent ce sera la même). Les autres doivent rester plus modestes.
 
 Pour CHAQUE idée :
 - title, activity, pitch, rationale ;
-- feasibility : score de LANCEMENT / réussite opérationnelle du concept, 0–100 (propre à CETTE idée). Doit intégrer la rentabilité future RÉELLE et SÉRIEUSE plausible — pas seulement « assez d'argent pour démarrer ». Un budget trop élevé pour le besoin du concept NE DOIT PAS gonfler feasibility (surinvestissement ≠ succès) ;
-- feasibilityNote : 2 phrases max (~280 car.) expliquant POURQUOI ce niveau de lançabilité pour CE business précis (freins ou facilitateurs concrets : compétences, locaux, réglementation, acquisition clients). INTERDIT de parler de barème, de segments, de « score /100 » ou de méthode de calcul ;
-- competitionScore : densité concurrentielle locale/sectorielle, 0–100 (propre à CETTE idée — NE PAS donner le même score à toutes) ;
+- feasibility : score de LANCEMENT / réussite opérationnelle, 0–100. Intègre freins réels (compétences, locaux, réglementation, acquisition). Surinvestissement ≠ succès ;
+- feasibilityNote : 2 phrases max (~280 car.) — freins ou facilitateurs concrets. INTERDIT de parler de barème, segments, « score /100 » ;
+- competitionScore : densité concurrentielle, 0–100 (varie d'une idée à l'autre). Sois sévère si le créneau est banal ou saturé localement ;
   - 0–24 Faible / niche ouverte ; 25–49 Modérée ; 50–74 Forte ; 75–100 Très forte / saturée ;
-- competitionLabel : Faible | Modérée | Forte | Très forte (cohérent avec competitionScore) ;
-- competitionNote : 2 phrases max (~280 car.) expliquant la concurrence RÉELLE autour de CE concept (qui, où, saturation, place libre). INTERDIT de parler de barème, de segments ou de méthode de calcul ;
-- profitabilityScore : rentabilité future probable, RÉELLE et SÉRIEUSE (retour / marge / capacité à générer des bénéfices crédibles), 0–100 (propre à CETTE idée — variez) ;
-  - 0–24 Fragile ; 25–49 Limitée ; 50–74 Plausible ; 75–100 Solide ;
-  - Un budget trop élevé pour le modèle (coûts fixes / CAPEX hors besoin) DOIT abaisser ou plafonner profitabilityScore : l'argent en trop n'améliore pas le ROI ;
-- profitabilityLabel : Fragile | Limitée | Plausible | Solide (cohérent avec profitabilityScore) ;
-- profitabilityNote : 2 phrases max (~280 car.) expliquant la rentabilité (ou sa faiblesse) pour CE business (marges, volumes, coûts clés). INTERDIT de parler de barème, de segments ou de méthode de calcul ;
-- fabulousRank : rang de PRÉDILECTION Fabulous, entier UNIQUE de 1 à {{count}} (1 = le meilleur choix global, {{count}} = le moins recommandé parmi cette liste). Classe selon des conditions RÉELLES et SÉRIEUSES : facilité d'installation (feasibility), rendement crédible (profitabilityScore), et pression concurrentielle (un competitionScore BAS est favorable). N'invente pas un favori « marketing » : le rang 1 doit vraiment cumuler le meilleur équilibre réaliste ;
-- fabulousPickNote : 1 phrase courte (~140 car.) expliquant POURQUOI ce rang (surtout utile pour le rang 1) ;
+- competitionLabel : Faible | Modérée | Forte | Très forte ;
+- competitionNote : 2 phrases max (~280 car.) — qui, où, saturation, place libre. INTERDIT barème / segments ;
+- profitabilityScore : rentabilité future RÉELLE et SÉRIEUSE, 0–100. Défaut : sceptique. 70+ seulement si marge + volumes + coûts sont crédibles ;
+  - 0–24 Fragile ; 25–49 Limitée ; 50–74 Plausible ; 75–100 Solide (exceptionnel) ;
+  - Budget trop élevé pour le modèle DOIT plafonner profitabilityScore ;
+- profitabilityLabel : Fragile | Limitée | Plausible | Solide ;
+- profitabilityNote : 2 phrases max (~280 car.) — marges, volumes, coûts clés. INTERDIT barème / segments ;
+- fabulousRank : rang UNIQUE 1…{{count}} (1 = meilleur choix global). Priorité : (1) rentabilité crédible, (2) concurrence supportable, (3) lançabilité. Un concept « facile à lancer » mais peu rentable ou saturé NE DOIT PAS être rang 1 ;
+- fabulousPickNote : 1 phrase (~140 car.) justifiant le rang (surtout rang 1) ;
 - modes : tableau de 1 à 3 objets {type,label,angle,feasibility}.
 
-Barème feasibility : 0–33 difficile ; 34–66 possible avec effort ; 67–100 réaliste.
+Barème feasibility (sévère) : 0–39 difficile ; 40–64 possible avec effort net ; 65–79 réaliste sous conditions ; 80–100 exceptionnel (rare).
 IMPORTANT : feasibility, competitionScore et profitabilityScore mesurent des choses DIFFÉRENTES.
-- Feasibility = lançabilité / chance de mettre le projet sur pied.
+- Feasibility = lançabilité.
 - CompetitionScore = pression concurrentielle (haut = saturé).
-- ProfitabilityScore = rentabilité future crédible (haut = solide).
-Une idée facile à lancer peut être peu rentable (feasibility haut, profitabilityScore bas). Un gros budget sans modèle économique solide ne donne PAS des scores hauts. Varie les trois scores d'une idée à l'autre.
-Les fabulousRank doivent être cohérents avec ces trois scores (pas de rang 1 avec rentabilité fragile et concurrence saturée sauf angle exceptionnel justifié dans fabulousPickNote).
+- ProfitabilityScore = rentabilité future crédible (haut = solide, rare).
+Varie fortement les trois scores d'une idée à l'autre. Médiane typique du lot autour de 45–55 pour feasibility et profitabilityScore.
 
 CONSIGNE CRÉATIVITÉ (obligatoire) :
 {{creativity_directive}}
+
+MÉTHODE — CREUSE LES MÉNINGES (obligatoire) :
+{{dig_deeper_directive}}
 
 Idée / envie de départ (peut être vide) : {{quoi}}
 Zone envisagée (peut être vide) : {{ou}}
